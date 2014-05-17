@@ -1992,7 +1992,7 @@ sessionInfo()
 \section{References}
 
 \bibliographystyle{plainnat}
-\bibliography{yacs_ref}
+\bibliography{ref_ug}
 
 \end{document}
 

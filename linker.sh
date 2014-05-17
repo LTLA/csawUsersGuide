@@ -26,4 +26,4 @@ methdir=/home/alun/AaronDocs/ChIP/busslinger/set/bam
 ln -s $methdir/H3K4me3_matureB_8070.bam h3k4me3_mat.bam
 ln -s $methdir/H3K4me3_matureB_8070.bam.bai h3k4me3_mat.bam.bai
 ln -s $methdir/H3K4me3_proB_8110.bam h3k4me3_pro.bam
-ln :s $methdir/H3K4me3_proB_8110.bam.bai h3k4me3_pro.bam.bai
+ln -s $methdir/H3K4me3_proB_8110.bam.bai h3k4me3_pro.bam.bai
