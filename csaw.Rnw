@@ -478,7 +478,6 @@ was used for this dataset so a value of 100 is appropriate.
 
 <<>>=
 demo <- windowCounts(bam.files, ext=frag.len, minq=100, dedup=TRUE)
-head(demo$counts)
 @
 
 On a more subjective note, reads on particular chromosomes can be specifically
@@ -559,7 +558,6 @@ face inward and are no more than \code{max.frag} apart.
 <<>>=
 petBamFile <- "example-pet.bam"
 demo <- windowCounts(petBamFile, max.frag=500, pet="both")
-head(demo$counts)
 @
 
 A suitable value for \code{max.frag} can be chosen by examining the
@@ -613,7 +611,6 @@ or for truly disastrous situations where paired-end sequencing has failed.
 
 <<>>=
 demo <- windowCounts(petBamFile, max.frag=500, pet="first")
-head(demo$counts)
 @
 
 Note that the paired-end methods in \pkgname{} depend on the synchronisation of
@@ -1262,6 +1259,7 @@ Poisson-distributed.
 
 <<>>=
 abundances <- aveLogCPM(data$counts, lib.size=data$totals*normfacs)
+length(abundances)
 summary(abundances)
 @
 
@@ -1321,20 +1319,24 @@ mean(unlist(max.collect))
 
 \section{By proportion}
 One approach is to to assume that only a certain proportion - say, 0.1\% - of
-the genome is genuinely bound. Only the top proportion of high-abundance
-windows are then retained. This approach is simple and has the practical
-advantage of maintaining a constant number of windows for the downstream
-analysis. However, it may not adapt well to different datasets where the
-relative proportion of binding can vary. The biological or technical 
-interpretation of this filter is also unclear.
+the genome is genuinely bound. The number of windows corresponding to these
+bound regions can be calculated based on the known \code{spacing} interval used
+in \code{windowCounts}. The top set of windows with the highest abundances can
+then be selected such that the size of the set is equal to the computed number.
 
 <<>>=
-spacing <- 50L
+spacing <- 50
 desired <- 0.001 
-max.windows <- sum(floor(seqlengths(data$region)/spacing))
-keep <- rank(abundances) > max.windows*(1-desired)
+genome.windows <- sum(seqlengths(data$region)/spacing)
+keep <- length(abundances) - rank(abundances) + 1 < genome.windows*desired
 sum(keep)
 @
+
+This approach is simple and has the practical advantage of maintaining a
+constant number of windows for the downstream analysis. However, it may not
+adapt well to different datasets where the relative proportion of binding can
+vary. Assuming an inappropriate percentage of binding will result in loss of 
+potential DB regions or excessive inclusion of background regions.
 
 \section{By global enrichment}
 An alternative approach involves choosing a filter based on enrichment over
@@ -1663,8 +1665,8 @@ indicative of a strong batch effect where the dispersions are large with
 minimal variability. A typical example would involve uncorrected differences in
 IP efficiency across replicates. In severe cases, the trended dispersion may
 fail to pass through the bulk of points as the variability is too low to be
-properly modelled in the QL framework. Alternative normalization methods may be
-necessary to resolve this issue (Section~\ref{sec:normbatch}).
+properly modelled in the QL framework. These batch effects are often caused
+by efficiency biases and can be removed with appropriate normalization.
 
 It is worth pointing out that the prior degrees of freedom should be robustly
 estimated \citep{phipson2013}. Obviously, this protects against large positive
@@ -1751,7 +1753,7 @@ $p$-value for each cluster based on the $p$-values the constituent windows
 observed across any sites within the region. The combined $p$-values are then
 converted to $q$-values using the BH method to control the region-level FDR. 
 
-\subsection{Clustering with external information}
+\section{Clustering with external information}
 Combined $p$-values can be computed for a predefined set of regions based on
 the windows overlapping those regions. The most obvious source of predefined
 regions is that of annotated features such as promoters or gene bodies.
@@ -1804,7 +1806,7 @@ more robust as each interval of the region is examined separately.
 % a new region is going to be arbitrary e.g. a slow decline in density from
 % high to low won't get picked up if you're looking for big differences.
 
-\subsection{Quick and dirty clustering}
+\section{Quick and dirty clustering}
 \label{sec:cluster}
 Clustering can also be quickly performed inside \pkgname{} with a simple
 single-linkage algorithm implemented in the \code{mergeWindows} function.  This
