@@ -47,7 +47,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 15 May 2014}
+Last revised 21 June 2014}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -126,14 +126,17 @@ design <- model.matrix(~factor(c('es', 'es', 'tn', 'tn')))
 colnames(design) <- c("intercept", "cell.type")
 @
 
-<<>>=
+<<keep.source=TRUE>>=
 require(csaw)
 data <- windowCounts(bam.files, ext=110)
-y <- DGEList(data$counts, lib.size=data$totals)
 binned <- windowCounts(bam.files, bin=TRUE, width=10000)
-y$samples$norm.factors <- normalizeChIP(binned$counts)
+normfacs <- normalizeChIP(binned$counts, binned$totals)
+
+require(edgeR)
+y <- DGEList(data$counts, lib.size=data$totals, norm.factors=normfacs)
 y <- estimateDisp(y, design)
 results <- glmQLFTest(y, design, robust=TRUE)
+
 merged <- mergeWindows(data$region, tol=1000L)
 tabcom <- combineTests(merged$id, results$table)
 @
@@ -1728,7 +1731,8 @@ interest. Interpretation of ChIP-seq experiments is more concerned with regions
 of the genome at which (differential) protein binding is found. In other words,
 the FDR across all detected \emph{regions} is usually desired. This is not
 equivalent to that across windows as each region will often consist of multiple
-overlapping windows. Control of one will not guarantee control of the other.
+overlapping windows. Control of one will not guarantee control of the other
+\citep{lun2014}.
 
 To illustrate this difference, consider an analysis where the FDR across all
 window positions is controlled at 10\%. In the results, there are 18 adjacent
