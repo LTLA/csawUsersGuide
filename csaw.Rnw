@@ -357,10 +357,11 @@ differential binding at all resolutions.
 % with variable sizes of enriched regions. Any given width will be optimized
 % for regions of a particular size so you might as well try out a bunch of
 % values. If an optimal non-zero width exists i.e. constant size regions, the
-% problem becomes that of trying to figure out the size. This is difficult for
-% diffuse regions where it is most needed (see autocorrelations). Using a
-% suboptimal value might reduce power but it shouldn't change the rankings of
-% the regions.
+% problem becomes that of trying to figure out the size. This is  easy for
+% sharp peaks where it's irrelevant (not much space between a small value and
+% zero) but hard diffuse regions where it is most needed (see
+% autocorrelations). Using a suboptimal value might reduce power but it
+% shouldn't change the rankings of the regions. 
 %
 % The argument for arbitrary resolution is akin to that when using a
 % microscope. Do you want to focus on the details or on the big picture? An
