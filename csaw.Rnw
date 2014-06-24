@@ -1722,7 +1722,7 @@ demonstration purposes.
 \chapter{Correction for multiple testing}
 
 \begin{combox}
-All right, we're almost there. This chapter needs the \code{results} list and
+All right, we're almost there. This chapter needs the \code{results} object 
 from the last chapter. You'll also need the filtered \code{data} list and the
 \code{frag.len} value from Chapter~\ref{chap:count}, as well as the the
 \code{broads} object from Chapter~\ref{chap:filter}. 
