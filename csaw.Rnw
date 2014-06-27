@@ -764,11 +764,10 @@ default values for most of the critical parameters except \code{bam.files},
 
 \section{Counting over manually specified regions}
 The \pkgname{} package focuses on counting reads into windows. However, it may
-be desirable on occassion to use the same conventions (e.g., duplicate
+be desirable on occasion to use the same conventions (e.g., duplicate
 removal, quality score filtering) when counting reads into pre-specified
-regions. This can be performed with the \code{regionCount} function, which is
-largely a wrapper for the \code{findOverlaps} function from the \granges{}
-package.
+regions. This can be performed with the \code{regionCounts} function, which is
+largely a wrapper for \code{findOverlaps} from the \granges{} package.
 
 <<>>=
 my.regions <- GRanges(c("chr11", "chr12", "chr15"),
