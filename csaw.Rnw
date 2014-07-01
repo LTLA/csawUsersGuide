@@ -1334,8 +1334,9 @@ of the corresponding libraries may be necessary to obtain sensible results.
 
 \begin{combox}
 This chapter will require \code{frag.len} and \code{data} defined in
-Chapter~\ref{chap:count}. We will also need the \code{normfacs} vector 
-and the \code{me.demo} object from Chapter~\ref{chap:norm}. 
+Chapter~\ref{chap:count}. We will also need the \code{normfacs} vector from
+Chapter~\ref{chap:norm}. Oh, and the \code{me.demo} list as well, just for a
+demonstration at the end of this chapter.
 \end{combox}
 
 \section{Independent filtering for count data}
@@ -1598,8 +1599,8 @@ When only a subset of genomic regions are of interest, DB detection  power can
 be improved by removing windows lying outside of these regions. Such regions
 could include promoters, enhancers, gene bodies or exons. The example below
 retrieves the coordinates of the broad gene bodies from the mouse genome,
-including the 3 kbp upstream of the TSS that represents the putative promoter
-region. 
+including the 3 kbp region upstream of the TSS that represents the putative
+promoter region for each gene. 
 
 <<>>=
 require(org.Mm.eg.db)
@@ -1732,6 +1733,8 @@ design
 @
 
 \section{Estimating the dispersions}
+
+\subsection{Stabilising estimates with empirical Bayes}
 \label{sec:dispest}
 Under the QL framework, both the QL and NB dispersions are used to model
 biological variability in the data \citep{lund2012}. The former ensures that
@@ -1882,7 +1885,7 @@ Chapter~\ref{chap:count}, as well as the \code{broads} object from
 Chapter~\ref{chap:filter}. 
 \end{combox}
 
-\section{Problems with false discovery control}
+\section{Problems with false discovery rate control}
 The false discovery rate (FDR) is usually the most appropriate measure of error
 for high-throughput experiments. Control of the FDR can be provided by applying
 the Benjamini-Hochberg (BH) method \citep{benjamini1995} to a set of
