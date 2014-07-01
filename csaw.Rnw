@@ -49,7 +49,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 21 June 2014}
+Last revised 1 July 2014}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -187,20 +187,21 @@ need are the \code{bam.files} that we defined in the introduction above.
 Sorted and indexed BAM (i.e. binary SAM) files are required as input into the
 read counting functions in \pkgname{}. Sorting should be performed on read
 position. Each index file should be named as \code{xxx.bam.bai} for the BAM
-file named \code{xxx.bam}. Users should be aware that the sensibility of the 
-index is not checked prior to counting. A common mistake is to replace or update
-the BAM file without updating the index. This will cause \pkgname{} to return
-incorrect results when it attempts to load alignments from new BAM file.
+file named \code{xxx.bam}. Both files should also be in the same directory.
+Users should be aware that the sensibility of the supplied index is not checked
+prior to counting. A common mistake is to replace or update the BAM file
+without updating the index. This will cause \pkgname{} to return incorrect
+results when it attempts to load alignments from new BAM file.
 
 \section{Counting reads into windows}
 
 \subsection{Overview}
-The \code{windowCounts} function counts fragments for a set of libraries using
-a sliding window approach. For single-end data, the fragment corresponding to a
-read is imputed by directionally extending each read to the average fragment
-length. The number of fragments overlapping a genomic window is counted. This
-is repeated after sliding the window along the genome to a new position.  A
-count is then obtained for each window in each library. 
+The \code{windowCounts} function uses a sliding window approach to count
+fragments for a set of libraries. For single-end data, the fragment
+corresponding to a read is imputed by directionally extending each read to the
+average fragment length. The number of fragments overlapping a genomic window
+is counted. This is repeated after sliding the window along the genome to a new
+position. A count is then obtained for each window in each library. 
 
 <<>>=
 frag.len <- 110
@@ -488,14 +489,13 @@ DB at all resolutions.
 
 \subsection{Filtering out low-quality reads}
 Reads that have been marked as PCR duplicates in the SAM flag can be ignored by
-setting \code{dedup=TRUE}. This can reduce the variability introduced by
+setting \code{dedup=TRUE}. This can reduce the variability caused by
 inconsistent duplication between replicates. However, it also caps the number
 of reads at each position. This can lead to loss of DB detection power in high
 abundance regions. Spurious differences may also be introduced when the same
 upper bound is applied to libraries of varying size. Thus, duplicate removal is
-not recommended for routine DB analyses. Of course, removal may not be
-avoidable in some cases, e.g., involving libraries generated from low
-quantities of DNA.
+not recommended for routine DB analyses. Of course, removal may be unavoidable
+in some cases, e.g., involving libraries generated from low quantities of DNA.
 
 Reads can also be filtered out based on the minimum mapping score with the
 \code{minq} argument. Low mapping scores are indicative of incorrectly and/or
@@ -535,8 +535,8 @@ Using \code{discard} is safer than simply ignoring windows that overlap the
 repeats. For example, a large window might contain both repeat regions and
 non-repeat regions. Discarding the window because of the former will compromise
 detection of DB features in the latter. Of course, any DB sites within the
-discarded regions will obviously not be detected during downstream analyses.
-Some caution is therefore required when specifying the regions of disinterest.
+discarded regions will obviously be lost from downstream analyses.  Some
+caution is therefore required when specifying the regions of disinterest.
 
 \subsection{Increasing speed and memory efficiency}
 The \code{spacing} parameter controls the distance with which windows are
@@ -555,14 +555,14 @@ For analyses with large windows, it is also worth increasing the \code{spacing}
 to a fraction of the specified \code{width}. This reduces the computational
 work by decreasing the number of windows and extracted counts. Any loss in
 spatial resolution due to a larger spacing interval is negligble when compared
-to that already lost by using a large window width. 
+to that already lost by using a large window size. 
 
 Windows with a low sum of counts across all libraries can be filtered out using
 the \code{filter} argument. This improves memory efficiency by discarding the
 majority of low-abundance windows corresponding to uninteresting background
 regions. The default filter value is set as the number of libraries multiplied
 by 5. This roughly corresponds to the minimum average count required for
-accurate downstream modelling. Note that more sophisticated filtering is
+accurate statistical modelling. Note that more sophisticated filtering is
 recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
 <<>>=
@@ -641,7 +641,7 @@ distribution above.
 demo <- windowCounts(petBamFile, max.frag=400, pet="both", ext=200, rescue.pairs=TRUE)
 @
 
-Paired-end data can also be treated as single end data by specifiying
+Paired-end data can also be treated as single-end data by specifiying
 \code{pet="first"} or \code{pet="second"}. This will only take the first or
 second read of each pair as defined in the SAM flags. Unlike
 \code{rescue.pairs}, the selection and use of one read is done for all read
@@ -662,12 +662,13 @@ prior to the use of \pkgname{}.
 \label{sec:ccf}
 Cross-correlation plots can be generated directly from BAM files using the
 \code{correlateReads} function. This provides a measure of the
-immunoprecipitation (IP) efficiency of an experiment \citep{kharchenko2008}.
-Efficient IP should yield a smooth peak at a distance corresponding to the
-average fragment length. This reflects the strand-dependent bimodality of reads
-around narrow regions of enrichment, e.g., TF binding sites. The location of
-the peak can be used as an estimate of the average fragment length ($\sim$110
-bp below) for read extension. 
+immunoprecipitation (IP) efficiency of a ChIP-seq experiment
+\citep{kharchenko2008}. Efficient IP should yield a smooth peak at a distance
+corresponding to the average fragment length. This reflects the
+strand-dependent bimodality of reads around narrow regions of enrichment, e.g.,
+TF binding sites. The location of the peak can be used as an estimate of the
+average fragment length ($\sim$110 bp below) for read extension in 
+\code{windowCounts}. 
 
 % Note that this makes some assumptions about the shape of each peak. In
 % particular, it assumes that the peaks are symmetrical so that the distance
@@ -706,7 +707,7 @@ length peak will not be visible as a separate entity.
 % length. A spike at zero is not observed as duplicates are removed.
 
 Cross-correlation plots can also be used for fragment length estimation of
-punctate histone marks such as histone acetylation and H3K4 methylation.
+narrow histone marks such as histone acetylation and H3K4 methylation.
 However, they are less effective for regions of diffuse enrichment where
 bimodality is not obvious (e.g. H3K27 trimethylation).
 
@@ -725,9 +726,9 @@ h3ac <- correlateReads("h3ac.bam", n, dedup=TRUE, cross=TRUE)
 h3k27me3 <- correlateReads("h3k27me3.bam", n, dedup=TRUE, cross=TRUE)
 h3k4me2 <- correlateReads("h3k4me2.bam", n, dedup=TRUE, cross=TRUE)
 plot(0:n, h3ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
-    xlab="Delay (bp)", ylab="CCF", pch=16, cex=0.5)
-points(0:n, h3k27me3, col="red", pch=16, cex=0.5)
-points(0:n, h3k4me2, col="forestgreen", pch=16, cex=0.5)
+    xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
+lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
+lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
 legend("topright", col=c("blue", "red", "forestgreen"),
     c("H3Ac", "H3K27me3", "H3K4me2"), pch=16)
 @
@@ -741,9 +742,9 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 \end{center}
 
 \section{Ensuring synchronisation}
-In practice, most ChIP-seq analysis pipelines based on \pkgname{} will involve
-multiple calls to the \code{windowCounts} function. Users should supply the
-same values for the \code{bam.files}, \code{dedup}, \code{pet}, \code{minq},
+In practice, most ChIP-seq analyses using \pkgname{} will involve multiple
+calls to the \code{windowCounts} function. Users should supply the same values
+for the \code{bam.files}, \code{dedup}, \code{pet}, \code{minq},
 \code{restrict}, \code{discard} and (for paired-end data) \code{max.frag} and
 \code{rescue.pairs} parameters at each call.  This ensures that the same reads
 are being used for counting throughout the analysis. For complex analyses, this
@@ -758,11 +759,14 @@ demo <- countWindows(param, bin=TRUE, width=1000)
 
 This strategy avoids the need for repeated manual specification of non-default
 arguments at each function call. Global changes can then be implemented by
-altering the contents of \code{param} directly. That said, for the sake of
-simplicity, the examples in the rest of this guide will use the
-\code{windowCounts} function. This performs read counting with the default
-values for most of the critical parameters except for \code{bam.files},
-\code{ext} and \code{width} (see the call to generate \code{data}, above).
+altering the contents of \code{param} directly. A good check for
+synchronisation is to ensure that the values of \code{...\$totals} are
+identical between calls. This means that the same reads are extracted from the
+BAM file in each call. For simplicity, the examples in the rest of this guide
+will use the \code{windowCounts} function.  This performs read counting with
+the default values for most of the critical parameters except for
+\code{bam.files}, \code{ext} and \code{width} (see the call to generate
+\code{data}, above).
 
 \section{Counting over manually specified regions}
 The \pkgname{} package focuses on counting reads into windows. However, it may
@@ -773,7 +777,8 @@ largely a wrapper for \code{findOverlaps} from the \granges{} package.
 
 <<>>=
 my.regions <- GRanges(c("chr11", "chr12", "chr15"),
-    IRanges(c(75461351, 95943801, 21656501), c(75461610, 95944810, 21657610)))
+    IRanges(c(75461351, 95943801, 21656501), 
+    c(75461610, 95944810, 21657610)))
 reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, minq=100, dedup=TRUE)
 reg.counts$counts
 @ 
@@ -793,6 +798,7 @@ are just for demonstration purposes and aren't necessary for the main example.
 \section{Eliminating composition biases}
 
 \subsection{Using the TMM method on binned counts}
+\label{sec:compo_norm}
 As the name suggests, composition biases are formed when there are differences
 in the composition of sequences across libraries. Highly enriched regions
 consume more sequencing resources and thereby suppress the representation of
@@ -817,17 +823,17 @@ The TMM method trims away putative DB bins (i.e., those with extreme M-values)
 and computes normalization factors from the remainder to use in \edger{}. The
 size of each library is scaled by the corresponding factor to obtain an
 effective library size for modelling. A larger normalization factor results in
-a larger effective library size and is conceptually equivalent to scaling
-each individual count downwards (as the ratio of that count to the library size
-will be smaller). Check out the \edger{} user's guide for more information.
+a larger effective library size and is conceptually equivalent to scaling each
+individual count downwards, given that  the ratio of that count to the library
+size will be smaller. Check out the \edger{} user's guide for more information.
 
 Note that \code{normalizeChIP} skips the precision weighting step in the TMM
-method. Weighting increases the contribution of bins with high counts.
-However, these bins are more likely to contain binding sites and thus are more
-likely to be DB. If any DB regions should survive trimming (e.g. those with
-less extreme fold changes), upweighting them would then be counterproductive.
-In fact, users may wish to explicitly filter out such bins and run TMM only on
-putative background regions, as shown below.
+method by default. Weighting increases the contribution of bins with high
+counts.  However, these bins are more likely to contain binding sites and thus
+are more likely to be DB. If any DB regions should survive trimming (e.g.,
+those with less extreme fold changes), upweighting them would be
+counterproductive. In fact, users may wish to explicitly filter out such bins
+and run TMM only on putative background regions, as shown below.
 
 <<>>=
 ab <- aveLogCPM(binned$counts, lib.size=binned$total)
@@ -1072,6 +1078,7 @@ for (i in 1:(length(bam.files)-1)) {
 \end{center}
 
 \section{Eliminating efficiency biases}
+\label{sec:eff_norm}
 Efficiency biases are commonly observed in ChIP-seq data. This refers to fold
 changes in enrichment that are introduced by variability in IP efficiencies
 between libraries. These technical differences are of no biological interest
@@ -1079,8 +1086,9 @@ and must be removed. This can be achieved by assuming some top percentage of
 bins or windows with the highest abundances contain binding sites. The TMM
 method can then be applied to eliminate systematic differences in the counts
 across those bins. In the example below, the top 1\% of bins are assumed to
-contain binding sites. For consistency, the same bin size is used here though
-the counts for binding sites should be high enough for smaller bins.
+contain binding sites. For consistency, the bin size in
+Section~\ref{sec:compo_norm} is re-used here though the counts for binding
+sites should be high enough for smaller bins.
 
 <<strip.white=false>>=
 me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
@@ -1107,13 +1115,12 @@ ac.norm
 % peaks which get caught by multiple windows, but everyone should have high
 % abundances at this point so it shouldn't matter.
 
-This method assumes that most high-abundance bins are not DB. Any changes must
-be due to differences in IP efficiency, or caused by some other uninteresting
-technical issue. Genuine biological differences may be removed when the
-assumption of a non-DB majority does not hold, i.e., overall enrichment is
-truly lower for one condition. Also, the percentage of bins to use for
-normalization may not be obvious if there is no obvious demarcation on a MA
-plot.
+This method assumes that most high-abundance bins are not DB. Any systematic
+changes must be caused by differences in IP efficiency or some other technical
+issue. Genuine biological differences may be removed when the assumption of a
+non-DB majority does not hold, i.e., overall binding is truly lower in one
+condition. Also, the percentage of bins to use for normalization may not be
+obvious if there is no obvious demarcation on a MA plot.
 
 Speaking of which, the results of normalization can again be visualized with MA
 plots. Of particular interest is the cloud of points on the plot at high
@@ -1164,14 +1171,13 @@ non-linear methods are required such as cyclic loess or quantile normalization.
 
 One such implementation is provided in \code{normalizeChIP} by setting
 \code{type="loess"}. This is based on the fast loess algorithm
-\citep{ballman2004} with minor adaptations to count data. It can be applied
-after some filtering to remove low-abundance regions where the loess curve
-fitting is not accurate. An offset matrix is then produced that contains the
-log-effective library sizes for each supplied bin/window. This can be supplied
-to the statistical methods in \edger{}, assuming that said bins or windows are
-also the ones to be tested for DB. The example below performs non-linear
+\citep{ballman2004} with minor adaptations to count data. An offset matrix is
+produced that contains the log-effective library sizes for each supplied
+bin/window. This can be used in \edger{}, assuming that said bins or windows
+are also the ones to be tested for DB. The example below performs non-linear
 normalization on the counts for smaller bins, of which the top 5\% are assumed
-to contain binding sites.
+to contain binding sites. Some filtering is necessary to remove low-abundance
+regions where loess curve fitting is inaccurate. 
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
@@ -1186,9 +1192,9 @@ Any abundance-dependent trend in the M-values should be eliminated. If
 filtering needs to be performed prior to normalization, the average count
 computed by \code{aveLogCPM} is strongly recommended as the filter statistic
 (see Chapter~\ref{chap:filter} for more detail on choices of filter value).
-This is because an average count threshold will act as a vertical cutoff in the
-plots below. Thus, spurious trends that might affect normalization are not
-introduced.
+This is because an average count threshold will act as a clean vertical cutoff
+in the plots below. Thus, spurious trends that might affect normalization are
+not introduced.
 
 <<eval=FALSE,keep.source=true,label=trendplot>>=
 par(mfrow=c(1,2))
@@ -1314,7 +1320,7 @@ for (top in c(100, 500, 1000, 5000)) {
 Replicates from different groups should form separate clusters in the plot.
 This indicates that the results are reproducible and that the effect sizes are
 large. Mixing between replicates of different conditions indicates that the
-biological difference has no effect on protein binding, or the data is too
+biological difference has no effect on protein binding, or that the data is too
 variable for any effect to manifest. Any outliers should also be noted as their
 presence may confound the downstream analysis. In the worst case, the removal
 of the corresponding libraries may be necessary to obtain sensible results.
@@ -1328,26 +1334,28 @@ of the corresponding libraries may be necessary to obtain sensible results.
 
 \begin{combox}
 This chapter will require \code{frag.len} and \code{data} defined in
-Chapter~\ref{chap:count}. We will also need the \code{normfacs} vector from
-Chapter~\ref{chap:norm}. 
+Chapter~\ref{chap:count}. We will also need the \code{normfacs} vector 
+and the \code{me.demo} object from Chapter~\ref{chap:norm}. 
 \end{combox}
 
 \section{Independent filtering for count data}
 Many of the low abundance windows in the genome correspond to background
 regions in which DB is not expected. Indeed, windows with low counts will not
-provide enough evidence against the null hypothesis to obtain low $p$-values.
-Similarly, some statistical approximations will fail at low counts.  Removing
-such uninteresting or ineffective tests reduces the severity of the multiple
-testing correction, increases detection power amongst the remaining tests and
-reduces computational work.
+provide enough evidence against the null hypothesis to obtain sufficiently low
+$p$-values for DB detection. Similarly, some approximations used in the
+statistical analysis will fail at low counts. Removing such uninteresting or
+ineffective tests reduces the severity of the multiple testing correction,
+increases detection power amongst the remaining tests and reduces computational
+work.
 
 Filtering is valid so long as it is independent of the test statistic under the
 null hypothesis \citep{bourgon2010}. In the negative binomial (NB) framework,
 this (probably) corresponds to filtering on the overall NB mean. The DB
-$p$-values retained after filtering should then be uniform, assuming analogous
-behaviour to the normal case. Row sums can also be used for datasets where the
-effective library sizes are not very different or where the counts are assumed
-to be Poisson-distributed between biological replicates.
+$p$-values retained after filtering should be uniform under the null
+hypothesis, assuming analogous behaviour to the normal case. Row sums can also
+be used for datasets where the effective library sizes are not very different
+or where the counts are assumed to be Poisson-distributed between biological
+replicates. 
 
 <<>>=
 abundances <- aveLogCPM(data$counts, lib.size=data$totals*normfacs)
@@ -1451,10 +1459,10 @@ As the threshold is computed for large bins, it needs to be scaled for a proper
 comparison to window abundances. If one assumes that reads are uniformly
 distributed in background regions, the threshold can be directly scaled down
 based on differences in the size of the read counting interval between windows
-and bins. For counts obtained with read extension, the size of the interval is
-equal to \code{ext + width}. Only one \code{ext} is added because expansion of
-the interval by read extension is strand-specific, i.e., only forward-mapping
-reads are counted on the left of the window and only reverse-mapping reads are
+and bins. For windows with read extension, the size of the interval is equal to
+\code{ext + width}. Only one \code{ext} is added because the expansion of the
+interval by read extension is strand-specific, i.e., only forward-mapping reads
+are counted on the left of the window and only reverse-mapping reads are
 counted on the right.
 
 % It's only ext, because we only count the reads on one strand in each side, so
@@ -1502,8 +1510,8 @@ abline(v=threshold, col="red")
 Of course, the pre-specified minimum fold change may be too aggressive when
 binding is weak. For TF data, a large cut-off works well as narrow binding
 sites will have high read densities and are unlikely to be lost during
-filtering.  Smaller minimum fold changes are recommended for regions of diffuse
-enrichment where the difference to background is less obvious. 
+filtering. Smaller minimum fold changes are recommended for diffuse marks
+where the difference from background is less obvious. 
 
 \section{By local enrichment}
 
@@ -1562,12 +1570,12 @@ count and avoids distortion of the type I error rates due to data snooping.
 \subsection{With negative controls}
 Negative controls for ChIP-seq refer to input or IgG libraries where the IP
 step has been skipped or compromised, respectively. This accounts for
-sequencing and mapping biases in ChIP-seq data. IgG controls also provide a
-measure of non-specific enrichment over the genome. These libraries are largely
-irrelevant when testing for DB. However, they can be used to filter out windows
-with an average count in the ChIP sample below that of the control.  The dummy
-example below requires a 5-fold or greater increase over the control to retain
-the window.
+sequencing/mapping biases in ChIP-seq data. IgG controls also quantify the
+amount of non-specific enrichment throughout the genome. These controls are
+mostly irrelevant when testing for DB between ChIP samples. However, they can
+be used to filter out windows with an average count in the ChIP sample below
+that of the control. The dummy example below requires a 5-fold or greater
+increase over the control to retain the window.
 
 <<eval=FALSE>>=
 in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
@@ -1576,12 +1584,22 @@ control <- aveLogCPM(in.demo$counts[,5], lib.size=in.demo$totals[5])
 keep <- chip > control + log2(5)
 @
 
+It is worth mentioning that the \pkgname{} pipeline can also be applied to
+search for ``DB'' between ChIP libraries and control libraries. The ChIP and
+control libraries can be treated as separate groups, in which most ``DB''
+events are expected to be enriched in the ChIP samples. If this is the case,
+the filtering procedure described above is inappropriate as it will select for
+windows with differences between ChIP and control samples. This compromises the
+assumption of the null hypothesis during testing, resulting in loss of type I
+error control.
+
 \section{By prior information}
-When only a subset of genomic regions are of interest, power can be improved by
-removing windows lying outside of these regions. This could include promoters,
-enhancers, gene bodies or exons. The example below retrieves the coordinates of
-the broad gene bodies from the mouse genome after extending each $5'$ end by 3
-kbp to include the putative promoter region. 
+When only a subset of genomic regions are of interest, DB detection  power can
+be improved by removing windows lying outside of these regions. Such regions
+could include promoters, enhancers, gene bodies or exons. The example below
+retrieves the coordinates of the broad gene bodies from the mouse genome,
+including the 3 kbp upstream of the TSS that represents the putative promoter
+region. 
 
 <<>>=
 require(org.Mm.eg.db)
@@ -1598,8 +1616,8 @@ head(broads)
 Windows can be filtered to only retain those which overlap with the regions of
 interest. Discerning users may wish to distinguish between full and partial
 overlaps, though this should not be a significant issue for small windows.
-Overlapping can also be combined with abundance filtering to obtain windows
-that contain binding sites in the regions of interest.
+This could also be combined with abundance filtering to retain windows that
+contain binding sites in the regions of interest.
 
 <<>>=
 suppressWarnings(keep <- overlapsAny(data$region, broads))
@@ -1608,9 +1626,39 @@ sum(keep)
 
 Any information used here should be independent of the DB status under the null
 in the current dataset. For example, DB calls from a separate dataset and/or
-independent annotation can be used without too many problems. However, using DB
-calls from the same dataset to filter regions would violate the null assumption
-and compromise type I error control.
+independent annotation can be used without problems. However, using DB calls
+from the same dataset to filter regions would violate the null assumption and
+compromise type I error control.
+
+\section{Relationship between filtering and normalization}
+Note that the NB mean computed by \code{aveLogCPM} depends on the correct
+specification of the library sizes. In the example above, the effective library
+sizes after normalization are used after multiplying by \code{normfacs}. This
+ensures that composition biases are considered when computing the average
+count. In other situations, this may result in some circular dependencies when
+filtering is also required prior to normalization, e.g., normalization for
+efficiency biases in Section~\ref{sec:eff_norm}. Inquisitive users may wish to
+perform multiple iterations of filtering/normalization to ensure that the
+results are self-consistent. 
+
+<<>>=
+for (it in 1:3) {
+    ab <- aveLogCPM(me.demo$counts, lib.sizes=me.demo$total*me.norm)
+    keep <- rank(ab) > 0.99*length(ab)
+    me.norm <- normalizeChIP(me.demo$count[keep,], lib.sizes=me.demo$totals)
+    cat("Iteration is", it, "\n")
+    print(me.norm)
+}
+@
+
+It is worth noting that the \code{aveLogCPM} function also depends on the
+estimated NB dispersion (see Chapter~\ref{chap:stats}). However, dispersion
+estimation can only proceed after normalization and filtering. This results in
+another circular dependency that is resolved/ignored by having a ``near
+enough is good enough'' philosophy, i.e., using a sensible but otherwise
+arbitrary value for the NB dispersion in \code{aveLogCPM}. The alternative
+would be to iterate over the entire analysis which would be prohibitively
+time-consuming in most circumstances.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1656,8 +1704,8 @@ First, a \code{DGEList} object must be formed from the count matrix. Additional
 information like the library size and the normalization factors should be
 included. For this analysis, the \code{normfacs} vector from TMM normalization
 of background bins is used. If an offset matrix is necessary (e.g., from
-non-linear normalization), this can be assigned into \code{y\$offset} for use
-in downstream functions.
+non-linear normalization), this can be assigned into \code{y\$offset} for later
+use in the various \edger{} functions.
 
 <<>>=	
 y <- DGEList(data$counts, lib.size=data$totals, norm.factors=normfacs)
@@ -1667,17 +1715,17 @@ Observant readers will notice that the library size here and in all calls to
 \code{normalizeChIP} and \code{aveLogCPM} is set to \code{...\$totals}.  This
 is critical as it ensures consistency between normalization, filtering and the
 downstream statistical processing, i.e., the same library sizes should be used
-throughout all steps.  The \code{totals} vector is typically used as it is
-constant for all window/bin sizes with any given dataset/read extraction
-parameters. Simply taking the column sums is usually inappropriate due to
-overlaps between windows and the effects of filtering.
+throughout all steps.  The \code{totals} vector is used as it is constant for
+all window/bin sizes with any given dataset/read extraction parameters. Simply
+taking the column sums is inappropriate due to overlaps between windows and the
+effects of filtering.
 
 The experimental design is described by a design matrix. In this case, the only
 relevant factor is the cell type of each sample. A generalized linear model
-(GLM) will then be fitted to the counts for each window using the specified
-design matrix \citep{mccarthy2012}. This provides a general framework for the
-analysis of complex experiments with multiple factors. Readers are referred to
-the user's guide in \edger{} for more details on parametrization.
+(GLM) will be fitted to the counts for each window using the specified design
+matrix \citep{mccarthy2012}. This provides a general framework for the analysis
+of complex experiments with multiple factors. Readers are referred to the
+user's guide in \edger{} for more details on parametrization.
 
 <<>>=
 design
@@ -1686,12 +1734,12 @@ design
 \section{Estimating the dispersions}
 \label{sec:dispest}
 Under the QL framework, both the QL and NB dispersions are used to model
-biological variability in the data. The former ensures that the NB
-mean-variance relationship is properly specified with appropriate contributions
-from the Poisson and Gamma components. The latter accounts for variability and
-uncertainty in the dispersion estimate. However, limited replication in most
-ChIP-seq experiments means that each window does not contain enough information
-for precise estimation of either dispersion. 
+biological variability in the data \citep{lund2012}. The former ensures that
+the NB mean-variance relationship is properly specified with appropriate
+contributions from the Poisson and Gamma components. The latter accounts for
+variability and uncertainty in the dispersion estimate. However, limited
+replication in most ChIP-seq experiments means that each window does not
+contain enough information for precise estimation of either dispersion. 
 
 % Both parameters need to be estimated for optimal performance; using too high
 % a value for the NB dispersion means that the QL dispersion can't recover (as
@@ -1742,8 +1790,9 @@ as mapping errors and PCR duplicates at low counts. It is difficult to
 accurately fit an empirical curve to these strong trends.  Inaccurate fitting
 means that the dispersions at high abundances are often overestimated. Users
 should check whether removal of the low abundance regions affects the
-dispersion estimate. Large differences imply that further abundance-based
-filtering may be desirable, as described in Chapter~\ref{chap:filter}.
+dispersion estimate. Large changes upon removal imply that more aggressive
+abundance-based filtering may be desirable, as described in
+Chapter~\ref{chap:filter}.
 
 <<label=rmchecker,eval=FALSE>>=
 yo <- DGEList(original$counts, lib=original$total, norm=normfacs)
@@ -1766,11 +1815,10 @@ legend("topright", c("raw", "filtered"), col=c("black", "grey"), lwd=2)
 \subsection{Modelling heteroskedasticity}
 The heteroskedasticity of the data is modelled in \edger{} by the prior degrees
 of freedom (d.f.). A large value for the prior d.f. indicates that
-heteroskedasticity is low. More EB shrinkage can be performed to reduce
-uncertainty and maximize power when the dispersions are not variable. However,
-strong shrinkage is not appropriate if the dispersions are highly variable.
-Lower prior degrees of freedom (and less shrinkage) is required to maintain
-type I error control. 
+heteroskedasticity is low. This means that more EB shrinkage can be performed
+to reduce uncertainty and maximize power. However, strong shrinkage is not
+appropriate if the dispersions are highly variable. Fewer prior degrees of
+freedom (and less shrinkage) is required to maintain type I error control. 
 
 <<>>=
 summary(results$df.prior)
@@ -1791,6 +1839,9 @@ dispersions at low counts. These will manifest as large negative outliers after
 a log transformation step during estimation \citep{smyth2004}. Without robust
 estimation, incorporation of these outliers will inflate the observed
 variability in the dispersions and reduce DB detection power.
+
+% If you've forgetten, you get near-zero dispersions because counts can be
+% exactly equal.
 
 \section{Testing for DB windows}
 The effect of specific factors can be tested to identify windows with
@@ -1907,8 +1958,8 @@ which are identically DB in opposite directions. Counting reads across the
 promoter will give equal counts for each group so changes within the promoter
 will not be detected. For peaks, imprecise boundaries for the called peaks can
 lead to loss of DB detection power due to ``contamination'' by reads from
-background regions. In both cases, window-based methods are more robust as each
-interval of the promoter/peak region is examined separately.
+background regions. In both cases, window-based methods may be more robust as each
+interval of the promoter/peak region is examined separately \citep{lun2014}.
 
 % Same problems for DB shifting or shrinkage, or even noisy background where
 % the surrounding non-NB regions contaminate the DB enriched signal.  The only
@@ -2005,9 +2056,9 @@ However, sign-based filtering is not recommended as the sign of windows within
 each cluster is not independent of their DB status. Windows in a genuine DB
 region will form one cluster (consistent sign) whereas those in non-DB regions
 will form many clusters (inconsistent sign, as the log-fold change is small).
-This results in more large $p$-values and conservativeness. Furthermore, any
-attempt to filter away small clusters will cause liberalness if too many large
-$p$-values are lost.
+This results in conservativeness as more clusters will have large $p$-values.
+Furthermore, any attempt to filter away small clusters will cause liberalness
+if too many large $p$-values are lost.
 
 \chapter{Post-processing steps}
 
@@ -2044,7 +2095,7 @@ are labelled as exon \code{0} whereas introns are labelled as \code{I}. For
 \code{left} and \code{right}, an additional \code{DISTANCE} field is included
 which indicates the gap between the annotated feature and the supplied region.
 
-While the string representation is space-saving, it is not easy to work with.
+While the string representation is saves space, it is not easy to work with.
 If the annotation needs to manipulated directly, users can obtain it from the
 \code{detailRanges} command by not specifying the regions of interest. This can
 then be used for overlapping, e.g., to identify the genes containing DB sites
@@ -2056,9 +2107,9 @@ head(anno.ranges)
 @
 
 \section{Saving the results to file}
-It is then a simple matter to save the results. This is done here in the
-\code{*.tsv} format where all detail is preserved. Compression is used to
-reduce the file size. Of course, other formats can be used depending on the
+It is a simple matter to save the results for later perusal. This is done here
+in the \code{*.tsv} format where all detail is preserved. Compression is used
+to reduce the file size. Of course, other formats can be used depending on the
 purpose of the file, e.g., exporting to BED files through the \rtracklayer{}
 package for visual inspection of the data with genomic browsers.
 
@@ -2098,8 +2149,8 @@ for (i in 1:length(bam.files)) {
 While there are definitely more sophisticated (and prettier) visualization
 methods available, the \code{plotRegion} function is provided as it uses the
 same read extraction parameters (e.g., \code{minq}, \code{dedup}) as
-\code{windowCounts}. Thus, it can be used to ensure that the visualization
-result is consistent with the analysis.
+\code{windowCounts}. Thus, it can be used to ensure that the visualized
+data is consistent with the analysis.
 
 \chapter{Epilogue}
 
