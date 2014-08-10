@@ -49,7 +49,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 1 July 2014}
+Last revised 9 August 2014}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -205,7 +205,8 @@ position. A count is then obtained for each window in each library.
 
 <<>>=
 frag.len <- 110
-data <- windowCounts(bam.files, ext=frag.len, width=10)
+window.width <- 10
+data <- windowCounts(bam.files, ext=frag.len, width=window.width)
 head(data$counts)
 head(data$region)
 @
@@ -1359,7 +1360,7 @@ or where the counts are assumed to be Poisson-distributed between biological
 replicates. 
 
 <<>>=
-abundances <- aveLogCPM(data$counts, lib.size=data$totals*normfacs)
+abundances <- aveLogCPM(data$counts, lib.size=data$totals)
 length(abundances)
 summary(abundances)
 @
@@ -1442,62 +1443,61 @@ Using an inappropriate percentage of binding sites will result in the loss of
 potential DB regions or inclusion of background regions.
 
 \section{By global enrichment}
-An alternative approach involves choosing a filter based on enrichment over the
-non-specific background. Specifically, the median (or any other robust average)
-of the binned abundances can be used as an estimate of the global background
-coverage in the dataset. Binning is necessary here to increase the size of the
-counts. This ensures that precision is maintained when estimating the average
-background abundance.
+An alternative approach involves choosing a filter based on the fold change over the level of non-specific enrichment.
+The degree of background enrichment can be estimated by counting reads into large bins across the genome.
+Binning is necessary here to increase the size of the counts when examining low-density background regions. 
+This ensures that precision is maintained when estimating the background abundance.
 
 <<>>=
 bin.size <- 2000L
 binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
-bin.ab <- aveLogCPM(binned$counts, lib.size=binned$total*normfacs)
-threshold <- median(bin.ab)
 @
 
-As the threshold is computed for large bins, it needs to be scaled for a proper
-comparison to window abundances. If one assumes that reads are uniformly
-distributed in background regions, the threshold can be directly scaled down
-based on differences in the size of the read counting interval between windows
-and bins. For windows with read extension, the size of the interval is equal to
-\code{ext + width}. Only one \code{ext} is added because the expansion of the
-interval by read extension is strand-specific, i.e., only forward-mapping reads
-are counted on the left of the window and only reverse-mapping reads are
-counted on the right.
+As background abundances are computed for large bins, it needs to be scaled for a proper comparison to the window abundances. 
+This can be done based on differences in the size of the read counting interval between windows and bins, assuming that reads are uniformly distributed in background regions.
+For windows with read extension, the size of the interval is equal to the sum of the window width and the fragment length.
+The fragment length is only added once because the expansion of the interval by read extension is strand-specific, i.e., only forward-mapping reads are counted on the left of the window and only reverse-mapping reads are counted on the right.
 
 % It's only ext, because we only count the reads on one strand in each side, so
 % assuming a uniform distribution, we take the equivalent of half ext on each
 % side which results in ext + width.
 
 <<>>=
-width <- median(width(data$region))
-eff.win.size <- width + frag.len
-adjustment <- log2(bin.size/eff.win.size)
-threshold <- threshold - adjustment
+scaled <- bin.size/(window.width + frag.len)
+scaled
 @
 
-Windows are filtered based on some minimum required fold change over the global
-background. Here, a fold change of 10 over the background is necessary for a
-window to be considered as containing a binding site. This approach has an
-intuitive and experimentally relevant interpretation which adapts to the level
-of non-specific enrichment in the dataset. 
+The abundances of the bins can then be estimated using \code{aveLogCPM} and downscaled according to the computed \code{scaled} value.
+The window abundances are also re-estimated here to standardize the effect of the prior count.
+Adding a prior count avoids undefined/unstable estimates when the actual counts are low.
+However, if the same prior is used in all \code{aveLogCPM} calls, downscaling will reduce the effective prior added to the bin counts.
+Thus, the prior must also be adjusted by \code{scaled} when computing the bin abundances, as shown below.
 
 <<>>=
-log.min.fc <- log2(10)
-threshold <- threshold+log.min.fc
-keep <- abundances >= threshold
+prior.count <- 0.5
+win.ab <- aveLogCPM(data$counts, lib.size=data$total, prior.count=prior.count)
+bin.ab <- aveLogCPM(binned$counts, lib.size=binned$total, prior.count=prior.count*scaled)
+bin.ab <- bin.ab - log2(scaled)
+@
+
+Finally, the median (or any other robust average) of the binned abundances can be used as a global estimate of the background coverage.
+Windows are filtered based on some minimum required fold change over this global background. 
+Here, a fold change of 5 is necessary for a window to be considered as containing a binding site. 
+This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
+
+<<>>=
+threshold <- median(bin.ab) + log2(5)
+keep <- win.ab >= threshold
 sum(keep)
 @
 
-The effect of filtering can also be visualized with a histogram. This allows
-users to confirm that the bulk of (assumed) background windows are discarded
-upon filtering. Note that windows containing genuine binding sites will usually
-fail to appear on such plots due to the dominance of the background windows
-throughout the genome.
+The effect of filtering can also be visualized with a histogram. 
+This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
+Note that bins containing genuine binding sites will usually not be visible on such plots.
+This is due to the dominance of the background windows throughout the genome.
 
 <<eval=FALSE,label=binhist>>=
-hist(bin.ab-adjustment, xlab="Adjusted bin log-CPM",  breaks=100, main="")
+hist(bin.ab, xlab="Adjusted bin log-CPM",  breaks=100, main="")
 abline(v=threshold, col="red")
 @
 
@@ -1508,50 +1508,76 @@ abline(v=threshold, col="red")
 @
 \end{center}
 
-Of course, the pre-specified minimum fold change may be too aggressive when
-binding is weak. For TF data, a large cut-off works well as narrow binding
-sites will have high read densities and are unlikely to be lost during
-filtering. Smaller minimum fold changes are recommended for diffuse marks
-where the difference from background is less obvious. 
+Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
+For TF data, a large cut-off works well as narrow binding sites will have high read densities and are unlikely to be lost during filtering. 
+Smaller minimum fold changes are recommended for diffuse marks where the difference from background is less obvious. 
 
 \section{By local enrichment}
 
 \subsection{Mimicking single-sample peak callers}
 Local background estimators can also be constructed with a little imagination.
-This avoids inappropriate filtering when there are differences in background
-coverage across the genome. Here, the 2 kbp region surrounding each window will
-be used as the ``neighbourhood'' over which a local estimate of non-specific
-enrichment for that window can be obtained. The counts for this region can be
-obtained with the aptly-named \code{regionCounts} function.
+This avoids inappropriate filtering when there are differences in background coverage across the genome. 
+Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
+The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
 
 <<>>=
 surrounds <- 2000
-neighbour <- suppressWarnings(resize(data$region, 
-    width(data$region)+surrounds, fix="center"))
+neighbour <- suppressWarnings(resize(data$region, surrounds, fix="center"))
 wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 @
 
-Counts for each window are subtracted from the counts for its neighbourhood.
-This ensures that any enriched regions or binding sites inside the window do
-not interfere with estimation of its local background.  Again, some adjustment
-for width is required for a valid comparison. Read extension is used for the
-neighbourhood counts, so note the addition of \code{frag.len}. The adjustment
-must also account for the subtraction of the window counts.
+Counts for each window are subtracted from the counts for its neighbourhood. 
+This ensures that any enriched regions or binding sites inside the window do not interfere with estimation of its local background.  
+Again, some scaling for the differences in width is required for a valid comparison between the average abundances for each window and its neighbourhood.
+This should also account for the aforementioned subtraction of counts.
 
 <<>>=
 neighbour.counts <- wider$counts - data$counts
-adjustment <- log2((surrounds + frag.len - eff.win.size)/eff.win.size)
+scaled <- (surrounds-window.width)/(window.width+frag.len)
 @
 
-Enrichment is defined as the fold change of the average window abundance
-over the local neighbourhood. Filtering can then be performed using a quantile-
-or fold change-based threshold on the enrichment values. This roughly mimics
-the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
+An average abundance is computed for each neighbourhood with \code{aveLogCPM}.
+A larger prior count is used here as estimates of the local background are less stable than that of the global background.
+Again, scaling of the prior is necessary when computing the neighbourhood abundances.
+This avoids spurious differences with the window abundances when the counts are low.
 
 <<>>=
-neighbour.ab <- aveLogCPM(neighbour.counts, lib.size=wider$totals*normfacs)-adjustment
-en.ab <- abundances - neighbour.ab
-summary(en.ab)
+prior.count <- 1
+win.ab <- aveLogCPM(data$counts, lib.size=data$total, prior.count=prior.count)
+neighbour.ab <- aveLogCPM(neighbour.counts, lib.size=wider$totals, prior.count=scaled*prior.count)
+neighbour.ab <- neighbour.ab - log2(scaled)
+@
+
+% I don't think this is avoidable; computing a p-value against the average
+% background using the raw counts might land us into trouble, particularly as
+% it could select against high- or low-variance windows.  It also reduces the
+% ease of interpretation. Small differences at high abundances could be enough
+% for retention because they'd get a small p-value. Our solution must be
+% derived from the abundances and the fold changes thereof; in which case, we
+% need to deal with prior counts.
+
+Enrichment is defined as the fold change of the average window abundance over the local neighbourhood. 
+The distribution of enrichment log-fold changes can be examined across all windows.
+Most values will lie somewhere above zero, given that some prefiltering has already been performed on the window counts.
+
+<<eval=FALSE,label=enriched>>=
+enriched.fc <- win.ab - neighbour.ab
+hist(enriched.fc, xlab="Enrichment logFC")
+@
+
+\begin{center}
+<<echo=FALSE,fig=TRUE>>=
+<<enriched>>
+@
+\end{center}
+
+Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
+Again, a 5-fold increase over the neighbourhood abundance is required for retention.
+This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
+
+<<>>=
+keep <- enriched.fc > log2(5)
+sum(keep)
 @
 
 Note that this procedure also assumes that no other enriched regions are
@@ -1632,15 +1658,11 @@ from the same dataset to filter regions would violate the null assumption and
 compromise type I error control.
 
 \section{Relationship between filtering and normalization}
-Note that the NB mean computed by \code{aveLogCPM} depends on the correct
-specification of the library sizes. In the example above, the effective library
-sizes after normalization are used after multiplying by \code{normfacs}. This
-ensures that composition biases are considered when computing the average
-count. In other situations, this may result in some circular dependencies when
-filtering is also required prior to normalization, e.g., normalization for
-efficiency biases in Section~\ref{sec:eff_norm}. Inquisitive users may wish to
-perform multiple iterations of filtering/normalization to ensure that the
-results are self-consistent. 
+Note that the NB mean computed by \code{aveLogCPM} depends on the correct specification of the library sizes. 
+In the example below, the effective library sizes after normalization are used after multiplying by \code{normfacs}. 
+This ensures that composition biases are considered when computing the average count. 
+In other situations, this may result in some circular dependencies when filtering is also required prior to normalization, e.g., of efficiency biases in Section~\ref{sec:eff_norm}. 
+Inquisitive users may wish to perform multiple iterations of filtering/normalization to ensure that the results are self-consistent. 
 
 <<>>=
 for (it in 1:3) {
@@ -1652,14 +1674,10 @@ for (it in 1:3) {
 }
 @
 
-It is worth noting that the \code{aveLogCPM} function also depends on the
-estimated NB dispersion (see Chapter~\ref{chap:stats}). However, dispersion
-estimation can only proceed after normalization and filtering. This results in
-another circular dependency that is resolved/ignored by having a ``near
-enough is good enough'' philosophy, i.e., using a sensible but otherwise
-arbitrary value for the NB dispersion in \code{aveLogCPM}. The alternative
-would be to iterate over the entire analysis which would be prohibitively
-time-consuming in most circumstances.
+It is worth noting that the \code{aveLogCPM} function also depends on the estimated NB dispersion (see Chapter~\ref{chap:stats}). 
+However, dispersion estimation can only proceed after normalization and filtering. 
+This results in another circular dependency that is resolved by using a sensible (but otherwise arbitrary) value for the NB dispersion in \code{aveLogCPM}. 
+The alternative would be to iterate over the entire DB analysis, which would be prohibitively time-consuming in most circumstances.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
