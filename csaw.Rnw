@@ -133,13 +133,13 @@ normfacs <- normalize(binned)
 @
 \item Filtering out uninteresting regions.
 <<>>=
-keep <- average(data) >= -1
+require(edgeR)
+keep <- aveLogCPM(asDGEList(data)) >= -1
 data <- data[keep,]
 @
 \item Identifying DB windows.
 <<>>=
 y <- asDGEList(data, norm.factors=normfacs)
-require(edgeR)
 y <- estimateDisp(y, design)
 results <- glmQLFTest(y, design, robust=TRUE)
 @
@@ -819,7 +819,7 @@ counterproductive. In fact, users may wish to explicitly filter out such bins
 and run TMM only on putative background regions, as shown below.
 
 <<>>=
-ab <- average(binned)
+ab <- avelogCPM(asDGEList(binned))
 keep <- ab <= quantile(ab, p=0.9)
 normalize(binned[keep,])
 @
@@ -1075,13 +1075,13 @@ sites should be high enough for smaller bins.
 
 <<strip.white=false>>=
 me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
-ab <- average(me.demo)
+ab <- aveLogCPM(asDGEList(me.demo))
 keep <- rank(ab) > 0.99*length(ab)
 me.norm <- normalize(me.demo[keep,])
 me.norm
 
 ac.demo <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=10000L)
-ab <- average(ac.demo)
+ab <- aveLogCPM(asDGEList(ac.demo))
 keep <- rank(ab) > 0.99*length(ab)
 ac.norm <- normalize(ac.demo[keep,])
 ac.norm
@@ -1126,9 +1126,9 @@ for (it in 1:2) {
         demo <- ac.demo
         norm <- ac.norm
         main <- "H3ac"
- 	}
-	adjc <- cpm(asDGEList(demo), log=TRUE)
-	smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
+    }
+    adjc <- cpm(asDGEList(demo), log=TRUE)
+    smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
         xlab="A", ylab="M", main=main)
     abline(h=log2(norm[1]/norm[2]), col="red")
     compo.fac <- normalize(demo)
@@ -1164,7 +1164,8 @@ regions where loess curve fitting is inaccurate.
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
-ab <- average(ac.demo2)
+ac.dge <- asDGEList(ac.demo2)
+ab <- aveLogCPM(ac.dge)
 keep <- rank(ab) > 0.95*length(ab)
 ac.demo2 <- ac.demo2[keep,]
 ac.off <- normalize(ac.demo2, type="loess")
@@ -1174,7 +1175,7 @@ head(ac.off)
 MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. If 
 filtering needs to be performed prior to normalization, the average count
-computed by \code{aveLogCPM}/\code{average} is strongly recommended as the filter statistic
+computed by \code{aveLogCPM} is strongly recommended as the filter statistic
 (see Chapter~\ref{chap:filter} for more detail on choices of filter value).
 This is because an average count threshold will act as a clean vertical cutoff
 in the plots below. Thus, spurious trends that might affect normalization are
@@ -1184,7 +1185,7 @@ not introduced.
 par(mfrow=c(1,2))
 abval <- ab[keep]
 o <- order(abval)
-adjc <- cpm(asDGEList(ac.demo2), log=TRUE)
+adjc <- cpm(ac.dge, log=TRUE)
 mval <- adjc[,1]-adjc[,2]
 fit <- loessFit(x=abval, y=mval)
 smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
@@ -1343,7 +1344,7 @@ or where the counts are assumed to be Poisson-distributed between biological
 replicates. 
 
 <<>>=
-abundances <- average(data)
+abundances <- aveLogCPM(asDGEList(data))
 summary(abundances)
 @
 
@@ -1454,9 +1455,9 @@ However, if the same prior is used in all \code{average} calls, downscaling will
 Thus, the prior must also be adjusted by \code{scaled} when computing the bin abundances, as shown below.
 
 <<>>=
-prior.count <- 0.5
-win.ab <- average(data, prior.count=prior.count)
-bin.ab <- average(binned, prior.count=prior.count*scaled)
+pc <- 0.5
+win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
+bin.ab <- aveLogCPM(asDGEList(binned, prior.count=pc*scaled)
 bin.ab <- bin.ab - log2(scaled)
 @
 
@@ -1523,9 +1524,9 @@ Again, scaling of the prior is necessary when computing the neighbourhood abunda
 This avoids spurious differences with the window abundances when the counts are low.
 
 <<>>=
-prior.count <- 1
-win.ab <- average(data, prior.count=prior.count)
-neighbour.ab <- aveLogCPM(neighbour.counts, lib.size=wider$totals, prior.count=scaled*prior.count)
+pc <- 1
+win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
+neighbour.ab <- aveLogCPM(neighbour.counts, lib.size=wider$totals, prior.count=scaled*pc)
 neighbour.ab <- neighbour.ab - log2(scaled)
 @
 
@@ -1587,8 +1588,8 @@ increase over the control to retain the window.
 
 <<eval=FALSE>>=
 in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
-chip <- average(in.demo[,1:4])
-control <- average(in.demo[,5])
+chip <- aveLogCPM(asDGEList(in.demo[,1:4]))
+control <- aveLogCPM(asDGEList(in.demo[,5]))
 keep <- chip > control + log2(5)
 @
 
@@ -1707,7 +1708,7 @@ of background bins is used. If an offset matrix is necessary (e.g., from
 non-linear normalization), this can be assigned into \code{y\$offset} for later
 use in the various \edger{} functions.
 
-<<>>=	
+<<>>=
 y <- asDGEList(data, norm.factors=normfacs)
 @
 
@@ -2140,7 +2141,7 @@ The height of each read coverage track is adjusted according to the library size
 A larger library will have a greater maximum plot height, such that a greater number of reads will not be represented by a larger peak.
 This avoids any misrepresentation of read depth when comparing between libraries.
 
-<<>>=	
+<<>>=
 lib.sizes <- exp(getOffset(y))
 mean.lib <- mean(lib.sizes)
 max.depth <- 20 * lib.sizes/mean.lib
@@ -2155,15 +2156,15 @@ In such cases, the code below will need to be modified accordingly.
 require(Gviz)
 collected <- list()
 for (i in 1:length(bam.files)) { 
-	reads <- extractReads(cur.region, bam.files[i])
-	pcov <- as(coverage(reads[strand(reads)=="+"]), "GRanges")
-	ncov <- as(coverage(reads[strand(reads)=="-"]), "GRanges")
+    reads <- extractReads(cur.region, bam.files[i])
+    pcov <- as(coverage(reads[strand(reads)=="+"]), "GRanges")
+    ncov <- as(coverage(reads[strand(reads)=="-"]), "GRanges")
     ptrack <- DataTrack(pcov, type="histogram", lwd=0, 
         fill=rgb(0,0,1,0.4), ylim=c(0, max.depth[i]), 
         name=bam.files[i], col.axis="black", col.title="black")
-	ntrack <- DataTrack(ncov, type="histogram", lwd=0, 
+    ntrack <- DataTrack(ncov, type="histogram", lwd=0, 
         fill=rgb(1,0,0,0.4), ylim=c(0, max.depth[i]))
-	collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
+    collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
 }
 gax <- GenomeAxisTrack(cex=1.2, col="black")
 plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
