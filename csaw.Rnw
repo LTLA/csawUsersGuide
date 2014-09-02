@@ -783,7 +783,7 @@ If any DB regions should survive trimming (e.g., those with less extreme fold ch
 In fact, users may wish to explicitly filter out such bins and run TMM only on putative background regions, as shown below.
 
 <<>>=
-ab <- avelogCPM(asDGEList(binned))
+ab <- aveLogCPM(asDGEList(binned))
 keep <- ab <= quantile(ab, p=0.9)
 normalize(binned[keep,])
 @
