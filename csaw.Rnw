@@ -1711,7 +1711,7 @@ These will manifest as large negative outliers after a log transformation step d
 Without robustness, incorporation of these outliers will inflate the observed variability in the dispersions.
 This results in a lower estimated prior d.f. and reduced DB detection power.
 
-% If you've forgetten, you get near-zero dispersions because counts can be exactly equal.
+% If you've forgotten, you get near-zero dispersions because counts can be exactly equal.
 
 \section{Testing for DB windows}
 The effect of specific factors can be tested to identify windows with significant differential binding. 
@@ -1741,35 +1741,29 @@ Multiple calls are only shown here and in Section~\ref{sec:dispest} for demonstr
 \chapter{Correction for multiple testing}
 
 \begin{combox}
-All right, we're almost there. This chapter needs the \code{results} object
-from the last chapter. You'll also need the filtered \code{data} list from
-Chapter~\ref{chap:count}, as well as the \code{broads} object from
-Chapter~\ref{chap:filter}. 
+All right, we're almost there. 
+This chapter needs the \code{results} object from the last chapter. 
+You'll also need the filtered \code{data} list from Chapter~\ref{chap:count}, as well as the \code{broads} object from Chapter~\ref{chap:filter}. 
 \end{combox}
 
 \section{Problems with false discovery rate control}
-The false discovery rate (FDR) is usually the most appropriate measure of error
-for high-throughput experiments. Control of the FDR can be provided by applying
-the Benjamini-Hochberg (BH) method \citep{benjamini1995} to a set of
-$p$-values. This is less conservative than the alternatives (e.g., Bonferroni)
-yet still provides some measure of error control. The most obvious approach is
-to apply the BH method to the set of $p$-values across all windows. This will
-control the FDR across the set of putative DB windows.
+The false discovery rate (FDR) is usually the most appropriate measure of error for high-throughput experiments. 
+Control of the FDR can be provided by applying the Benjamini-Hochberg (BH) method \citep{benjamini1995} to a set of $p$-values. 
+This is less conservative than the alternatives (e.g., Bonferroni) yet still provides some measure of error control. 
+The most obvious approach is to apply the BH method to the set of $p$-values across all windows. 
+This will control the FDR across the set of putative DB windows.
 
-However, the FDR across all detected windows is not necessarily the most
-relevant error rate. Interpretation of ChIP-seq experiments is more concerned
-with regions of the genome in which (differential) protein binding is found,
-rather than the individual windows. In other words, the FDR across all detected
-DB regions is usually desired. This is not equivalent to that across all DB
-windows as each region will often consist of multiple overlapping windows.
+However, the FDR across all detected windows is not necessarily the most relevant error rate. 
+Interpretation of ChIP-seq experiments is more concerned with regions of the genome in which (differential) protein binding is found, rather than the individual windows. 
+In other words, the FDR across all detected DB regions is usually desired. 
+This is not equivalent to that across all DB windows as each region will often consist of multiple overlapping windows.
 Control of one will not guarantee control of the other \citep{lun2014}.
 
-To illustrate this difference, consider an analysis where the FDR across all
-window positions is controlled at 10\%. In the results, there are 18 adjacent
-window positions forming one cluster and 2 windows forming a separate cluster.
-Each cluster represents a region. The first set of windows is a truly DB region
-whereas the second set is a false positive. A window-based interpretation of
-the FDR is correct as only 2 of the 20 window positions are false positives.
+To illustrate this difference, consider an analysis where the FDR across all window positions is controlled at 10\%. 
+In the results, there are 18 adjacent window positions forming one cluster and 2 windows forming a separate cluster.
+Each cluster represents a region. 
+The first set of windows is a truly DB region whereas the second set is a false positive. 
+A window-based interpretation of the FDR is correct as only 2 of the 20 window positions are false positives.
 However, a region-based interpretation results in an actual FDR of 50\%.
 
 % The BH method is particularly popular as it is simple to apply and robust to
@@ -1779,35 +1773,28 @@ However, a region-based interpretation results in an actual FDR of 50\%.
 % E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
 % be under 0.05 as well. So, if the BH method works, so does Simes' method.
 
-Problems from misinterpretation can be avoided by applying the BH method to a
-$p$-value from each region. Windows can be clustered together into regions with
-a number of strategies. Simes' method can then be used to compute a combined
-$p$-value for each cluster based on the $p$-values the constituent windows
-\citep{simes1986}. This tests the joint null hypothesis that no enrichment is
-observed across any sites within the region. The combined $p$-values are then
-adjusted using the BH method to control the region-level FDR. 
+Problems from misinterpretation can be avoided by applying the BH method to a $p$-value from each region. 
+Windows can be clustered together into regions with a number of strategies. 
+Simes' method can then be used to compute a combined $p$-value for each cluster based on the $p$-values the constituent windows \citep{simes1986}.
+This tests the joint null hypothesis that no enrichment is observed across any sites within the region. 
+The combined $p$-values are then adjusted using the BH method to control the region-level FDR. 
 
 \section{Clustering with external information}
-Combined $p$-values can be computed for a pre-defined set of regions based on
-the windows overlapping those regions. The most obvious source of pre-defined
-regions is that of annotated features such as promoters or gene bodies.
-Alternatively, called peaks can be used provided that sufficient care has been
-taken to avoid loss of error control from data snooping. In either case, the
-\code{findOverlaps} function from the \granges{} package can be used to
-identify all windows in or overlapping each specified region. 
+Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
+The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
+Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping. 
+In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
 
 <<>>=
 olap <- findOverlaps(broads, rowData(data))
 olap
 @
 
-The \code{combineTests} function can then be used to combine the $p$-values for
-all windows in each region. This provides a single combined $p$-value (and its
-FDR-adjusted value) for each region. The row names of the output table
-correspond to the value of the cluster identifiers supplied in \code{ids}.
-These should, in turn, act as indices for the regions of interest in
-\code{broads}. The average log-CPM and log-FC across all windows in each
-region are also computed.
+The \code{combineTests} function can then be used to combine the $p$-values for all windows in each region. 
+This provides a single combined $p$-value (and its FDR-adjusted value) for each region. 
+The row names of the output table correspond to the value of the cluster identifiers supplied in \code{ids}.
+These should, in turn, act as indices for the regions of interest in \code{broads}. 
+The average log-CPM and log-FC across all windows in each region are also computed.
 
 <<>>=
 cluster.ids <- queryHits(olap)
@@ -1816,15 +1803,12 @@ tabprom <- combineTests(cluster.ids, results$table[window.ids,,drop=FALSE])
 head(tabprom)
 @
 
-At this point, one might imagine that it would be simpler to just collect and
-analyze counts over the predefined regions. This is a valid strategy but will
-yield different results. Consider a promoter containing two separate peaks
-which are identically DB in opposite directions. Counting reads across the
-promoter will give equal counts for each group so changes within the promoter
-will not be detected. For peaks, imprecise boundaries for the called peaks can
-lead to loss of DB detection power due to ``contamination'' by reads from
-background regions. In both cases, window-based methods may be more robust as each
-interval of the promoter/peak region is examined separately \citep{lun2014}.
+At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
+This is a valid strategy but will yield different results. 
+Consider a promoter containing two separate peaks that are identically DB in opposite directions. 
+Counting reads across the promoter will give equal counts for each group so changes within the promoter will not be detected. 
+For peaks, imprecise boundaries for the called peaks can lead to loss of DB detection power due to ``contamination'' by reads from background regions. 
+In both cases, window-based methods may be more robust as each interval of the promoter/peak region is examined separately \citep{lun2014}.
 
 % Same problems for DB shifting or shrinkage, or even noisy background where
 % the surrounding non-NB regions contaminate the DB enriched signal.  The only
@@ -1842,13 +1826,10 @@ interval of the promoter/peak region is examined separately \citep{lun2014}.
 
 \section{Quick and dirty clustering}
 \label{sec:cluster}
-Clustering can also be quickly performed inside \pkgname{} with a simple
-single-linkage algorithm, implemented in the \code{mergeWindows} function.
-This approach can be useful as it avoids potential problems with the other
-clustering methods, e.g., peak-calling errors, incorrect or incomplete
-annotation. Briefly, all windows which are less than some distance apart - say,
-1 kbp - are put in the same cluster. This reflects some arbitrary minimum
-distance at which two binding events are considered to be separate sites.
+Clustering can also be performed inside \pkgname{} with a simple single-linkage algorithm, implemented in the \code{mergeWindows} function.
+This approach is useful as it avoids potential problems with the other clustering methods, e.g., peak-calling errors, incorrect or incomplete annotation. 
+Briefly, all high-abundance windows that are less than some distance apart - say, 1 kbp - are put in the same cluster. 
+This reflects some arbitrary minimum distance at which two binding events are considered to be separate sites.
 
 <<>>=
 merged <- mergeWindows(rowData(data), tol=1000L)
@@ -1857,20 +1838,18 @@ merged$region
 
 A combined $p$-value is computed for each cluster as previously described.
 Application of the BH method controls the FDR across all detected clusters.
-Like before, the row names in the output table are indices for the
-corresponding coordinates of the clusters in \code{merged\$regions}. This
-allows for simple correspondence between the results and the regions. 
+Like before, the row names in the output table are indices for the corresponding coordinates of the clusters in \code{merged\$regions}. 
+This allows for simple correspondence between the results and the regions. 
 
 <<>>=
 tabcom <- combineTests(merged$id, results$table)
 head(tabcom)
 @
 
-If many overlapping windows are present, very large clusters may be formed that
-are difficult to interpret. A simple check can be used to determine whether
-most clusters are of an acceptable size. Many huge clusters indicate that more
-aggressive filtering from Chapter~\ref{chap:filter} is required.  This
-mitigates chaining effects by reducing the density of windows in the genome.
+If many overlapping windows are present, very large clusters may be formed that are difficult to interpret. 
+A simple check can be used to determine whether most clusters are of an acceptable size. 
+Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:filter} is required.  
+This mitigates chaining effects by reducing the density of windows in the genome.
 
 % Note that several large clusters may still be present due to high
 % coverage within long tandem repeat loci.
@@ -1879,13 +1858,10 @@ mitigates chaining effects by reducing the density of windows in the genome.
 summary(width(merged$region))
 @
 
-Alternatively, chaining can be limited by setting the \code{max.width}
-parameter to restrict the sizes of the merged intervals.  The chosen value
-should be small enough so as to be separate differentially bound regions from
-unchanged neighbours, yet large enough to avoid difficulties in interpretation
-from many adjacent windows. A value from 2000 to 10000 bp is recommended.  This
-can viewed as the maximum distance at which two binding sites are considered
-part of the same event.
+Alternatively, chaining can be limited by setting \code{max.width} to restrict the size of the merged intervals.  
+The set value should be small enough so as to separate DB regions from unchanged neighbours, yet large enough to avoid misinterpretation of the FDR.
+A value from 2000 to 10000 bp is recommended. 
+This can viewed as the maximum distance at which two binding sites are considered part of the same event.
 
 <<>>=
 merged <- mergeWindows(rowData(data), tol=1000L, max.width=5000L)
@@ -1906,29 +1882,25 @@ summary(width(merged$region))
 % method described above, where parameters are expressed as distances. And besides,
 % it's fast enough to run a couple of times to check the parameters.
 
-There are also provisions for clustering based on the sign of the log-fold
-change. The idea is that clusters will be broken up wherever the sign changes.
-This will separate binding sites that are close together but are changing in
-opposite directions. A vector can be supplied in \code{sign} to indicate
-whether each window has a positive log-fold change.
+There are also provisions for clustering based on the sign of the log-fold change. 
+The idea is that clusters will be broken up wherever the sign changes. 
+This will separate binding sites that are close together but are changing in opposite directions. 
+A vector can be supplied in \code{sign} to indicate whether each window has a positive log-fold change.
 
 <<>>=
 merged <- mergeWindows(rowData(data), tol=1000L, sign=(results$table$logFC > 0))
 summary(width(merged$region))
 @
 
-However, sign-based filtering is not recommended as the sign of windows within
-each cluster is not independent of their DB status. Windows in a genuine DB
-region will form one cluster (consistent sign) whereas those in non-DB regions
-will form many clusters (inconsistent sign, as the log-fold change is small).
+However, sign-based filtering is not recommended as the sign of windows within each cluster is not independent of their DB status. 
+Windows in a genuine DB region will form one cluster (consistent sign) whereas those in non-DB regions will form many clusters (inconsistent sign, as the log-fold change is small).
 This results in conservativeness as more clusters will have large $p$-values.
-Furthermore, any attempt to filter away small clusters will cause liberalness
-if too many large $p$-values are lost.
+Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
 \chapter{Post-processing steps}
 
 \begin{combox}
-This is where we bring it all together. We'll need the \code{merged}
+This is where we bring it all together. We'll need the \code{merged} 
 list and the \code{tabcom} table from the previous chapter.  There's a bit
 about visualization at the end where we need the \code{y} object from
 Chapter~\ref{chap:stats} and the \code{bam.files} that we started off with.
