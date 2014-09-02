@@ -31,6 +31,7 @@
 \newcommand{\subread}{subread}
 \newcommand{\macs}{MACS}
 \newcommand{\rtracklayer}{rtracklayer}
+\newcommand{\gviz}{Gviz}
 \newcommand{\granges}{GenomicRanges}
 
 % Defining a comment box.
@@ -132,13 +133,13 @@ normfacs <- normalize(binned)
 @
 \item Filtering out uninteresting regions.
 <<>>=
-require(edgeR)
-keep <- aveLogCPM(assay(data), lib.size=data$totals) >= -1
+keep <- average(data) >= -1
 data <- data[keep,]
 @
 \item Identifying DB windows.
 <<>>=
-y <- DGEList(assay(data), lib.size=data$totals, norm.factors=normfacs)
+y <- asDGEList(data, norm.factors=normfacs)
+require(edgeR)
 y <- estimateDisp(y, design)
 results <- glmQLFTest(y, design, robust=TRUE)
 @
@@ -1410,7 +1411,7 @@ retained set is equal to the computed number.
 <<>>=
 spacing <- 50
 desired <- 0.001 
-genome.windows <- sum(seqlengths(data$region)/spacing)
+genome.windows <- sum(seqlengths(rowData(data))/spacing)
 keep <- length(abundances) - rank(abundances) + 1 < genome.windows*desired
 sum(keep)
 @
@@ -1498,15 +1499,13 @@ Local background estimators can also be constructed with a little imagination.
 This avoids inappropriate filtering when there are differences in background coverage across the genome. 
 Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
 The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
+Synchronization with \code{windowCounts} is ensured by using the same argument for \code{param}, if a non-default value was used.
 
 <<>>=
 surrounds <- 2000
-neighbour <- suppressWarnings(resize(data$region, surrounds, fix="center"))
+neighbour <- suppressWarnings(resize(rowData(data), surrounds, fix="center"))
 wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 @
-
-On a side note, if a non-default \code{param} was used in \code{windowCounts}, users should ensure that the same value is passed to \code{regionCounts} as well.
-This ensures that the same reads are used for window- and region-based counting.
 
 Counts for each window are subtracted from the counts for its neighbourhood. 
 This means that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.  
@@ -1514,7 +1513,7 @@ Again, some scaling for the differences in width is required for a valid compari
 This should also account for the aforementioned subtraction of counts.
 
 <<>>=
-neighbour.counts <- wider$counts - data$counts
+neighbour.counts <- assay(wider) - assay(data)
 scaled <- (surrounds-window.width)/(window.width+frag.len)
 @
 
@@ -2086,9 +2085,9 @@ require(TxDb.Mmusculus.UCSC.mm10.knownGene)
 sig.bins <- merged$region[as.integer(rownames(tabcom))]
 anno <- detailRanges(sig.bins, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
    orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
-head(anno$overlap)
-head(anno$left)
-head(anno$right)
+tail(anno$overlap)
+tail(anno$left)
+tail(anno$right)
 @
 
 Character vectors of compact string representations are provided that describe
