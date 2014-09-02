@@ -89,9 +89,9 @@ dir.create("plots-ug")
 
 \chapter{Introduction}
 \section{Scope}
-This document gives an overview of the Bioconductor package \pkgname{} for detecting differential binding (DB) in ChIP-seq experiments.  
+This document gives an overview of the Bioconductor package \pkgname{} for detecting differential binding (DB) in ChIP-seq experiments.
 Specifically, \pkgname{} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions. 
-However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.  
+However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.
 The statistical methods described here are based upon those in the \edger{} package \citep{robinson2010}. 
 Knowledge of \edger{} is useful but not a prerequesite for reading this guide.
 
@@ -655,7 +655,7 @@ Cross-correlation plots can be generated directly from BAM files using the \code
 This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment \citep{kharchenko2008}. 
 Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
 This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
-The location of the peak can then be used as an estimate of the average fragment length ($\sim$110 bp below) for read extension in  \code{windowCounts}. 
+The location of the peak can then be used as an estimate of the average fragment length ($\sim$110 bp below) for read extension in \code{windowCounts}. 
 
 % Note that this makes some assumptions about the shape of each peak. In
 % particular, it assumes that the peaks are symmetrical so that the distance
@@ -746,28 +746,23 @@ head(assay(reg.counts))
 \chapter{Calculating normalization factors}
 \label{chap:norm}
 \begin{combox}
-This next chapter will need the \code{bam.files} vector again. You'll notice
-that that a number of other BAM files are used in this chapter. However, these
-are just for demonstration purposes and aren't necessary for the main example.
+This next chapter will need the \code{bam.files} vector again. 
+You'll notice that that a number of other BAM files are used in this chapter. 
+However, these are just for demonstration purposes and aren't necessary for the main example.
 \end{combox}
 
 \section{Eliminating composition biases}
 
 \subsection{Using the TMM method on binned counts}
 \label{sec:compo_norm}
-As the name suggests, composition biases are formed when there are differences
-in the composition of sequences across libraries. Highly enriched regions
-consume more sequencing resources and thereby suppress the representation of
-other regions. Differences in the magnitude of suppression can lead to spurious
-DB calls. Scaling by library size fails to correct for this as composition biases
-can still occur in libraries of the same size. 
+As the name suggests, composition biases are formed when there are differences in the composition of sequences across libraries. 
+Highly enriched regions consume more sequencing resources and thereby suppress the representation of other regions. 
+Differences in the magnitude of suppression can lead to spurious DB calls. 
+Scaling by library size fails to correct for this as composition biases can still occur in libraries of the same size. 
 
-To remove composition biases in \pkgname{}, reads are counted in large bins and
-the counts are used for normalization with the \code{normalize} wrapper
-function. This uses the trimmed mean of M-values (TMM) method
-\citep{oshlack2010} to correct for any sytematic fold change in the coverage of
-the bins. The assumption here is that most bins represent non-DB background
-regions so any consistent difference across bins must be spurious.
+To remove composition biases in \pkgname{}, reads are counted in large bins and the counts are used for normalization with the \code{normalize} wrapper function. 
+This uses the trimmed mean of M-values (TMM) method \citep{oshlack2010} to correct for any sytematic fold change in the coverage of the bins. 
+The assumption here is that most bins represent non-DB background regions so any consistent difference across bins must be spurious.
 
 <<>>=
 binned <- windowCounts(bam.files, bin=TRUE, width=10000)
@@ -775,21 +770,17 @@ normfacs <- normalize(binned)
 normfacs
 @
 
-The TMM method trims away putative DB bins (i.e., those with extreme M-values)
-and computes normalization factors from the remainder to use in \edger{}. The
-size of each library is scaled by the corresponding factor to obtain an
-effective library size for modelling. A larger normalization factor results in
-a larger effective library size and is conceptually equivalent to scaling each
-individual count downwards, given that  the ratio of that count to the library
-size will be smaller. Check out the \edger{} user's guide for more information.
+The TMM method trims away putative DB bins (i.e., those with extreme M-values) and computes normalization factors from the remainder to use in \edger{}. 
+The size of each library is scaled by the corresponding factor to obtain an effective library size for modelling. 
+A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the library
+size will be smaller. 
+Check out the \edger{} user's guide for more information.
 
-Note that \code{normalize} skips the precision weighting step in the TMM
-method by default. Weighting increases the contribution of bins with high
-counts.  However, these bins are more likely to contain binding sites and thus
-are more likely to be DB. If any DB regions should survive trimming (e.g.,
-those with less extreme fold changes), upweighting them would be
-counterproductive. In fact, users may wish to explicitly filter out such bins
-and run TMM only on putative background regions, as shown below.
+Note that the default \code{normalize} method skips the precision weighting step in the TMM method.
+Weighting aims to increase the contribution of bins with high counts.
+However, these bins are more likely to contain binding sites and thus are more likely to be DB. 
+If any DB regions should survive trimming (e.g., those with less extreme fold changes), upweighting them would be counterproductive. 
+In fact, users may wish to explicitly filter out such bins and run TMM only on putative background regions, as shown below.
 
 <<>>=
 ab <- avelogCPM(asDGEList(binned))
@@ -798,14 +789,12 @@ normalize(binned[keep,])
 @
 
 \subsection{Choosing a bin size}
-By definition, read coverage is low for background regions. This can lead to a
-high frequency of zero counts and undefined M-values when reads are counted
-into windows. Adding a prior count is only a superficial solution as the chosen
-prior will have undue influence on the estimate of the normalization factor
-when many counts are low. The variance of the fold change distribution is also
-higher for low counts. This reduces the effectiveness of the trimming procedure
-during normalization. These problems can be overcome by using large bins to
-increase the size of the counts prior to TMM normalization. 
+By definition, read coverage is low for background regions. 
+This can lead to a high frequency of zero counts and undefined M-values when reads are counted into windows. 
+Adding a prior count is only a superficial solution as the chosen prior will have undue influence on the estimate of the normalization factor when many counts are low. 
+The variance of the fold change distribution is also higher for low counts. 
+This reduces the effectiveness of the trimming procedure during normalization. 
+These problems can be overcome by using large bins to increase the size of the counts prior to TMM normalization. 
 
 % Yes, smaller counts do have greater variance in the resulting fold changes.
 % This is because it's more possible for smaller counts to achieve a large fold
@@ -871,13 +860,13 @@ calcNormFactors(x$counts)
 % more pain due to the need to estimate distribution parameters and the
 % possible lack of robustness to violation of the distributional assumptions.
 
-Of course, this strategy requires the user to supply a bin size. Excessively
-large bins are problematic as background and enriched regions will be included
-in the same bin. This makes it difficult to trim away enriched bins during the
-TMM procedure. Obviously, bins which are too small will have read counts which
-are too low.  Testing multiple bin sizes is recommended to ensure that the
-estimates are robust to any changes. Experience suggests that a value around
-10000 bp is suitable for most datasets.
+Of course, this strategy requires the user to supply a bin size. 
+Excessively large bins are problematic as background and enriched regions will be included in the same bin. 
+This makes it difficult to trim away enriched bins during the TMM procedure.
+Obviously, bins that are too small will have read counts that are too low.
+Both effects will result in inaccurate normalization, so some compromise is necessary.
+Testing multiple bin sizes is recommended to ensure that the estimates are robust to any changes. 
+Experience suggests that a value around 10000 bp is suitable for most datasets.
 
 <<>>=
 demo <- windowCounts(bam.files, bin=TRUE, width=5000)
@@ -1005,13 +994,12 @@ calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=1
 % prior count).
 
 \subsection{Visualizing normalization efforts with an MA plot}
-The effectiveness of normalization can be checked using a MA plot. A single
-main cloud of points should be present that represents the background regions.
-Separation into multiple discrete points indicates that the counts are too low
-and that larger bin sizes should be used. Composition biases manifest as a
-vertical shift in the position of this cloud. Ideally, the log-ratios of the
-corresponding normalization factors should correspond to the centre of the
-cloud. This indicates that undersampling has been identified and corrected.
+The effectiveness of normalization can be checked using a MA plot. 
+A single main cloud of points should be present that represents the background regions.
+Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
+Composition biases manifest as a vertical shift in the position of this cloud. 
+Ideally, the log-ratios of the corresponding normalization factors should correspond to the centre of the cloud. 
+This indicates that undersampling has been identified and corrected.
 
 <<eval=FALSE,label=normplot>>=
 par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
@@ -1035,16 +1023,13 @@ for (i in 1:(length(bam.files)-1)) {
 
 \section{Eliminating efficiency biases}
 \label{sec:eff_norm}
-Efficiency biases are commonly observed in ChIP-seq data. This refers to fold
-changes in enrichment that are introduced by variability in IP efficiencies
-between libraries. These technical differences are of no biological interest
-and must be removed. This can be achieved by assuming some top percentage of
-bins or windows with the highest abundances contain binding sites. The TMM
-method can then be applied to eliminate systematic differences in the counts
-across those bins. In the example below, the top 1\% of bins are assumed to
-contain binding sites. For consistency, the bin size in
-Section~\ref{sec:compo_norm} is re-used here though the counts for binding
-sites should be high enough for smaller bins.
+Efficiency biases are commonly observed in ChIP-seq data. 
+This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
+These technical differences are of no biological interest and must be removed. 
+This can be achieved by assuming some top percentage of bins or windows with the highest abundances contain binding sites. 
+The TMM method can then be applied to eliminate systematic differences in the counts across those bins. 
+In the example below, the top 1\% of bins are assumed to contain binding sites. 
+For consistency, the bin size in Section~\ref{sec:compo_norm} is re-used here though the counts for binding sites should be high enough for smaller bins.
 
 <<strip.white=false>>=
 me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
@@ -1071,22 +1056,17 @@ ac.norm
 % peaks which get caught by multiple windows, but everyone should have high
 % abundances at this point so it shouldn't matter.
 
-This method assumes that most high-abundance bins are not DB. Any systematic
-changes must be caused by differences in IP efficiency or some other technical
-issue. Genuine biological differences may be removed when the assumption of a
-non-DB majority does not hold, i.e., overall binding is truly lower in one
-condition. Also, the percentage of bins to use for normalization may not be
-obvious if there is no obvious demarcation on a MA plot.
+This method assumes that most high-abundance bins are not DB. 
+Any systematic changes must be caused by differences in IP efficiency or some other technical issue. 
+Genuine biological differences may be removed when the assumption of a non-DB majority does not hold, i.e., overall binding is truly lower in one condition. 
+Also, the percentage of bins to use for normalization may not be obvious if there is no obvious demarcation on a MA plot.
 
-Speaking of which, the results of normalization can again be visualized with MA
-plots. Of particular interest is the cloud of points on the plot at high
-A-values. This represents a systematic fold change in bound regions, either due
-to genuine DB or variable IP efficiency. Note the difference in the
-normalization factors from removal of efficiency bias (full) against that of
-composition bias (dashed). The choice between the two methods depends on
-whether one assumes that the systematic differences at high abundances
-represent genuine DB events. If not, they must represent efficiency biases and
-should be removed.
+Speaking of which, the results of normalization can again be visualized with MA plots. 
+Of particular interest is the cloud of points on the plot at high A-values. 
+This represents a systematic fold change in bound regions, either due to genuine DB or variable IP efficiency. 
+Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed). 
+The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events. 
+If not, they must represent efficiency biases and should be removed.
 
 <<eval=FALSE,label=methplot,strip.white=false>>=
 par(mfrow=c(1,2))
@@ -1117,23 +1097,18 @@ for (it in 1:2) {
 \end{center}
 
 \section{Dealing with trended biases}
-In more extreme cases, the bias may vary with the average abundance to form a
-trend. One possible explanation is that changes in IP efficiency will have
-little effect at low-abundance background regions and more effect at
-high-abundance binding sites. Thus, the magnitude of the bias between libraries
-will change with abundance. The trend cannot be corrected with scaling methods
-as no single scaling factor will remove differences at all abundances.  Rather,
-non-linear methods are required such as cyclic loess or quantile normalization.
+In more extreme cases, the bias may vary with the average abundance to form a trend. 
+One possible explanation is that changes in IP efficiency will have little effect at low-abundance background regions and more effect at high-abundance binding sites. 
+Thus, the magnitude of the bias between libraries will change with abundance. 
+The trend cannot be corrected with scaling methods as no single scaling factor will remove differences at all abundances.
+Rather, non-linear methods are required such as cyclic loess or quantile normalization.
 
-One such implementation is provided in \code{normalize} by setting
-\code{type="loess"}. This is based on the fast loess algorithm
-\citep{ballman2004} with minor adaptations to count data. An offset matrix is
-produced that contains the log-effective library sizes for each supplied
-bin/window. This can be used in \edger{}, assuming that said bins or windows
-are also the ones to be tested for DB. The example below performs non-linear
-normalization on the counts for smaller bins, of which the top 5\% are assumed
-to contain binding sites. Some filtering is necessary to remove low-abundance
-regions where loess curve fitting is inaccurate. 
+One such implementation is provided in \code{normalize} by setting \code{type="loess"}. 
+This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to count data. 
+A matrix is produced that contains a specific offset term for each bin/window in each library.
+This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB. 
+The example below performs non-linear normalization on the counts for smaller bins, of which the top 5\% are assumed to contain binding sites. 
+Some filtering is necessary to remove low-abundance regions where loess curve fitting is inaccurate. 
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
@@ -1146,13 +1121,10 @@ head(ac.off)
 @
 
 MA plots can be examined to determine whether normalization was successful.
-Any abundance-dependent trend in the M-values should be eliminated. If 
-filtering needs to be performed prior to normalization, the average count
-computed by \code{aveLogCPM} is strongly recommended as the filter statistic
-(see Chapter~\ref{chap:filter} for more detail on choices of filter value).
-This is because an average count threshold will act as a clean vertical cutoff
-in the plots below. Thus, spurious trends that might affect normalization are
-not introduced.
+Any abundance-dependent trend in the M-values should be eliminated. 
+If filtering needs to be performed prior to normalization, the average count computed by \code{aveLogCPM} is strongly recommended as the filter statistic (see Chapter~\ref{chap:filter} for more detail on choices of filter value).
+This is because an average count threshold will act as a clean vertical cutoff in the plots below. 
+Thus, spurious trends that might affect normalization are not introduced.
 
 <<eval=FALSE,keep.source=true,label=trendplot>>=
 par(mfrow=c(1,2))
@@ -1181,19 +1153,16 @@ lines(abval[o], fit$fitted[o], col="red")
 @
 \end{center}
 
-Note that all non-linear methods assume that most bins/windows are not DB at
-each abundance. This tends to be a stronger assumption than that for scaling
-methods, which only require a non-DB majority across all bins. Removal of the
-trend may not be appropriate if it represents some genuine biological
-phenomenon. 
+Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
+This is a stronger assumption than that for scaling methods, which only require a non-DB majority across all bins. 
+Removal of the trend may not be appropriate if it represents some genuine biological phenomenon, e.g., involving changes in overall binding. 
 
 \section{A word on other biases}
-No normalization is performed to adjust for differences in mappability or
-sequencability between different regions of the genome. Region-specific biases
-are assumed to be constant between libraries. This is generally reasonable as
-the biases depend on fixed properties of the genome sequence such as GC
-content. Thus, biases should cancel out during DB comparisons. Any variability
-in the bias between samples will be absorbed into the dispersion estimate. 
+No normalization is performed to adjust for differences in mappability or sequencability between different regions of the genome. 
+Region-specific biases are assumed to be constant between libraries. 
+This is generally reasonable as the biases depend on fixed properties of the genome sequence such as GC content. 
+Thus, biases should cancel out during DB comparisons.
+Any variability in the bias between samples will be absorbed into the dispersion estimate. 
 
 % Note that Cheung (i.e. Ahringer) go about dividing ChIP samples by input
 % controls and stating that there are differences in the called regions between
@@ -1208,13 +1177,11 @@ in the bias between samples will be absorbed into the dispersion estimate.
 % improve comparisons between technologies. However, this isn't particularly
 % relevant to the correction of biases between samples.
 
-That said, explicit normalization to correct these biases can improve results
-for some datasets. Procedures like GC correction could decrease the observed
-variability by removing systematic differences between replicates. Of course,
-this also assumes that the targeted differences have no biological relevance.
-Detection power may be lost if this is not true. For example, differences in
-the GC content distribution can be driven by technical bias as well as biology,
-e.g., when protein binding is associated with a specific GC composition.
+That said, explicit normalization to correct these biases can improve results for some datasets.
+Procedures like GC correction could decrease the observed variability by removing systematic differences between replicates. 
+Of course, this also assumes that the targeted differences have no biological relevance.
+Detection power may be lost if this is not true. 
+For example, differences in the GC content distribution can be driven by technical bias as well as biology, e.g., when protein binding is associated with a specific GC composition.
 
 %%%%%%%%%%%%%%%%%%%%%% 
 %It's worth dividing GC bias into two types. The first is where the variances
@@ -1250,13 +1217,10 @@ e.g., when protein binding is associated with a specific GC composition.
 % same.
 
 \section{Examining replicate similarity with MDS plots}
-On a semi-related note, the binned counts can be used to examine the similarity
-of replicates through multi-dimensional scaling (MDS) plots. The distance
-between each pair of libraries is computed as the square root of the mean
-squared log-fold change across the top set of bins with the highest absolute
-log-fold changes. A small top set visualizes the most extreme differences
-whereas a large set visualizes overall differences. Again, binning is necessary
-as fold changes will be undefined in the presence of zero counts.
+On a semi-related note, the binned counts can be used to examine the similarity of replicates through multi-dimensional scaling (MDS) plots. 
+The distance between each pair of libraries is computed as the square root of the mean squared log-fold change across the top set of bins with the highest absolute log-fold changes.
+A small top set visualizes the most extreme differences whereas a large set visualizes overall differences.
+Again, binning is necessary as fold changes will be undefined in the presence of zero counts.
 
 <<label=mds,eval=false>>=
 par(mfrow=c(2,2), mar=c(5,4,2,2))
@@ -1276,12 +1240,10 @@ for (top in c(100, 500, 1000, 5000)) {
 \end{center}
 
 Replicates from different groups should form separate clusters in the plot.
-This indicates that the results are reproducible and that the effect sizes are
-large. Mixing between replicates of different conditions indicates that the
-biological difference has no effect on protein binding, or that the data is too
-variable for any effect to manifest. Any outliers should also be noted as their
-presence may confound the downstream analysis. In the worst case, the removal
-of the corresponding libraries may be necessary to obtain sensible results.
+This indicates that the results are reproducible and that the effect sizes are large.
+Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
+Any outliers should also be noted as their presence may confound the downstream analysis.
+In the worst case, the removal of the corresponding libraries may be necessary to obtain sensible results.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
