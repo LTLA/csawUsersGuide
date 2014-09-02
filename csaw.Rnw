@@ -1900,20 +1900,17 @@ Furthermore, any attempt to filter away small clusters will cause liberalness if
 \chapter{Post-processing steps}
 
 \begin{combox}
-This is where we bring it all together. We'll need the \code{merged} 
-list and the \code{tabcom} table from the previous chapter.  There's a bit
-about visualization at the end where we need the \code{y} object from
-Chapter~\ref{chap:stats} and the \code{bam.files} that we started off with.
+This is where we bring it all together.
+We'll need the \code{merged} list and the \code{tabcom} table from the previous chapter. 
+There's a bit about visualization at the end where we need the \code{y} object from Chapter~\ref{chap:stats} and the \code{bam.files} that we started off with.
 Oh, and the \code{org.Mm.eg.db} object that we loaded in Chapter~\ref{chap:filter}.
 \end{combox}
 
 \section{Adding gene-based annotation}
-Annotation can be added to a given set of regions using the \code{detailRanges}
-function. This will identify overlaps between the regions and annotated
-features such as exons, introns and promoters. Here, the promoter region of 
-each gene is defined as some interval 3 kbp up- and 1 kbp downstream of the TSS
-for that gene. Any exonic features within \code{dist} on the left or right side
-of the region will also be reported.
+Annotation can be added to a given set of regions using the \code{detailRanges} function. 
+This will identify overlaps between the regions and annotated features such as exons, introns and promoters. 
+Here, the promoter region of each gene is defined as some interval 3 kbp up- and 1 kbp downstream of the TSS for that gene. 
+Any exonic features within \code{dist} on the left or right side of the region will also be reported.
 
 <<>>=
 require(TxDb.Mmusculus.UCSC.mm10.knownGene)
@@ -1925,18 +1922,15 @@ tail(anno$left)
 tail(anno$right)
 @
 
-Character vectors of compact string representations are provided that describe
-the features overlapped by each supplied region. Each pattern represents
-\code{GENE|EXONS|STRAND} for the overlapped exons of that gene. Promoters
-are labelled as exon \code{0} whereas introns are labelled as \code{I}. For
-\code{left} and \code{right}, an additional \code{DISTANCE} field is included
-which indicates the gap between the annotated feature and the supplied region.
+Character vectors of compact string representations are provided that describe the features overlapped by each supplied region. 
+Each pattern represents \code{GENE|EXONS|STRAND} for the overlapped exons of that gene. 
+Promoters are labelled as exon \code{0} whereas introns are labelled as \code{I}. 
+For \code{left} and \code{right}, an additional \code{DISTANCE} field is included.
+This indicates the gap between the annotated feature and the supplied region.
 
-While the string representation is saves space, it is not easy to work with.
-If the annotation needs to manipulated directly, users can obtain it from the
-\code{detailRanges} command by not specifying the regions of interest. This can
-then be used for overlapping, e.g., to identify the genes containing DB sites
-overlapping the promoter.
+While the string representation saves space in the output, it is not easy to work with.
+If the annotation needs to manipulated directly, users can obtain it from the \code{detailRanges} command by not specifying the regions of interest. 
+This can then be used for overlapping, e.g., to identify the genes containing DB sites overlapping the promoter.
 
 <<>>=
 anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
@@ -1944,11 +1938,10 @@ head(anno.ranges)
 @
 
 \section{Saving the results to file}
-It is a simple matter to save the results for later perusal. This is done here
-in the \code{*.tsv} format where all detail is preserved. Compression is used
-to reduce the file size. Of course, other formats can be used depending on the
-purpose of the file, e.g., exporting to BED files through the \rtracklayer{}
-package for visual inspection of the data with genomic browsers.
+It is a simple matter to save the results for later perusal. 
+This is done here in the \code{*.tsv} format where all detail is preserved. 
+Compression is used to reduce the file size. 
+Of course, other formats can be used depending on the purpose of the file, e.g., exporting to BED files through the \rtracklayer{} package for visual inspection of the data with genomic browsers.
 
 <<>>=
 ofile <- gzfile("clusters.gz", open="w")
