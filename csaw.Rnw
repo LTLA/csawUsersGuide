@@ -150,7 +150,7 @@ tabcom <- combineTests(merged$id, results$table)
 @
 \end{enumerate}
 
-Each step will be demonstrated in this guide with some publicly available data.
+In this guide, the behaviour of each step will be demonstrated with some publicly available data.
 The dataset below focuses on changes in NFYA binding between embryonic stem cells and terminal neurons \citep{tiwari2012}. 
 This will be used as a case study for most of the code examples throughout the guide.
 
@@ -176,8 +176,8 @@ At this point, all we need are the \code{bam.files} that we defined in the intro
 
 \section{Types of input data}
 Sorted and indexed BAM (i.e. binary SAM) files are required as input into the read counting functions in \pkgname{}. 
-Sorting should be performed on read position. 
-Each index file should be named as \code{xxx.bam.bai} for the BAM file named \code{xxx.bam}. 
+Sorting should be performed on the genomic position of the mapped read.
+For a given BAM file named \code{xxx.bam}, the corresponding index file should be named as \code{xxx.bam.bai} 
 Both files should also be in the same directory. 
 Users should be aware that the sensibility of the supplied index is not checked prior to counting. 
 A common mistake is to replace or update the BAM file without updating the index. 
@@ -200,7 +200,7 @@ data <- windowCounts(bam.files, ext=frag.len, width=window.width)
 
 The data is returned as a \code{SummarizedExperiment} object.
 The matrix of counts is stored as the first entry in the \code{assays} slot.
-Each row corresponds to a genomic window whereas each column corresponds to a library.
+Each row corresponds to a genomic window while each column corresponds to a library.
 The coordinates of each window are stored in the \code{rowData}.
 The total number of reads in each library are stored as \code{totals} in the \code{colData}.
 
@@ -504,22 +504,25 @@ The \subread{} program \citep{liao2013} was used to align the reads in this data
 
 <<>>=
 demo <- windowCounts(bam.files, ext=frag.len, param=param)
+demo$totals
 @
 
-On a more subjective note, reads on particular chromosomes can be specifically counted by specifying the chromosomes of interest in \code{restrict}. 
+\subsection{Avoiding problematic genomic regions}
+Read extraction and counting can be restricted to particular chromosomes by specifying the names of the chromosomes of interest in \code{restrict}. 
 This avoids the need to count reads on unassigned contigs or uninteresting chromosomes, e.g., the mitochondrial genome for ChIP-seq studies targeting nuclear factors. 
 Alternatively, it allows \code{windowCounts} to work on huge datasets or in limited memory by analyzing only one chromosome at a time.
 
-Finally, reads lying in certain regions can also be removed by specifying those regions in \code{discard}. 
+Reads lying in certain regions can also be removed by specifying the coordinates of those regions in \code{discard}. 
 This is intended to remove reads that are wholly aligned within known repeat regions but were not removed by the \code{minq} filter. 
 Repeats are problematic as changes in repeat copy number between conditions can lead to spurious DB. 
 Removal of reads within repeat regions can avoid detection of these irrelevant differences. 
-Annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{mouse}.
+Coordinates of annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{mouse}.
 
 <<>>=
 repeats <- GRanges("chr1", IRanges(3000001, 3002128))
 new.param <- readParam(discard=repeats, restrict=c("chr1", "chr10", "chrX"))
 demo <- windowCounts(bam.files, ext=frag.len, param=new.param)
+head(rowData(demo))
 @
 
 Using \code{discard} is safer than simply ignoring windows that overlap the repeats. 
@@ -528,6 +531,7 @@ Discarding the window because of the former will compromise detection of DB feat
 Of course, any DB sites within the discarded regions will obviously be lost from downstream analyses.  
 Some caution is therefore required when specifying the regions of disinterest.
 
+\subsection{Additional notes about \code{readParam} objects}
 Note that users can also modify an existing \code{readParam} object using the \code{reform} method.
 The example below copies the parameter values in \code{param} and replaces \code{minq} and \code{discard} with the specified values.
 This is safer than direct modification of the slots, as appropriate type/value checking of each class member is performed.
@@ -538,7 +542,7 @@ another.param
 @
 
 For simplicity, most of the calls to \code{windowCounts} in this guide will use the default settings for \code{param}, i.e., \code{readParam()}.
-Users are encouraged to construct their own \code{readParam} objects, for consistent application throughout their analyses.
+However, users are encouraged to construct their own \code{readParam} objects and apply them consistently throughout their analyses.
 A good check for synchronisation is to ensure that the values of \code{...\$totals} are identical between calls. 
 This means that the same reads are extracted from the BAM file in each call. 
 
@@ -550,48 +554,39 @@ Of course, this also sacrifices spatial resolution as adjacent positions are not
 
 <<>>=
 demo <- windowCounts(bam.files, spacing=100, ext=frag.len)
-head(demo$region)
+head(rowData(demo))
 @
 
-For analyses with large windows, it is also worth increasing the \code{spacing}
-to a fraction of the specified \code{width}. This reduces the computational
-work by decreasing the number of windows and extracted counts. Any loss in
-spatial resolution due to a larger spacing interval is negligble when compared
-to that already lost by using a large window size. 
+For analyses with large windows, it is also worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
+This reduces the computational work by decreasing the number of windows and extracted counts. 
+Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
 
-Windows with a low sum of counts across all libraries can be filtered out using
-the \code{filter} argument. This improves memory efficiency by discarding the
-majority of low-abundance windows corresponding to uninteresting background
-regions. The default filter value is set as the number of libraries multiplied
-by 5. This roughly corresponds to the minimum average count required for
-accurate statistical modelling. Note that more sophisticated filtering is
-recommended and should be applied later (see Chapter~\ref{chap:filter}).
+Windows with a low sum of counts across all libraries can be filtered out using the \code{filter} argument. 
+This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
+The default filter value is set as the number of libraries multiplied by 5. 
+This roughly corresponds to the minimum average count required for accurate statistical modelling. 
+Note that more sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
 <<>>=
 demo <- windowCounts(bam.files, ext=frag.len, filter=30)
-head(demo$counts)
+head(assay(demo))
 @
 
-A special case occurs when \code{bin=TRUE}. This will set \code{spacing=width}
-and only use the $5'$ end of each read for counting. Reads are then counted
-into contiguous bins across the genome. No filtering is performed such that a
-count value must be returned for each bin. Users should set \code{width} to a
-reasonably large value, otherwise reads will be counted and reported for every
-single base in the genome by default.
+Setting \code{bin=TRUE} will cause \code{windowCounts} to count reads into contiguous bins across the genome.
+Specifically, \code{spacing} is set to \code{width} and only the $5'$ end of each read is used for counting. 
+No filtering is performed such that a count value must be returned for each bin. 
+Users should set \code{width} to a reasonably large value, otherwise reads will be counted and reported for every single base in the genome by default.
 
 <<>>=
 demo <- windowCounts(bam.files, width=1000, bin=TRUE)
-head(demo$region)
+head(rowData(demo))
 @
 
 \section{Experiments involving paired-end tags}
-ChIP experiments with paired-end sequencing can be accomodated by setting
-\code{pet="both"} in the \code{windowCounts} function. Read extension is not
-required for paired-end data as the genomic interval spanned by the originating
-fragment is explicitly defined between the $5'$ positions of the paired reads.
-The number of fragments overlapping each window is then counted as described.
-By default, only proper pairs are used whereby the two reads are on the same
-chromosome, face inward and are no more than \code{max.frag} apart.
+ChIP experiments with paired-end sequencing can be accomodated by setting \code{pet="both"} in the \code{param} object supplied to \code{windowCounts}. 
+Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined between the $5'$ positions of the paired reads.
+The number of fragments overlapping each window is then counted as described. 
+By default, only proper pairs are used whereby the two reads are on the same chromosome, face inward and are no more than \code{max.frag} apart.
 
 <<>>=
 petBamFile <- "example-pet.bam"
@@ -601,12 +596,10 @@ demo$totals
 @
 \label{data:pet}
 
-A suitable value for \code{max.frag} can be chosen by examining the
-distribution of fragment sizes using the \code{getPETSizes} function. In this
-example, a user might use a value of around 500 bp as it covers most of the
-fragment size distribution. The plot can also be used to examine the quality of
-the PET sequencing procedure. The location of the peak should be consistent
-with the fragmentation and size selection steps in library preparation. 
+A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes using the \code{getPETSizes} function. 
+In this example, a user might use a value of around 500 bp as it covers most of the fragment size distribution. 
+The plot can also be used to examine the quality of the PET sequencing procedure. 
+The location of the peak should be consistent with the fragmentation and size selection steps in library preparation. 
 
 <<label=frag,eval=FALSE>>=
 out <- getPETSizes(petBamFile)
@@ -622,24 +615,19 @@ abline(v=400, col="red")
 @
 \end{center}
 
-The number of fragments exceeding the maximum size can be recorded for quality
-control. The \code{getPETSizes} function also returns the number of invalid
-pairs, inter-chromosomal pairs, pairs with one unmapped read and single reads.
-A non-negligble proportion of these reads indicates that there may be some
-problems with the paired-end alignment or sequencing. 
+The number of fragments exceeding the maximum size can be recorded for quality control. 
+The \code{getPETSizes} function also returns the number of invalid pairs, inter-chromosomal pairs, pairs with one unmapped read and single reads. 
+A non-negligble proportion of these reads indicates that there may be problems with paired-end alignment or sequencing. 
 
 <<>>=
 c(out$diagnostics, too.large=sum(out$sizes > 400))
 @
 
-In cases where there are a non-negligble proportion of invalid pairs, the reads
-can be rescued by setting \code{rescue.pairs=TRUE}. For each invalid
-intra-chromosomal read pair, the read with the higher mapping quality score
-will be directionally extended to \code{ext} to impute the fragment. For
-inter-chromosomal read pairs, both reads are extended in this manner. Counting
-will then be performed with these fragments in addition to those from the valid
-pairs. A value of \code{ext} can be chosen based on the mode of the
-distribution above.
+In cases where there are a non-negligble proportion of invalid pairs, the reads can be rescued by setting \code{rescue.pairs=TRUE}. 
+For each invalid intra-chromosomal read pair, the read with the higher mapping quality score will be directionally extended to \code{ext} to impute the fragment. 
+For inter-chromosomal read pairs, both reads are extended in this manner. 
+Counting will then be performed with these fragments in addition to those from the valid pairs. 
+A value of \code{ext} can be chosen based on the mode of the distribution above.
 
 <<>>=
 rescue.param <- reform(pet.param, rescue.ext=200, rescue.pairs=TRUE)
@@ -647,13 +635,10 @@ demo <- windowCounts(petBamFile, param=rescue.param)
 demo$totals
 @
 
-Paired-end data can also be treated as single-end data by specifiying
-\code{pet="first"} or \code{pet="second"}. This will only take the first or
-second read of each pair as defined in the SAM flags. Unlike
-\code{rescue.pairs}, the selection and use of one read is done for all read
-pairs regardless of validity. This may be useful for comparing paired-end with
-single-end data, or in truly disastrous situations where paired-end sequencing
-has failed.
+Paired-end data can also be treated as single-end data by specifiying \code{pet="first"} or \code{pet="second"}. 
+This will only take the first or second read of each pair as defined in the SAM flags. 
+Unlike \code{rescue.pairs}, the selection and use of one read is done for all read pairs regardless of validity. 
+This may be useful for comparing paired-end with single-end data, or in truly disastrous situations where paired-end sequencing has failed.
 
 <<>>=
 first.param <- readParam(pet="first")
@@ -661,22 +646,16 @@ demo <- windowCounts(petBamFile, param=first.param)
 demo$totals
 @
 
-Note that all of the paired-end methods in \pkgname{} depend on the
-synchronisation of mate information for each alignment in the BAM file. Any
-file manipulations that might break this synchronisation should be corrected
-prior to the use of \pkgname{}.
+Note that all of the paired-end methods in \pkgname{} depend on the synchronisation of mate information for each alignment in the BAM file. 
+Any file manipulations that might break this synchronisation should be corrected prior to the use of \pkgname{}.
 
 \section{Estimating the average fragment length}
 \label{sec:ccf}
-Cross-correlation plots can be generated directly from BAM files using the
-\code{correlateReads} function. This provides a measure of the
-immunoprecipitation (IP) efficiency of a ChIP-seq experiment
-\citep{kharchenko2008}. Efficient IP should yield a smooth peak at a distance
-corresponding to the average fragment length. This reflects the
-strand-dependent bimodality of reads around narrow regions of enrichment, e.g.,
-TF binding sites. The location of the peak can be used as an estimate of the
-average fragment length ($\sim$110 bp below) for read extension in 
-\code{windowCounts}. 
+Cross-correlation plots can be generated directly from BAM files using the \code{correlateReads} function. 
+This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment \citep{kharchenko2008}. 
+Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
+This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
+The location of the peak can then be used as an estimate of the average fragment length ($\sim$110 bp below) for read extension in  \code{windowCounts}. 
 
 % Note that this makes some assumptions about the shape of each peak. In
 % particular, it assumes that the peaks are symmetrical so that the distance
@@ -698,14 +677,12 @@ plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
 @
 \end{center}
 
-A sharp spike may also observed in the plot at a distance corresponding to the
-read length. This is thought to be an artifact, caused by the preference of
-aligners towards uniquely mapped reads. The size of the smooth peak can be
-compared to the height of the spike to assess the signal-to-noise ratio of the
-data \citep{landt2012}. Poor IP efficiency will result in a smaller or absent
-peak as bimodality is less pronounced. Note that duplicate removal is required
-here to reduce the size of the read length spike. Otherwise, the fragment
-length peak will not be visible as a separate entity.
+A sharp spike may also observed in the plot at a distance corresponding to the read length. 
+This is thought to be an artifact, caused by the preference of aligners towards uniquely mapped reads. 
+The size of the smooth peak can be compared to the height of the spike to assess the signal-to-noise ratio of the data \citep{landt2012}. 
+Poor IP efficiency will result in a smaller or absent peak as bimodality is less pronounced. 
+Note that duplicate removal is required here (set \code{dedup=TRUE} in \code{readParam}) to reduce the size of the read length spike. 
+Otherwise, the fragment length peak will not be visible as a separate entity.
 
 % For a given background read, most aligners will prefer (or demand) unique
 % mapping locations. Any unique sequence in the genome will also have a unique
@@ -715,10 +692,8 @@ length peak will not be visible as a separate entity.
 % distance between the 5' ends of the forward and reverse reads i.e. the read
 % length. A spike at zero is not observed as duplicates are removed.
 
-Cross-correlation plots can also be used for fragment length estimation of
-narrow histone marks such as histone acetylation and H3K4 methylation.
-However, they are less effective for regions of diffuse enrichment where
-bimodality is not obvious (e.g. H3K27 trimethylation).
+Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation.
+However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g. H3K27 trimethylation).
 
 % For enrichment with any reasonably large width, we've assumed that the
 % binding event provides no protection during sonication. If it does, you
@@ -752,11 +727,9 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 \end{center}
 
 \section{Counting over manually specified regions}
-The \pkgname{} package focuses on counting reads into windows. However, it may
-be desirable on occasion to use the same conventions (e.g., duplicate
-removal, quality score filtering) when counting reads into pre-specified
-regions. This can be performed with the \code{regionCounts} function, which is
-largely a wrapper for \code{findOverlaps} from the \granges{} package.
+The \pkgname{} package focuses on counting reads into windows. 
+However, it may be desirable on occasion to use the same conventions (e.g., duplicate removal, quality score filtering) when counting reads into pre-specified regions. 
+This can be performed with the \code{regionCounts} function, which is largely a wrapper for \code{findOverlaps} from the \granges{} package.
 
 <<>>=
 my.regions <- GRanges(c("chr11", "chr12", "chr15"),
