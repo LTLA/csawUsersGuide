@@ -531,7 +531,7 @@ Discarding the window because of the former will compromise detection of DB feat
 Of course, any DB sites within the discarded regions will obviously be lost from downstream analyses.  
 Some caution is therefore required when specifying the regions of disinterest.
 
-\subsection{Additional notes about \code{readParam} objects}
+\subsection{Additional notes about parameter specification}
 Note that users can also modify an existing \code{readParam} object using the \code{reform} method.
 The example below copies the parameter values in \code{param} and replaces \code{minq} and \code{discard} with the specified values.
 This is safer than direct modification of the slots, as appropriate type/value checking of each class member is performed.
@@ -1560,7 +1560,7 @@ The alternative would be to iterate over the entire DB analysis, which would be 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Testing differential binding}
+\chapter{Testing for differential binding}
 \label{chap:stats}
 
 \begin{combox}
@@ -1917,9 +1917,9 @@ require(TxDb.Mmusculus.UCSC.mm10.knownGene)
 sig.bins <- merged$region[as.integer(rownames(tabcom))]
 anno <- detailRanges(sig.bins, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
    orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
-tail(anno$overlap)
-tail(anno$left)
-tail(anno$right)
+head(anno$overlap)
+head(anno$left)
+head(anno$right)
 @
 
 Character vectors of compact string representations are provided that describe the features overlapped by each supplied region. 
