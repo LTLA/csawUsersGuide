@@ -1130,7 +1130,7 @@ Thus, spurious trends that might affect normalization are not introduced.
 par(mfrow=c(1,2))
 abval <- ab[keep]
 o <- order(abval)
-adjc <- cpm(ac.dge, log=TRUE)
+adjc <- cpm(ac.dge[keep,], log=TRUE)
 mval <- adjc[,1]-adjc[,2]
 fit <- loessFit(x=abval, y=mval)
 smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
@@ -1369,7 +1369,7 @@ Thus, the prior must also be adjusted by \code{scaled} when computing the bin ab
 <<>>=
 pc <- 0.5
 win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
-bin.ab <- aveLogCPM(asDGEList(binned, prior.count=pc*scaled)
+bin.ab <- aveLogCPM(asDGEList(binned), prior.count=pc*scaled)
 bin.ab <- bin.ab - log2(scaled)
 @
 
@@ -1993,7 +1993,7 @@ for (i in 1:length(bam.files)) {
         fill=rgb(1,0,0,0.4), ylim=c(0, max.depth[i]))
     collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
 }
-gax <- GenomeAxisTrack(cex=1.2, col="black")
+gax <- GenomeAxisTrack(col="black")
 plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
 @
 
