@@ -1275,10 +1275,10 @@ summary(abundances)
 @
 
 For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
-One can then restrict the dataset to the filtered values. 
+This restricts the analysis to windows with abundances above this threshold.
 While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
 Downstream estimates of various statistics are also more relevant when restricted to the regions of interest. 
-Of course, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
+That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
 
 <<>>=
 keep <- abundances > -1
@@ -1286,9 +1286,10 @@ demo <- data[keep,]
 summary(keep)
 @
 
-The exact choice of filter threshold may not be obvious, especially when there is no clear distinction between genuine binding and background.
-A filter that is too conservative will be ineffective whereas a filter that is too aggressive may reduce power by removing false nulls. 
-In some respects, the filter value is necessarily arbitrary as it reflects a prior belief regarding the minimum abundance of the features of interest.
+The exact choice of filter threshold may not be obvious.
+This problem is exacerbated when there is no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
+A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
+Arbitrariness is unavoidable when balancing these opposing considerations.
 Nonetheless, several strategies for defining the threshold are described below. 
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
