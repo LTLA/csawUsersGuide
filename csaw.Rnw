@@ -1931,7 +1931,7 @@ This indicates the gap between the annotated feature and the supplied region.
 
 While the string representation saves space in the output, it is not easy to work with.
 If the annotation needs to manipulated directly, users can obtain it from the \code{detailRanges} command by not specifying the regions of interest. 
-This can then be used for overlapping, e.g., to identify the genes containing DB sites overlapping the promoter.
+This can then be used for interactive manipulation, e.g., to identify all genes where the promoter contains DB sites.
 
 <<>>=
 anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
