@@ -1588,7 +1588,7 @@ Each window can then be tested for significant  differences between counts  for 
 
 Of course, any statistical method can be used if it is able to accept a count matrix and a vector of normalization factors (or more generally, a matrix of offsets). 
 The choice of \edger{} is primarily motivated by its performance relative to some published alternatives \citep{law2014}.
-This author's desire to increase his h-index is also an undeniable factor.
+This author's desire to increase his h-index may also be a factor \citep{chen2014}.
 
 \subsection{Setting up the data}
 A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
