@@ -1375,7 +1375,7 @@ scaled
 The abundances of the bins are estimated and downscaled according to the computed \code{scaled} value.
 The window abundances are also re-estimated here to standardize the effect of the prior count.
 Adding a prior count avoids undefined/unstable estimates when the actual counts are low.
-However, if the same prior is used in all \code{aveLogCPM} calls, downscaling will reduce the effective prior added to the bin counts.
+However, if the same prior is used for both bin and window counts, downscaling will reduce the effective prior added to the former.
 Thus, the prior must also be adjusted by \code{scaled} when computing the bin abundances, as shown below.
 
 <<>>=
