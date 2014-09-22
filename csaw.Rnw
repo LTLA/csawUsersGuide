@@ -90,7 +90,7 @@ dir.create("plots-ug")
 \chapter{Introduction}
 \section{Scope}
 This document gives an overview of the Bioconductor package \pkgname{} for detecting differential binding (DB) in ChIP-seq experiments.
-Specifically, \pkgname{} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions. 
+Specifically, \pkgname{} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions \citep{lun2014}.
 However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.
 The statistical methods described here are based upon those in the \edger{} package \citep{robinson2010}. 
 Knowledge of \edger{} is useful but not a prerequesite for reading this guide.
