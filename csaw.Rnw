@@ -516,15 +516,30 @@ Alternatively, it allows \code{windowCounts} to work on huge datasets or in limi
 
 Reads lying in certain regions can also be removed by specifying the coordinates of those regions in \code{discard}. 
 This is intended to remove reads that are wholly aligned within known repeat regions but were not removed by the \code{minq} filter. 
-Repeats are problematic as changes in repeat copy number between conditions can lead to spurious DB. 
+Repeats are problematic as changes in repeat copy number or accessibility between conditions can lead to spurious DB. 
 Removal of reads within repeat regions can avoid detection of these irrelevant differences. 
-Coordinates of annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{mouse}.
 
 <<>>=
 repeats <- GRanges("chr1", IRanges(3000001, 3002128))
 new.param <- readParam(discard=repeats, restrict=c("chr1", "chr10", "chrX"))
 demo <- windowCounts(bam.files, ext=frag.len, param=new.param)
 head(rowData(demo))
+@
+
+Coordinates of annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}.
+However, this requires some effort to parse.
+If possible, the simplest approach is to extract them from an appropriate \code{BSgenome} object. 
+The example below takes the repeats called by the RepeatMasker program in the hg19 build of the human genome.
+
+<<>>=
+require(BSgenome.Hsapiens.UCSC.hg19.masked)
+bs <- BSgenome.Hsapiens.UCSC.hg19.masked
+all.masks <- list()
+for (i in 1:length(seqnames(bs))) { 
+    cur.chr <- seqnames(bs)[i]
+	all.masks[[i]] <- GRanges(cur.chr, masks(bs[[cur.chr]])$RM)
+}
+suppressWarnings(do.call(c, all.masks))
 @
 
 Using \code{discard} is safer than simply ignoring windows that overlap the repeats. 
@@ -1109,11 +1124,11 @@ The trend cannot be corrected with scaling methods as no single scaling factor w
 Rather, non-linear methods are required, such as cyclic loess or quantile normalization.
 
 One such implementation is provided in \code{normalize} by setting \code{type="loess"}. 
-This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to count data. 
-A matrix is produced that contains a specific offset term for each bin/window in each library.
-This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB. 
-The example below performs non-linear normalization on the counts for smaller bins, of which the top 5\% are assumed to contain binding sites. 
-Some filtering is necessary to remove low-abundance regions where loess curve fitting is inaccurate. 
+This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
+A matrix is produced that contains an offset term for each bin/window in each library.
+This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB.
+In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} normalization.
+The example below works on the filtered counts for smaller bins, of which the top 5\% are assumed to contain binding sites. 
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
@@ -1127,9 +1142,10 @@ head(ac.off)
 
 MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. 
-If filtering needs to be performed prior to normalization, the average count computed by \code{aveLogCPM} is strongly recommended as the filter statistic (see Chapter~\ref{chap:filter} for more detail on choices of filter value).
+Filtering is strongly recommended to remove low-abundance regions where loess curve fitting is inaccurate. 
+When doing so, the value computed by \code{aveLogCPM} should be used as the filter statistic.
 This is because an average count threshold will act as a clean vertical cutoff in the plots below. 
-Thus, spurious trends that might affect normalization are not introduced.
+Spurious trends that might affect normalization will not be introduced at the filter boundary. 
 
 <<eval=FALSE,keep.source=true,label=trendplot>>=
 par(mfrow=c(1,2))
@@ -1161,6 +1177,8 @@ lines(abval[o], fit$fitted[o], col="red")
 Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
 This is a stronger assumption than that for scaling methods, which only require a non-DB majority across all features.
 Removal of the trend may not be appropriate if it represents some genuine biological phenomenon, e.g., involving changes in overall binding. 
+In addition, the computed offsets are not compatible with the normalization factors from the scaling methods.
+Only one of these sets of values will ultimately be used by \edger{}.
 
 \section{A word on other biases}
 No normalization is performed to adjust for differences in mappability or sequencability between different regions of the genome. 
@@ -1299,7 +1317,8 @@ The exact choice of filter threshold may not be obvious.
 This problem is exacerbated when there is no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
 A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
 Arbitrariness is unavoidable when balancing these opposing considerations.
-Nonetheless, several strategies for defining the threshold are described below. 
+Nonetheless, several strategies for defining the threshold are described below.
+Users are directed to choose one of these filtering approaches for their own analyses.
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
 % the best idea, simply because it means that it's not independent of the
@@ -1536,7 +1555,7 @@ head(broads)
  
 Windows can be filtered to only retain those which overlap with the regions of interest. 
 Discerning users may wish to distinguish between full and partial overlaps, though this should not be a significant issue for small windows.
-This could also be combined with abundance filtering to retain windows that contain binding sites in the regions of interest.
+This could also be combined with abundance filtering to retain windows that contain putative binding sites in the regions of interest.
 
 <<>>=
 suppressWarnings(keep <- overlapsAny(rowData(data), broads))
