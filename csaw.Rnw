@@ -1128,7 +1128,7 @@ This is based on the fast loess algorithm \citep{ballman2004} with minor adaptat
 A matrix is produced that contains an offset term for each bin/window in each library.
 This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB.
 In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} normalization.
-The example below works on the filtered counts for smaller bins, of which the top 5\% are assumed to contain binding sites. 
+The example below operates on the filtered counts for small bins, of which the top 5\% are assumed to contain binding sites. 
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
