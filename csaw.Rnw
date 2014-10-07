@@ -530,6 +530,7 @@ Coordinates of annotated repeats can be found for a number of species on the UCS
 However, this requires some effort to parse.
 If possible, the simplest approach is to extract them from an appropriate \code{BSgenome} object. 
 The example below takes the repeats called by the RepeatMasker program in the hg19 build of the human genome.
+Blacklisted regions from the ENCODE project are another option \citep{landt2012}.
 
 <<>>=
 require(BSgenome.Hsapiens.UCSC.hg19.masked)
