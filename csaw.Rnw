@@ -1897,8 +1897,8 @@ Any value from 2000 to 10000 bp is recommended.
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
 <<>>=
-merged <- mergeWindows(rowData(data), tol=1000L, max.width=5000L)
-summary(width(merged$region))
+merged.max <- mergeWindows(rowData(data), tol=1000L, max.width=5000L)
+summary(width(merged$max))
 @
 
 % Is there a better way to do this? I suppose we could choose the number of
@@ -1921,14 +1921,48 @@ This will separate binding sites that are close together but are changing in opp
 A vector can be supplied in \code{sign} to indicate whether each window has a positive log-fold change.
 
 <<>>=
-merged <- mergeWindows(rowData(data), tol=1000L, sign=(results$table$logFC > 0))
-summary(width(merged$region))
+merged.sign <- mergeWindows(rowData(data), tol=1000L, sign=(results$table$logFC > 0))
+summary(width(merged.sign$region))
 @
 
 For routine analyses, sign-based filtering is not recommended as the sign of windows within each cluster is not independent of their DB status. 
 Windows in a genuine DB region will form one cluster (consistent sign) whereas those in non-DB regions will form many clusters (inconsistent sign, as the log-fold change is small).
 This results in conservativeness as more clusters will have large $p$-values.
 Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
+
+\section{Getting the most DB window}
+In some cases, it may be necessary to also report the window in which the strongest DB is found.
+This information can be useful for identifying the relevant window in large complex clusters, or to narrow down the relevant sequence for motif discovery.
+Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
+This reports the index of the window with the lowest $p$-value in each cluster.
+
+<<>>=
+best <- getBestTest(merged$id, results$table)
+head(best)
+@
+
+In most cases, the cluster coordinates will be precise enough so that the best window need only be reported as a descriptive measure.
+However, more statistical rigour is necessary if the latter are to be reported directly, i.e., as the features of interest over which the error rate is to be controlled.
+To maintain error control, a Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{best}.
+This is necessary to account for the implicit multiple testing across all windows in each cluster.
+
+Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
+This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
+As the average abundance is independent of the $p$-value, no multiple testing correction is necessary under this definition.
+
+<<>>=
+best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
+head(best.2)
+@
+
+Arbitrary summarization schemes can be implemented manually with the \code{aggregate} function.
+For example, the code below finds the window with the largest absolute log-fold change in each cluster.
+
+<<>>=
+manual <- aggregate(results$table$logFC ~ merged$id,  
+    FUN=function(x) { which.max(abs(x)) })
+head(manual)
+@
 
 \chapter{Post-processing steps}
 
