@@ -318,7 +318,7 @@ Reads from a DB site may be counted alongside reads from a non-DB site (e.g., no
 This will result in the loss of DB detection power.
 
 The window size can be interpreted as a measure of the width of the binding site. 
-Thus, TF analyses will usually use a window size of several base pairs. 
+Thus, TF analyses will typically use a window size of several base pairs. 
 This maximizes spatial resolution to allow optimal detection of narrow regions of enrichment. 
 For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
 This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
@@ -746,6 +746,48 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 <<histone_ccf>>
 @
 \end{center}
+
+\section{Choosing an appropriate window size}
+The coverage profile around potential binding sites can be obtained with the \code{profileSummit} function.
+This defines ``summits'' as local maxima in the read density across the genome.
+The coverage of the surrounding regions is recorded as a function of the distance from the summit.
+This is averaged across all summits to obtain a coverage profile for each library.
+
+<<label=profiling,eval=FALSE>>=
+collected.ac <- profileSummit("h3ac.bam", param=dedup.on, min.depth=0.5)
+collected.me2 <- profileSummit("h3k4me2.bam", param=dedup.on, min.depth=0.5)
+collected.tf <- profileSummit("es_1.bam", param=dedup.on, min.depth=0.5)
+
+plot(collected.ac$span, collected.ac$coverage, type="l", col="blue", 
+    xlim=c(0, 5000), lwd=2, xlab="Window size", ylab="Relative coverage")
+lines(collected.me2$span, collected.me2$coverage, col="darkgreen", lwd=2)
+lines(collected.tf$span, collected.tf$coverage, lwd=2)
+@
+
+\setkeys{Gin}{width=0.7\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<profiling>>
+@
+\end{center}
+
+The window size can then be identified as the distance at which the surrounding coverage becomes negligble.
+In the example above, a window size of around 500 - 1000 bp may be appropriate for the H3 acetylation and H3K4me2 datasets.
+This captures most of the additional coverage around the summit without risking contamination from non-enriched background.
+In contrast, the NF-YA profile drops off more sharply.
+This indicates that a smaller window size ($< 100$ bp) is probably adequate, consistent with sharp TF binding.
+
+In practice, a clear-cut choice of distance/window size is rarely found in real datasets.
+For many non-TF targets, the widths of the enriched regions can be highly variable.
+This manifests as a long tail in the coverage profile plot and suggests that no single window size is optimal.
+Indeed, even if all enriched regions were of constant width, the width of the DB events occurring within those regions may be variable.
+Thus, it may be preferable to err on the side of smaller windows to maintain spatial resolution for such events.
+
+The performance of this approach also deteriorates when background enrichment is prevalent.
+This makes it difficult to determine when the coverage becomes negligble.
+The problem is compounded for diffuse marks where the transition between enrichment and background is unclear.
+Indeed, summits are unlikely to be well-defined within diffuse regions.
+Users are advised to exercise caution when deciding on an appropriate window size.
 
 \section{Counting over manually specified regions}
 The \pkgname{} package focuses on counting reads into windows. 
