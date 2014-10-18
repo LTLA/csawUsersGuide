@@ -1,0 +1,2142 @@
+\documentclass[12pt]{report}
+\usepackage{fancyvrb,graphicx,natbib,url,comment,import,bm}
+\usepackage{tikz}
+\usepackage[hidelinks]{hyperref}
+
+% Margins
+\topmargin -0.1in
+\headheight 0in
+\headsep 0in
+\oddsidemargin -0.1in
+\evensidemargin -0.1in
+\textwidth 6.5in
+\textheight 8.3in
+
+% Sweave options
+\usepackage{Sweave}
+\SweaveOpts{keep.source=TRUE,prefix.string=plots-ug-rel/ug,png=TRUE,pdf=FALSE}
+
+\DefineVerbatimEnvironment{Sinput}{Verbatim}{fontshape=sl,fontsize=\footnotesize}
+\DefineVerbatimEnvironment{Soutput}{Verbatim}{fontsize=\footnotesize}
+\DefineVerbatimEnvironment{Scode}{Verbatim}{fontsize=\footnotesize}
+%\fvset{listparameters={\setlength{\topsep}{0pt}}}
+\renewenvironment{Schunk}{\vspace{0pt}}{\vspace{0pt}}
+
+\DefineVerbatimEnvironment{Rcode}{Verbatim}{fontsize=\footnotesize}
+\newcommand{\edger}{edgeR}
+\newcommand{\pkgname}{csaw}
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+\newcommand{\R}{\textsf{R}}
+
+\newcommand{\subread}{subread}
+\newcommand{\macs}{MACS}
+\newcommand{\rtracklayer}{rtracklayer}
+\newcommand{\gviz}{Gviz}
+\newcommand{\granges}{GenomicRanges}
+
+% Defining a comment box.
+\usepackage{framed,color}
+\definecolor{shadecolor}{rgb}{0.9, 0.9, 0.9}
+\newenvironment{combox}
+{ \begin{shaded}\begin{center}\begin{minipage}[t]{0.95\textwidth} }
+{ \end{minipage}\end{center}\end{shaded} }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{\pkgname{}: ChIP-seq analysis with windows \\ \vspace{0.2in} User's Guide}
+\author{Aaron Lun}
+
+% Set to change date for document, not compile date.
+\date{First edition 15 August 2012\\
+\vspace{6pt}
+Last revised 21 September 2014}
+
+% Removing the bibliography title so it shows up in the contents.
+\makeatletter
+\renewenvironment{thebibliography}[1]{%
+%     \section*{\refname}%
+%      \@mkboth{\MakeUppercase\refname}{\MakeUppercase\refname}%
+      \list{\@biblabel{\@arabic\c@enumiv}}%
+           {\settowidth\labelwidth{\@biblabel{#1}}%
+            \leftmargin\labelwidth
+            \advance\leftmargin\labelsep
+            \@openbib@code
+            \usecounter{enumiv}%
+            \let\p@enumiv\@empty
+            \renewcommand\theenumiv{\@arabic\c@enumiv}}%
+      \sloppy
+      \clubpenalty4000
+      \@clubpenalty \clubpenalty
+      \widowpenalty4000%
+      \sfcode`\.\@m}
+     {\def\@noitemerr
+       {\@latex@warning{Empty `thebibliography' environment}}%
+      \endlist}
+\makeatother
+
+\begin{document}
+\pagenumbering{roman}
+\maketitle
+\tableofcontents
+
+<<results=hide,echo=FALSE>>=
+dir.create("plots-ug-rel")
+@
+
+\newpage
+\pagenumbering{arabic}
+
+\chapter{Introduction}
+\section{Scope}
+This document gives an overview of the Bioconductor package \pkgname{} for detecting differential binding (DB) in ChIP-seq experiments.
+Specifically, \pkgname{} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions \citep{lun2014}.
+However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.
+The statistical methods described here are based upon those in the \edger{} package \citep{robinson2010}. 
+Knowledge of \edger{} is useful but not a prerequesite for reading this guide.
+
+\section{How to get help}
+Most questions about \pkgname{} should be answered by the documentation. 
+Every function mentioned in this guide has its own help page. 
+For example, a detailed description of the arguments and output of the \code{windowCounts} function can be obtained by typing \code{?windowCounts} or \code{help(windowCounts)} at the \R{} prompt. 
+Further detail on the methods or the underlying theory can be found in the references at the bottom of each help page.
+
+The authors of the package always appreciate receiving reports of bugs in the package functions or in the documentation. 
+The same goes for well-considered suggestions for improvements. 
+Other questions about how to use \pkgname{} are best sent to the Bioconductor support site at \url{https://support.bioconductor.org}.
+Please send requests for general assistance and advice to the support site, rather than to the individual authors. 
+
+Users posting to the support site for the first time may find it helpful to read the posting guide at \url{http://www.bioconductor.org/help/support/posting-guide}.
+
+\section{Quick start}
+A typical ChIP-seq analysis in \pkgname{} would look something like that described below. 
+This assumes that a vector of file paths to sorted and indexed BAM files is provided in \code{bam.files} and a design matrix in supplied in \code{design}.
+The code is split across several steps:
+
+<<results=hide,echo=FALSE,label=bamdef>>=
+bam.files <- c("es_1.bam", "es_2.bam", "tn_1.bam", "tn_2.bam")
+design <- model.matrix(~factor(c('es', 'es', 'tn', 'tn')))
+colnames(design) <- c("intercept", "cell.type")
+@
+
+\begin{enumerate}
+\item Loading in data from BAM files.
+<<>>=
+require(csaw)
+data <- windowCounts(bam.files, ext=110)
+binned <- windowCounts(bam.files, bin=TRUE, width=10000)
+@
+\item Calculating normalization factors.
+<<>>=
+normfacs <- normalize(binned)
+@
+\item Filtering out uninteresting regions.
+<<>>=
+require(edgeR)
+keep <- aveLogCPM(asDGEList(data)) >= -1
+data <- data[keep,]
+@
+\item Identifying DB windows.
+<<>>=
+y <- asDGEList(data, norm.factors=normfacs)
+y <- estimateDisp(y, design)
+fit <- glmQLFit(y, design, robust=TRUE)
+results <- glmQLFTest(fit)
+@
+\item Correcting for multiple testing.
+<<>>=
+merged <- mergeWindows(rowData(data), tol=1000L)
+tabcom <- combineTests(merged$id, results$table)
+@
+\end{enumerate}
+
+In this guide, the behaviour of each step will be demonstrated with some publicly available data.
+The dataset below focuses on changes in the binding profile of the NFYA protein between embryonic stem cells and terminal neurons \citep{tiwari2012}. 
+This will be used as a case study for most of the code examples throughout the guide.
+
+<<>>=
+<<bamdef>>
+@
+\label{data:main}
+
+A comprehensive listing of the datasets used in this guide is provided in Section~\ref{sec:dataset}, along with instructions on how to obtain and process them for entry into the \pkgname{} pipeline.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Converting reads to counts}
+\label{chap:count}
+\begin{combox}
+Hello, reader. 
+A little box like this will be present at the start of each chapter. 
+It's intended to tell you which objects from previous chapters are needed to get the code in the current chapter to work.  
+At this point, all we need are the \code{bam.files} that we defined in the introduction above. 
+\end{combox}
+
+\section{Types of input data}
+Sorted and indexed BAM (i.e., binary SAM) files are required as input into the read counting functions in \pkgname{}. 
+Sorting should be performed on the genomic position of the mapped read.
+For a given BAM file named \code{xxx.bam}, the corresponding index file should be named as \code{xxx.bam.bai} such that both files are in the same directory. 
+Users should be aware that the sensibility of the supplied index is not checked prior to counting. 
+A common mistake is to replace or update the BAM file without updating the index. 
+This will cause \pkgname{} to return incorrect results when it attempts to load alignments from new BAM file.
+
+\section{Counting reads into windows}
+
+\subsection{Overview}
+The \code{windowCounts} function uses a sliding window approach to count fragments for a set of libraries. 
+For single-end data, the fragment corresponding to a read is imputed by directionally extending each read to the average fragment length. 
+The number of fragments overlapping a genomic window is counted. 
+This is repeated after sliding the window along the genome to a new position. 
+A count is then obtained for each window in each library. 
+
+<<>>=
+frag.len <- 110
+window.width <- 1
+data <- windowCounts(bam.files, ext=frag.len, width=window.width)
+@
+
+The data is returned as a \code{SummarizedExperiment} object.
+The matrix of counts is stored as the first entry in the \code{assays} slot.
+Each row corresponds to a genomic window while each column corresponds to a library.
+The coordinates of each window are stored in the \code{rowData}.
+The total number of reads in each library are stored as \code{totals} in the \code{colData}.
+
+<<>>=
+head(assay(data))
+head(rowData(data))
+data$totals
+@
+
+For single-end data, suitable values for the average fragment length in \code{ext} can be estimated from the primary peak in a cross-correlation plot (see Section~\ref{sec:ccf}). 
+Alternatively, the length can be estimated from diagnostics during ChIP or library preparation, e.g., post-fragmentation gel electrophoresis images. 
+Typical values range from 100 to 300 bp, depending on the efficiency of sonication and the use of size selection steps in library preparation.
+
+%%%%%%%%%%%%%%%%%%%
+% It's a simplifying assumption that the fragment length is constant.
+% Variability in the fragment length between libraries is not considered.  If
+% you ever need to vary it, that suggests that you've used a different protocol
+% between libraries, which you really shouldn't do. In the best case, you use
+% the same protocol and the fragment size changes between groups because of a
+% biological difference e.g. more nucleosomes inhibiting fragmentation.
+% However, if you use different fragment lengths for different groups, you
+% could end up with spurious DB calls at constant regions just because of
+% fragment length. This is usually not interesting.
+%
+% A related problem is whether you can allow the fragment length to vary within
+% the genome. For example, some places may be easier to fragment which leads to
+% heterogeneity in the fragment lengths at different locations. The problem
+% with trying to identify a fragment length for each location is that the
+% estimate wouldn't be very precise because you're calculating it from limited
+% data. It would really only work for large peaks where the large number of
+% reads stabilises the estimate. However, the advantage wouldn't be that great
+% as results for large peaks should be fairly stable anyway.
+%
+% On real data, the cross-correlation plots are one smooth peak (excluding the
+% read-length spike). This suggests that there's no gross segregation of
+% fragment lengths in the population. Changing the fragment length doesn't seem
+% to change the results too much either. Of course, this whole discussion is
+% moot when we're working with histone marks as you can't really estimate the
+% fragment length from the data.
+
+%%%%%%%%%%%%%%%%%%%
+% An anticipated attack on this approach is why I don't filter for bimodality
+% to identify good candidate sites (a la MACS). It is said that this will
+% reduce the severity of the MTC procedure. I don't do this for several reasons:
+%
+% The first is that every difference is interesting, even if it doesn't
+% necessarily occur in a nice bimodal shape (e.g. histones + other proteins).
+% For example, you mightn't get nice bimodality if one half of the peak is
+% sitting somewhere that's unmappable or difficult to sequence. If you filter
+% by bimodality you'll miss it completely.
+%
+% The second is that defining bimodality is difficult. Arbitrary thresholds for
+% bimodality don't necessarily have a good physical interpretation.  This is
+% complicated by the fact that you have to combine background and enriched
+% samples to avoid data snooping; this can dilute bimodality for smaller peaks.
+% A problem specific to MACS is that single-sample mode won't pick up two peaks
+% within ~10 kbp; one peak will be used as the background for the other peak,
+% which means that it mightn't be significant.
+%
+% Read extension in the direction of the read means that bimodal structures
+% will have sites with greater enrichment depths than regions with the same
+% number of reads but random read directions. This brings looking for
+% bimodality under the framework of row sum filtering. It is also smoother; if
+% you're not bimodal but there is a difference, you still get picked up.
+% 
+% Finally, you can do whatever bimodal filtering you want implicitly, by
+% running the peak caller you want to emulate and then picking only those
+% windows that overlap called peaks. This will give you the MTC advantage
+% without requiring too much extra code.
+
+%%%%%%%%%%%%%%%%%%%
+% Read extension results in strong correlations between adjacent sites as the
+% counts are mostly determined by the same set of reads. However, these
+% correlations have no effect on the statistical analysis. Consider a subset of
+% sites randomly sampled throughout the genome. Correlations within the subset
+% are weaker as the sites are more likely to be further apart and less likely
+% to be affected by the same reads. An (approximately) independent subset of
+% sites can then be obtained by infrequent sampling. The probability of
+% sampling a particular count combination is equal to its relative frequency
+% across the genome. This means that the expected composition of the sampled
+% set is equal to the set of all count combinations where each combination has
+% weight proportional to its frequency in the genome. Thus, an independent
+% subset will provide the same results as those obtained with the use of the
+% entire genome.  This is similar to the outcome of thinning in Markov chain
+% Monte Carlo procedures \citep{link2012}.
+
+\begin{center}
+\begin{tikzpicture}[font=\sffamily]
+% Filling the left region.
+\filldraw[fill=black!20] (0,0) rectangle (10,1);
+\draw (0,-0.1)--(0,-0.5)--(10,-0.5)--(10,-0.1);
+\draw (5,-0.5)--(5,-1);
+\node[below] at (5, -1) {width};
+
+% Adding left read.
+\draw[line width=3pt,color=red!30] (-2,1.5)--(2.5,1.5);
+\draw[line width=3pt,color=red] (-2,1.5)--(-0.5,1.5)--(-0.8,1.8);
+\draw (-2,1.8)--(-2,2)--(2.5,2)--(2.5,1.8);
+\node[below] at (-2,1.45) {\begin{tabular}{c} forward \\ read \end{tabular}};
+
+% Adding the right read
+\draw[line width=3pt,color=blue!30] (12,1.8)--(7.5,1.8);
+\draw[line width=3pt,color=blue] (12,1.8)--(10.5,1.8)--(10.8,2.1);
+\draw (12,2.1)--(12,2.3)--(7.5,2.3)--(7.5,2.1);
+\node[below] at (12,1.75) {\begin{tabular}{c} reverse \\ read \end{tabular}};
+
+\draw (0,2)--(0,3.2)--(3.1,3.2);
+\draw (10,2.3)--(10,3.2)--(6.9,3.2);
+\node[above] at (5,2.8) {fragment length (ext)};
+\end{tikzpicture}
+\end{center}
+
+The specified \code{width} of each window controls the compromise between spatial resolution and count size. 
+Larger windows will yield higher read counts which can provide more power for DB detection. 
+However, spatial resolution is also lost for large windows whereby adjacent features can no longer be distinguished. 
+Reads from a DB site may be counted alongside reads from a non-DB site (e.g., non-specific background) or even those from an adjacent site that is DB in the opposite direction. 
+This will result in the loss of DB detection power.
+
+The window size can be interpreted as a measure of the width of the binding site. 
+Thus, TF analyses will typically use a window size of several base pairs. 
+This maximizes spatial resolution to allow optimal detection of narrow regions of enrichment. 
+For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
+This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
+For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
+Analyses with multiple widths can be combined to provide a comprehensive picture of DB at all resolutions. 
+
+%%%%%%%%%
+% There's two ways to deal with histone marks; clustering or using a width/bin
+% size. Both methods are designed to increase the size of the regions, and
+% hence the size of the counts. Both methods suffer the consequences from loss
+% of spatial resolution. Clustering can dynamically adjust to variable size
+% regions. However, this inherently results in changes to spatial resolution
+% which may or may not be appropriate. For example, there's no way you'd pick
+% up a shrinkage in enrichment spread in the optimal manner because everything
+% would always be clustered together. Using a width provides some more peace of
+% mind when you want these events picked up. 
+%
+% Clustering is also problematic because it only uses information at a single
+% location in the genome. This means that the cluster boundaries tend to be
+% quite imprecise when there is no outstanding enrichment signal. Results might
+% not be robust to such tuning or even new datasets (cluster groupings can
+% change which will change the manner in which counts are collected). On a
+% related note, clustering parameters are also more finicky/less intuitive.
+%
+% Clustering based on reads also has the claim that you get better resolution
+% because you don't have to account for the extra width of the sliding window
+% that kicks out the width of the region interval. However, this advantage
+% disappears when you get background reads. Clustering will include the
+% positions of those reads in the final output size when the clustering range
+% is large enough (e.g. epsilon for DBSCAN). Reporting the boundaries of the
+% cluster will then be affected by the value of the clustering range as more
+% background reads get included if the clustering range is larger.
+% 
+% All in all, clustering will give higher counts and better performance for
+% clusters where the DB status is homogenous throughout the cluster. For more
+% complex events, clustering will probably be suboptimal as the clustering
+% critera must remain blind to the DB status (see above). 
+%
+% So, widths are generally a simpler alternative. However, it is unable to deal
+% with variable sizes of enriched regions. Any given width will be optimized
+% for regions of a particular size so you might as well try out a bunch of
+% values. If an optimal non-zero width exists i.e. constant size regions, the
+% problem becomes that of trying to figure out the size. This is  easy for
+% sharp peaks where it's irrelevant (not much space between a small value and
+% zero) but hard diffuse regions where it is most needed (see
+% autocorrelations). Using a suboptimal value might reduce power but it
+% shouldn't change the rankings of the regions. 
+%
+% The argument for arbitrary resolution is akin to that when using a
+% microscope. Do you want to focus on the details or on the big picture? An
+% example of the necessarily arbitrary nature of width selection would be a
+% bunch of histone marks which are differentially enriched in short stretches.
+% These stretches are separated by short, non-DB spaces. In ``big picture''
+% terms, one would classify these stretches as part of the same region so you
+% would use a large width to increase counts and power. However, depending on
+% the definition of 'short', there may be some biological importance in the
+% details of the pattern which would be missed by a large width (e.g.
+% enrichment localized around TF sites, excluded at a gene).
+%
+% I don't think using gargantuan widths to maximize power for very diffuse
+% regions is a great idea. Strange things happen at low abundances (e.g.
+% correlations found during background normalization) which muddies the waters
+% in terms of validating very diffuse reigons. Ideally, local regions should be
+% able to carry their own weight in terms of power, which makes it much more
+% convincing when trying to eyeball the results.
+
+%%%%%%%%%
+% Another important point is whether FDR control is maintained in the combined
+% set of results from analyses with differing widths. The answer is, "Most of
+% the time.".  If FDR control is maintained in each set of results, then the
+% combined set should also maintain FDR control (as the expected value of the
+% FDR doesn't change). However, the FDR concept has an implicit assumption that
+% there is at least one true positive in the significant set. Without this
+% assumption, the FDR calculation would just descend to FWER control using
+% Simes' method. This assumption is required for each set that is to be
+% combined i.e. one true positive in each set of results. If we were to compute
+% the FDR directly from the combined set of p-values/weights, we'd only require
+% the assumption of one true positive in the combined set.
+%
+% It's not hard to imagine instances where the first assumption is violated but
+% the second is not. Consider a set where there are no true positives and the
+% tests are all completely correlated. When you combine results, you're adding
+% an expected value of a*n (for threshold 'a' and number of tests 'n') to both
+% the numerator and denominator of false positives and total discoveries,
+% respectively. If you were controlling the FDR exactly before you added this
+% lot, then FDR control would now be lost. Of course, this is a rather extreme
+% example. More realistic situations wouldn't be so badly affected as the a*n
+% product would probably be small. In fact, the assumption of a true positive
+% in each set might not be all that strong as positive correlations exist
+% between tests corresponding to the same site using different widths.  This
+% means that a true positive at one width probably translates to a true
+% positive in another.
+%
+% To protect against this, two approaches are possible. The first is to
+% multiply the q-values by the number of different width analyses. This is a
+% Bonferroni approach which provides the most conservative protection (i.e.
+% everything is assumed to be the lowest q-value in the combined set). It is
+% also the simplest. The second approach is to dump the p-values (and logFC's
+% and logCPM's) and the weights into a file after each width analysis; then
+% reload them, merge them into a single DENList by rbinding, and compute
+% q-values with calcWeightedFDR. Then, split them up again for region assembly.
+% Complicated but scalable. To be honest, I put both under "too much effort"
+% and I just ride the assumption.
+%
+% Another warning with multiple analyses is that even if the FDR is controlled
+% in each one, you'll end up with the problem of overlapping results. If you
+% merge redundant DB tests, you can end up with a worst-case effective FDR
+% which is almost twice as large; this assumes that all true discoveries
+% overlap and all false discoveries are unique. So, you'll end up having to
+% multiply your q-values by the number of test sets you're merging. You could
+% probably get a tighter bound due to the correlations between corresponding
+% tests in different sets, but this approach dovetails nicely with my worries
+% above, so it's what I'm going with. 
+
+%%%%%%
+% My attempts to estimate the width include:
+%%
+% Autocorrelations. These are quite ineffective in guiding the choice of width.
+% This is because for diffuse marks where they are most needed, the poor
+% density of reads in enriched regions reduces the strength of the
+% correlations. This means that you almost start off at zero (whereas for more
+% punctate marks, the correlations at small lags are much higher). In short,
+% you can't distinguish between diffuse marks and random reads. 
+%
+% More generally, autocorrelations aren't that great because there's nothing to
+% compare it to. It keeps dropping rather than becoming maximal at any point.
+% Trying to find when it elbows off is fairly arbitrary. Comparing it to a
+% threshold is also difficult i.e. distinguishing between negligble' and 'even
+% more negligble'. It also ceases to be robust to the choice of threshold when
+% relative scales are used, because the function begins asymptoting way above
+% zero (so small changes on the x-axis correspond to very large changes on the
+% estimated width).
+%
+% The autocorrelation function also depends on other factors such as the number
+% of peaks which complicates interpretation relative to a fixed threshold.  For
+% example, a mark with lots of small peaks will have a higher and more
+% persistent autocorrelation than a mark with fewer peaks, even if the latter's
+% peaks are larger. 
+%%
+% Masking reads from each strand with those from the other strand, and
+% computing cross-correlations using the remainders. The maximum point should
+% then depend on the value of the width. Problem is, the exact relationship
+% depends on the shape of the clusters. The effectiveness of masking also
+% depends on the shape of the cluster e.g. a triangular distribution for each
+% peak will have fewer overlaps and reduced masking. Increasing the
+% aggressiveness of the masking then raises problems with the reliability of
+% the results (as you start hitting the isolated forward/reverse flanks).
+%%
+% Alternatively, peak-calling programs like MACS \citep{zhang2008} can be used
+% in single sample mode on pooled libraries to determine the width of enriched
+% regions.  Pooling is necessary to avoid snooping on the DB status of regions.
+% Note that the width of enrichment may not necessarily be the optimal width
+% for detecting DB regions, especially for the more diffuse histone marks.
+% There is also an implicit assumption that the widths of the binding sites are
+% reasonably constant across the genome. 
+
+\subsection{Filtering out low-quality reads}
+Read extraction from the BAM files is controlled with the \code{param} argument in \code{windowCounts}.
+This takes a \code{readParam} object which specifies a number of extraction parameters.
+The idea is to define the \code{readParam} object once in the pipeline.
+It can then be reused for all relevant functions, to ensure that read loading is consistent throughout the analysis.
+
+<<>>=
+default.param <- readParam()
+default.param
+@
+
+Reads that have been marked as PCR duplicates in the SAM flag can be ignored by setting \code{dedup=TRUE}. 
+This can reduce the variability caused by inconsistent duplication between replicates. 
+However, it also caps the number of reads at each position. 
+This can lead to loss of DB detection power in high abundance regions. 
+Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size. 
+Thus, duplicate removal is not recommended for routine DB analyses. 
+Of course, removal may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
+
+Reads can also be filtered out based on the minimum mapping score with the \code{minq} argument. 
+Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
+Removal of these reads is highly recommended as it will ensure that only the reliable alignments are supplied to \pkgname{}.
+The exact value of the threshold depends on the range of scores provided by the aligner. 
+The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 100 might be appropriate.
+
+An example of read counting with more stringent parameters is shown below.
+Comparison to the values in \code{data\$totals} indicates that fewer reads are used in each library.
+
+<<>>=
+param <- readParam(minq=100, dedup=TRUE)
+demo <- windowCounts(bam.files, ext=frag.len, param=param)
+demo$totals
+@
+
+\subsection{Avoiding problematic genomic regions}
+Read extraction and counting can be restricted to particular chromosomes by specifying the names of the chromosomes of interest in \code{restrict}. 
+This avoids the need to count reads on unassigned contigs or uninteresting chromosomes, e.g., the mitochondrial genome for ChIP-seq studies targeting nuclear factors. 
+Alternatively, it allows \code{windowCounts} to work on huge datasets or in limited memory by analyzing only one chromosome at a time.
+
+Reads lying in certain regions can also be removed by specifying the coordinates of those regions in \code{discard}. 
+This is intended to remove reads that are wholly aligned within known repeat regions but were not removed by the \code{minq} filter. 
+Repeats are problematic as changes in repeat copy number or accessibility between conditions can lead to spurious DB. 
+Removal of reads within repeat regions can avoid detection of these irrelevant differences. 
+
+<<>>=
+repeats <- GRanges("chr1", IRanges(3000001, 3002128))
+new.param <- readParam(discard=repeats, restrict=c("chr1", "chr10", "chrX"))
+demo <- windowCounts(bam.files, ext=frag.len, param=new.param)
+head(rowData(demo))
+@
+
+Coordinates of annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}.
+However, this requires some effort to parse.
+If possible, the simplest approach is to extract them from an appropriate \code{BSgenome} object. 
+The example below takes the repeats called by the RepeatMasker program in the hg19 build of the human genome.
+Blacklisted regions from the ENCODE project are another option \citep{landt2012}.
+
+<<>>=
+require(BSgenome.Hsapiens.UCSC.hg19.masked)
+bs <- BSgenome.Hsapiens.UCSC.hg19.masked
+all.masks <- list()
+for (i in 1:length(seqnames(bs))) { 
+    cur.chr <- seqnames(bs)[i]
+	all.masks[[i]] <- GRanges(cur.chr, masks(bs[[cur.chr]])$RM)
+}
+suppressWarnings(do.call(c, all.masks))
+@
+
+Using \code{discard} is safer than simply ignoring windows that overlap the repeats. 
+For example, a large window might contain both repeat regions and non-repeat regions. 
+Discarding the window because of the former will compromise detection of DB features in the latter. 
+Of course, any DB sites within the discarded regions will be lost from downstream analyses.  
+Some caution is therefore required when specifying the regions of disinterest.
+
+\subsection{Additional notes about parameter specification}
+Users can modify an existing \code{readParam} object using the \code{reform} method.
+The example below copies \code{param} and replaces \code{minq} and \code{discard} with new values.
+This is safer than directly modifying the slots, as appropriate type/value checking of each class member is performed.
+
+<<>>=
+another.param <- reform(param, minq=NA, discard=repeats)
+another.param
+@
+
+For simplicity, most of the calls to \code{windowCounts} in this guide will use the default settings for \code{param}, i.e., \code{readParam()}.
+However, users are encouraged to construct their own \code{readParam} objects and apply them consistently throughout their analyses.
+A good check for synchronisation is to ensure that the values of \code{...\$totals} are identical between calls. 
+This means that the same reads are extracted from the BAM file in each call. 
+
+\subsection{Increasing speed and memory efficiency}
+The \code{spacing} parameter controls the distance between adjacent windows in the genome.
+Using a higher value will reduce computational work as fewer features need to be counted.
+This may be useful when machine memory is limited. 
+Of course, spatial resolution is lost with larger spacings.
+Adjacent positions are not counted and thus cannot be distinguished. 
+
+<<>>=
+demo <- windowCounts(bam.files, spacing=100, ext=frag.len)
+head(rowData(demo))
+@
+
+For analyses with large windows, it is also worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
+This reduces the computational work by decreasing the number of windows and extracted counts. 
+Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
+
+Windows with a low sum of counts across all libraries can be filtered out using the \code{filter} argument. 
+This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
+By default, the value of the filter is defined as the number of libraries multiplied by 5. 
+This roughly corresponds to the minimum average count required for accurate statistical modelling. 
+Note that more sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
+
+<<>>=
+demo <- windowCounts(bam.files, ext=frag.len, filter=30)
+head(assay(demo))
+@
+
+Setting \code{bin=TRUE} will cause \code{windowCounts} to count reads into contiguous bins across the genome.
+Specifically, \code{spacing} is set to \code{width} and only the $5'$ end of each read is used for counting. 
+No filtering is performed such that a count value will be returned for each genomic bin. 
+Users should set \code{width} to a reasonably large value, e.g., above 1000 bp.
+Otherwise, reads will be counted and reported for every single base in the genome by default.
+
+<<>>=
+demo <- windowCounts(bam.files, width=1000, bin=TRUE)
+head(rowData(demo))
+@
+
+\section{Experiments involving paired-end tags}
+ChIP experiments with paired-end sequencing can be accomodated by setting \code{pet="both"} in the \code{param} object supplied to \code{windowCounts}. 
+Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined between the $5'$ positions of the paired reads.
+The number of fragments overlapping each window is then counted as described. 
+By default, only proper pairs are used whereby the two reads are on the same chromosome, face inward and are no more than \code{max.frag} apart.
+
+<<>>=
+petBamFile <- "example-pet.bam"
+pet.param <- readParam(max.frag=400, pet="both")
+demo <- windowCounts(petBamFile, param=pet.param)
+demo$totals
+@
+\label{data:pet}
+
+A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes using the \code{getPETSizes} function. 
+In this example, a user might use a value of around 500 bp as it covers most of the fragment size distribution. 
+The plot can also be used to examine the quality of the PET sequencing procedure. 
+The location of the peak should be consistent with the fragmentation and size selection steps in library preparation. 
+
+<<label=frag,eval=FALSE>>=
+out <- getPETSizes(petBamFile)
+frag.sizes <- out$sizes[out$sizes<=800]
+hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
+abline(v=400, col="red")
+@
+
+\setkeys{Gin}{width=0.7\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<frag>>
+@
+\end{center}
+
+The number of fragments exceeding the maximum size can be recorded for quality control. 
+The \code{getPETSizes} function also returns the number of single reads, pairs with one unmapped read, improperly orientated pairs and inter-chromosomal pairs.
+A non-negligble proportion of these reads may be indicative of problems with paired-end alignment or sequencing. 
+
+<<>>=
+c(out$diagnostics, too.large=sum(out$sizes > 400))
+@
+
+In datasets where many read pairs are invalid, the reads in those pairs can be rescued by setting \code{rescue.pairs=TRUE}. 
+For each invalid intra-chromosomal read pair, the read with the higher mapping quality score will be directionally extended by \code{rescue.ext} to impute the fragment. 
+For inter-chromosomal read pairs, both reads are extended in this manner. 
+Counting will then be performed with these fragments in addition to those from the valid pairs. 
+A value of \code{rescue.ext} can be chosen based on the mode of the distribution above.
+
+<<>>=
+rescue.param <- reform(pet.param, rescue.ext=200, rescue.pairs=TRUE)
+demo <- windowCounts(petBamFile, param=rescue.param)
+demo$totals
+@
+
+Paired-end data can also be treated as single-end data by specifiying \code{pet="first"} or \code{pet="second"}. 
+This will only take the first or second read of each pair as defined in the SAM flags. 
+Unlike \code{rescue.pairs}, the selection and use of one read is done for all read pairs regardless of validity. 
+This may be useful for comparing paired-end with single-end data, or in truly disastrous situations where paired-end sequencing has failed.
+
+<<>>=
+first.param <- readParam(pet="first")
+demo <- windowCounts(petBamFile, param=first.param)
+demo$totals
+@
+
+Note that all of the paired-end methods in \pkgname{} depend on the synchronisation of mate information for each alignment in the BAM file. 
+Any file manipulations that might break this synchronisation should be corrected prior to read counting.
+
+\section{Estimating the average fragment length}
+\label{sec:ccf}
+Cross-correlation plots can be generated directly from BAM files using the \code{correlateReads} function. 
+This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment \citep{kharchenko2008}. 
+Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
+This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
+The location of the peak can then be used as an estimate of the fragment length for read extension in \code{windowCounts}. 
+For this dataset, an estimate of $\sim$110 bp is obtained from the plot below.
+
+% Note that this makes some assumptions about the shape of each peak. In
+% particular, it assumes that the peaks are symmetrical so that the distance
+% between the modes is equal to the average fragment length. I mean, it's
+% probably not even the mean, it's just the mode of the fragment lengths. 
+
+<<label=ccf,eval=FALSE>>=
+max.delay <- 500
+dedup.on <- readParam(dedup=TRUE, minq=100)
+x <- correlateReads(bam.files, max.delay, param=dedup.on)
+plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
+@
+
+\setkeys{Gin}{width=0.7\textwidth}
+\begin{center}
+\centering
+<<fig=TRUE,echo=FALSE>>=
+<<ccf>>
+@
+\end{center}
+
+A sharp spike may also observed in the plot at a distance corresponding to the read length. 
+This is thought to be an artifact, caused by the preference of aligners towards uniquely mapped reads. 
+Duplicate removal is typically required here (i.e., set \code{dedup=TRUE} in \code{readParam}) to reduce the size of this spike. 
+Otherwise, the fragment length peak will not be visible as a separate entity.
+The size of the smooth peak can also be compared to the height of the spike to assess the signal-to-noise ratio of the data \citep{landt2012}. 
+Poor IP efficiency will result in a smaller or absent peak as bimodality is less pronounced. 
+
+% For a given background read, most aligners will prefer (or demand) unique
+% mapping locations. Any unique sequence in the genome will also have a unique
+% reverse complement sequence which is also favoured by the aligner. Reads end
+% up ``stacking'' on top of these unique sequences in both the forward and
+% reverse directions. This results in an increase in correlations equal to the
+% distance between the 5' ends of the forward and reverse reads i.e. the read
+% length. A spike at zero is not observed as duplicates are removed.
+
+Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation.
+However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g., H3K27 trimethylation).
+
+% For enrichment with any reasonably large width, we've assumed that the
+% binding event provides no protection during sonication. If it does, you
+% should see bimodality where there's an empty gap between the forward/reverse
+% clusters. The estimated value from the cross-correlations then represents the
+% length of the gap (i.e. the width of the binding site) plus a bit extra from
+% variability in fragmentation sites at each end. If this is true, you could
+% just use the estimated fragment length without any width value because it is
+% modelled for free.
+
+<<label=histone_ccf,eval=FALSE>>=
+n <- 10000
+dedup.on <- readParam(dedup=TRUE)
+h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
+h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
+h3k4me2 <- correlateReads("h3k4me2.bam", n, param=dedup.on)
+plot(0:n, h3ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
+    xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
+lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
+lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
+legend("topright", col=c("blue", "red", "forestgreen"),
+    c("H3Ac", "H3K27me3", "H3K4me2"), pch=16)
+@
+\label{data:ccf}
+
+\setkeys{Gin}{width=0.7\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<histone_ccf>>
+@
+\end{center}
+
+\section{Counting over manually specified regions}
+The \pkgname{} package focuses on counting reads into windows. 
+However, it may be occasionally desirable to use the same conventions (e.g., duplicate removal, quality score filtering) when counting reads into pre-specified regions. 
+This can be performed with the \code{regionCounts} function, which is largely a wrapper for \code{findOverlaps} from the \granges{} package.
+
+<<>>=
+my.regions <- GRanges(c("chr11", "chr12", "chr15"),
+    IRanges(c(75461351, 95943801, 21656501), 
+    c(75461610, 95944810, 21657610)))
+reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
+head(assay(reg.counts))
+@ 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Calculating normalization factors}
+\label{chap:norm}
+\begin{combox}
+This next chapter will need the \code{bam.files} vector again. 
+You'll notice that that a number of other BAM files are used in this chapter. 
+However, these are just present for demonstration purposes and aren't necessary for the main NFYA example.
+\end{combox}
+
+\section{Eliminating composition biases}
+
+\subsection{Using the TMM method on binned counts}
+\label{sec:compo_norm}
+As the name suggests, composition biases are formed when there are differences in the composition of sequences across libraries. 
+Highly enriched regions consume more sequencing resources and thereby suppress the representation of other regions. 
+Differences in the magnitude of suppression between libraries can lead to spurious DB calls. 
+Scaling by library size fails to correct for this as composition biases can still occur in libraries of the same size. 
+
+To remove composition biases in \pkgname{}, reads are counted in large bins and the counts are used for normalization with the \code{normalize} wrapper function. 
+This uses the trimmed mean of M-values (TMM) method \citep{oshlack2010} to correct for any sytematic fold change in the coverage of the bins. 
+The assumption here is that most bins represent non-DB background regions so any consistent difference across bins must be spurious.
+
+<<>>=
+binned <- windowCounts(bam.files, bin=TRUE, width=10000)
+normfacs <- normalize(binned)
+normfacs
+@
+
+The TMM method trims away putative DB bins (i.e., those with extreme M-values) and computes normalization factors from the remainder to use in \edger{}. 
+The size of each library is scaled by the corresponding factor to obtain an effective library size for modelling. 
+A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the (effective) library size will be smaller. 
+Check out the \edger{} user's guide for more information.
+
+Note that the default \code{normalize} method skips the precision weighting step in the TMM method.
+Weighting aims to increase the contribution of bins with high counts.
+However, these bins are more likely to contain binding sites and thus are more likely to be DB. 
+If any DB regions should survive trimming (e.g., those with less extreme fold changes), upweighting them would be counterproductive. 
+In fact, users may wish to explicitly filter out such bins and run TMM only on putative background regions, as shown below.
+
+<<>>=
+ab <- aveLogCPM(asDGEList(binned))
+keep <- ab <= quantile(ab, p=0.9)
+normalize(binned[keep,])
+@
+
+\subsection{Choosing a bin size}
+By definition, read coverage is low for background regions. 
+This can result in a large number of zero counts and undefined M-values when reads are counted into small windows. 
+Adding a prior count is only a superficial solution as the chosen prior will have undue influence on the estimate of the normalization factor when many counts are low. 
+The variance of the fold change distribution is also higher for low counts. 
+This reduces the effectiveness of the trimming procedure during normalization. 
+These problems can be overcome by using large bins to increase the size of the counts prior to TMM normalization. 
+
+% Yes, smaller counts do have greater variance in the resulting fold changes.
+% This is because it's more possible for smaller counts to achieve a large fold
+% change than it is for larger counts (as the former is less stable). Clear
+% evidence of this can be observed below, with concommitant effects on the
+% estimates.
+<<echo=FALSE,eval=FALSE>>=
+out <- (log(rnbinom(1000, mu=2, size=100)/rnbinom(1000, mu=2, size=100)))
+var(out[is.finite(out)])
+var(log(rnbinom(1000, mu=20, size=100)/rnbinom(1000, mu=20, size=100)))
+
+# Simulating undersampling with spiked-in genes.
+simulator <- function(ngenes, total.cols, spiked.cols, genes.spiked, mu.back, mu.spike, disp) {
+    x <- matrix(rnbinom(ngenes, mu=mu.back, size=1/disp), nrow=ngenes, ncol=total.cols);
+    normed <- mu.back*ngenes/(mu.back*(ngenes-genes.spiked)+mu.spike*genes.spiked);
+    x[,(spiked.cols+1):total.cols] <- rnbinom(ngenes, mu=mu.back*normed, size=1/disp);
+    spiked <- sample(ngenes, genes.spiked);
+    x[spiked,(spiked.cols+1):total.cols] <- rnbinom(genes.spiked,
+        mu=mu.spike*normed, size=1/disp);
+    return(list(counts=x, factor=normed, spiked=spiked));
+}
+
+ngenes <- 10000
+x <- simulator(ngenes, 2, 1, 2000, 10, 20, 0.05);
+
+collate <- function(mat, fac) {
+    current <- nrow(mat)/fac;
+    a <- x$counts[1:current,];
+    if (fac<2) { return(a); }
+    for (i in 2:fac) { a <- a+x$counts[(i-1)*current+1:current,] }
+    return(a)
+}
+
+# Enriched mixing in with background results in tamer normalization factors (duh)
+calcNormFactors(x$counts)
+calcNormFactors(collate(x$counts, 2))
+calcNormFactors(collate(x$counts, 4))
+
+# Discreteness effects results in lower norm factors. Note that the second one
+# is, on average, lower than the third one, but you'll have to run it a couple of times.
+x <- simulator(ngenes, 2, 1, 200, 2, 10, 0.05);
+calcNormFactors(x$counts)
+x <- simulator(ngenes, 2, 1, 200, 5, 25, 0.05);
+calcNormFactors(x$counts)
+x <- simulator(ngenes, 2, 1, 200, 50, 250, 0.05);
+calcNormFactors(x$counts)
+@
+
+% The undefined nature of the log FC's with zero counts also complicates
+% matters. Adding an offset doesn't help as the results will change
+% dramatically with the value of the offset. This is because the choice of
+% offset is a massive contributor to the magnitude of the resulting fold
+% change, and thus determines where that FC is placed in the distribution.
+% Treatment as Inf or -Inf is suboptimal as a 1 vs 0 situation is usually not
+% enriched (but will definitely be trimmed at Inf) whereas a 100 vs 10
+% situation is enriched but will be trimmed later. 
+% 
+% Removal is definitely suboptimal as it results in loss of information when
+% you have a non-zero count paired with a zero count. The non-zero count can
+% provide some evidence for undersampling (e.g. lots of <1, 0> pairs probably
+% indicate undersampling). Zero counts can only be overcome by incorporating a
+% probability distribution to model its frequency. However, this results in
+% more pain due to the need to estimate distribution parameters and the
+% possible lack of robustness to violation of the distributional assumptions.
+
+Of course, this strategy requires the user to supply a bin size. 
+If the bins are too large, background and enriched regions will be included in the same bin. 
+This makes it difficult to trim away bins corresponding to enriched regions.
+On the other hand, the counts will be too low if the bins are too small.
+Testing multiple bin sizes is recommended to ensure that the estimates are robust to any changes. 
+A value of 10000 bp is suitable for most datasets.
+
+<<>>=
+demo <- windowCounts(bam.files, bin=TRUE, width=5000)
+normalize(demo)
+demo <- windowCounts(bam.files, bin=TRUE, width=15000)
+normalize(demo)
+@
+
+% For roughly equal libraries, you could just throw in a bunch of bin sizes and
+% take the most extreme (i.e. different from 1) factors that you can find.
+% This leverages off the fact that both too large and too small bins will
+% underestimate the magnitude of the logarithm of the scaling factor; so, the
+% most extreme intermediate is probably correct. In particular, zero counts
+% should cause underestimation because the undersampled library should have
+% more zero counts paired with non-zero counts in the other library. Thus,
+% removal of zero counts is effectively removing evidence for undersampling.
+% However, this falls apart when the library sizes are dramatically different:
+<<echo=FALSE,eval=FALSE>>=
+calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=100)))
+@
+% There actually isn't any undersampling but that doesn't stop us from
+% producing a very aggressive normalization estimate. I think it's because you
+% only get a zero count when the smaller library is unlucky enough to get a low
+% value. If you remove them, you're nibbling on just one side of the fold
+% change distribution prior to the actual trimming. This means that you end up
+% getting a biased estimate of the normalization factor.  So, we can't just
+% rely on picking the biggest of the bunch anymore, particularly when the
+% library sizes are hugely different.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Here I shall list the assorted failures in my attempts to truly solve this problem:
+%% 
+% Any sort of sitewise trimming procedure seemed to fail. I've tried trimming
+% on the deviance and on the p-value, neither have gone down well.  I suspect
+% it is because of the sensitivity to the dispersion estimate, which I want to
+% avoid estimating because it's a pain. In particular, different dispersions
+% will mean that tags with the same fold change but different count sizes will
+% get trimmed differently (whereas really they should be trimmed together).
+% Also, you basically convert the fold change distribution into a one-tailed
+% thing where you only trim from one side. This is problematic when everything
+% is discrete as it means you trim off big chunks at a time. Instability
+% results as you will start to remove big chunks, each corresponding to
+% opposite sides of the fold change distribution.
+%%
+% Finding the offset with the minimal sum of deviances across sites. I even
+% used the dispersion estimate for each site; the idea being that, for sites
+% which were very different, the dispersion would be large so the deviance
+% wouldn't change much when you altered the dispersions. However, this didn't
+% work out too well as the influence of the truly DB sites would still be
+% enough to underestimate the normalization factor. Indeed, when the number of
+% DB sites is large, this tends to do worse than TMM. Looks like we have to
+% remove them directly to avoid problems.
+%%
+% Finding the offset where the number of sites with increasing deviance matches
+% the number of sites with decreasing deviance, and any variant thereof
+% involving numbers of sites rather than the magnitude of the difference. The
+% use of the number of sites was designed to be more robust to the presence of
+% DB sites, assuming that the majority of sites where nonDE. However, this
+% turned out to be quite imprecise as you could easily get a range of offsets
+% with the same difference in the number of increasing/decreasing sites. The
+% presence of tied counts exacerbates this for small offsets, because a little
+% change results in (potentially) a big number of sites switching from an
+% increase to a decrease in their deviance.
+%
+% Summing across background enriched regions. The idea was that background
+% regions should be constant, so identifying and crunching them would give us
+% the normalization factor fairly easily. If you plot the proportion of counts
+% in one library against the row sum, you should see (when undersampling is
+% present) low abundances at one side of the horizontal 0.5 line, and high
+% abundances (mostly) on the other side. That set of proportions for low
+% abundances can be converted to the normalization factor. The proportions
+% should also be fairly consistent amongst the set of low abundances, with some
+% leeway for estimation precision and contamination from DB regions as the
+% abundance increases. 
+%
+% This works great for simulated data. However, strange things happen in real
+% data. The proportions doesn't change monotonically with increasing abundance
+% as you'd expect from increasing contamination. Rather, it peaks/troughs at a
+% row sum of 3-5 before returning to the center line. This isn't just some
+% random phenomenon - the standard errors of the proportions indicate that they
+% are reliable (assuming independence), and it can be observed in at least
+% three separate datasets. My best guess to why this is happening is that there
+% is some correlation between the regions corresponding to those abundances.
+% This means that they change all at once which results in a smooth peak.
+% Finally, I did these for biological replicates for which no undersampling
+% should occur at all (though that might be optimistic given the vagaries of
+% immunoprecipitation). 
+%
+% All this results in considerable instability in the normalization procedure.
+% An excellent example is with the mitochondrial genome, reads for which must
+% be due to non-specific enrichment. Thus, the read count of the entire genome
+% (without duplicate removal, because it's a bit small) can be used to get the
+% normalization factor. However, in practice this is a mess, with massive
+% scaling factors often proposed between replicates.  The total counts are high
+% enough for a precise estimate (~ several thousand) given independence; this
+% suggests that our inaccuracies are due to strong correlations between counts.
+% While there may also be additional problems for mitochondria over nuclear
+% DNA, I think this is reasonably demonstrative of what happens with low
+% counts.
+
+% You can try to maximize the differences in the normalization factors within a
+% range of thresholds, but often that just means that you're choosing the
+% largest allowable threshold if there is any outward trend for high-abundance
+% regions. The only time it'll do better from the static method above is if
+% there is an inward trend (i.e. increasing abundance -> approaches the zero
+% line), which is pretty unlikely.  It'll also be slightly worse for the other
+% scenarios (in terms of MSE) as maximization will overestimate the true
+% difference - this becomes an important consideration if there is a trend in
+% the background itself, whereby the difference within the background exceeds
+% the difference between the background and enriched medians. Of course, if you
+% don't limit the threshold, you could go all the way up to the individual
+% points and get very big normalization factors at genuinely DE regions.
+
+% There's also an issue of which normalization factors are correct when the
+% null is false. What is the right factor for the low counts of a truly DE
+% region? I mean, if you're normalizing between the low counts, should you use
+% the normalization factor for the non-enriched bins?  I suppose I should, but
+% that leads to the unenviable task of trying to figure out which ones are
+% enriched and which ones are not enriched.  Which defeats the purpose of
+% normalizing before hypothesis testing anyway. The best approach is just to
+% assume that nulls are true for everyone; this results in some wrong
+% fold-changes when nulls are false, but that's the least of my concerns. Even
+% with cyclic loess it's hit-and-miss because the A-value for a high/low
+% combination doesn't really mean anything (especially if it's sensitive to the
+% prior count).
+
+\subsection{Visualizing normalization efforts with an MA plot}
+The effectiveness of normalization can be examined using a MA plot. 
+A single main cloud of points should be present that represents the background regions.
+Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
+Composition biases manifest as a vertical shift in the position of this cloud. 
+Ideally, the log-ratios of the corresponding normalization factors should correspond to the centre of the cloud. 
+This indicates that undersampling has been identified and corrected.
+
+<<eval=FALSE,label=normplot>>=
+par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
+adj.counts <- cpm(asDGEList(binned), log=TRUE)
+for (i in 1:(length(bam.files)-1)) {
+    cur.x <- adj.counts[,1]
+    cur.y <- adj.counts[,1+i]
+    smoothScatter(x=(cur.x+cur.y)/2+6*log2(10), y=cur.x-cur.y,
+        xlab="A", ylab="M", main=paste("1 vs", i+1))
+    all.dist <- diff(log2(normfacs[c(i+1, 1)]))
+    abline(h=all.dist, col="red")
+}
+@
+
+\setkeys{Gin}{width=0.98\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE,width=8,height=3>>=
+<<normplot>>
+@
+\end{center}
+
+\section{Eliminating efficiency biases}
+\label{sec:eff_norm}
+Efficiency biases are commonly observed in ChIP-seq data. 
+This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
+These technical differences are of no biological interest and must be removed. 
+This can be achieved by assuming some top percentage of bins or windows with the highest abundances contain binding sites. 
+The TMM method can then be applied to eliminate systematic differences in the counts across those bins. 
+In the example below, the top 1\% of bins are assumed to contain binding sites. 
+For consistency, the bin size in Section~\ref{sec:compo_norm} is re-used here though the counts for binding sites should be high enough for smaller bins.
+
+<<strip.white=false>>=
+me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
+ab <- aveLogCPM(asDGEList(me.demo))
+keep <- rank(ab) > 0.99*length(ab)
+me.norm <- normalize(me.demo[keep,])
+me.norm
+
+ac.demo <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=10000L)
+ab <- aveLogCPM(asDGEList(ac.demo))
+keep <- rank(ab) > 0.99*length(ab)
+ac.norm <- normalize(ac.demo[keep,])
+ac.norm
+@
+\label{data:norm}
+
+% An equivalent approach is to apply TMM on each window directly. I generally
+% don't like doing this as it's harder to assess the context in which the
+% normalization factor is being chosen (and the potential effect of fiddling
+% with the filter threshold). The abundance range for window counts is too
+% small for effective visualisation on an MA plot. There's also the fact that
+% each read is counted multiple times, though this isn't a real problem; the
+% only thing to worry about is that it will effectively upweight high-abundance
+% peaks which get caught by multiple windows, but everyone should have high
+% abundances at this point so it shouldn't matter.
+
+This method assumes that most high-abundance bins are not DB. 
+Any systematic changes must be caused by differences in IP efficiency or some other technical issue. 
+However, genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
+Also, some care is required when choosing the top percentage of bins or windows to use for normalization.
+Using too many bins (or windows) will include background regions, while using too few will result in unstable estimates.
+See Chapter~\ref{chap:filter} for more details on selection of enriched regions.
+
+The results of normalization can again be visualized with MA plots. 
+Of particular interest is the cloud of points at high A-values.
+This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
+Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed). 
+The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events. 
+If not, they must represent efficiency biases and should be removed.
+
+<<eval=FALSE,label=methplot,strip.white=false>>=
+par(mfrow=c(1,2))
+for (it in 1:2) {
+    if (it==1) {
+        demo <- me.demo
+        norm <- me.norm
+        main <- "H3K4me3"
+    } else {
+        demo <- ac.demo
+        norm <- ac.norm
+        main <- "H3ac"
+    }
+    adjc <- cpm(asDGEList(demo), log=TRUE)
+    smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
+        xlab="A", ylab="M", main=main)
+    abline(h=log2(norm[1]/norm[2]), col="red")
+    compo.fac <- normalize(demo)
+    abline(h=log2(compo.fac[1]/compo.fac[2]), col="red", lty=2)
+}
+@
+
+\setkeys{Gin}{width=0.98\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE,width=10,height=5>>=
+<<methplot>>
+@
+\end{center}
+
+\section{Dealing with trended biases}
+In more extreme cases, the bias may vary with the average abundance to form a trend. 
+One possible explanation is that changes in IP efficiency will have little effect at low-abundance background regions and more effect at high-abundance binding sites. 
+Thus, the magnitude of the bias between libraries will change with abundance. 
+The trend cannot be corrected with scaling methods as no single scaling factor will remove differences at all abundances.
+Rather, non-linear methods are required, such as cyclic loess or quantile normalization.
+
+One such implementation is provided in \code{normalize} by setting \code{type="loess"}. 
+This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
+A matrix is produced that contains an offset term for each bin/window in each library.
+This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB.
+In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} normalization.
+The example below operates on the filtered counts for small bins, of which the top 5\% are assumed to contain binding sites. 
+
+<<>>=
+ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
+ac.dge <- asDGEList(ac.demo2)
+ab <- aveLogCPM(ac.dge)
+keep <- rank(ab) > 0.95*length(ab)
+ac.demo2 <- ac.demo2[keep,]
+ac.off <- normalize(ac.demo2, type="loess")
+head(ac.off)
+@
+
+MA plots can be examined to determine whether normalization was successful.
+Any abundance-dependent trend in the M-values should be eliminated. 
+Filtering is strongly recommended to remove low-abundance regions where loess curve fitting is inaccurate. 
+When doing so, the value computed by \code{aveLogCPM} should be used as the filter statistic.
+This is because an average count threshold will act as a clean vertical cutoff in the plots below. 
+Spurious trends that might affect normalization will not be introduced at the filter boundary. 
+
+<<eval=FALSE,keep.source=true,label=trendplot>>=
+par(mfrow=c(1,2))
+abval <- ab[keep]
+o <- order(abval)
+adjc <- cpm(ac.dge[keep,], log=TRUE)
+mval <- adjc[,1]-adjc[,2]
+fit <- loessFit(x=abval, y=mval)
+smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
+   main="Raw", ylim=c(-2,2), xlim=c(0, 7))
+lines(abval[o], fit$fitted[o], col="red")
+#
+# Repeating after normalization.
+re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
+mval <- re.adjc[,1]-re.adjc[,2]
+fit <- loessFit(x=abval, y=mval)
+smoothScatter(abval, re.adjc[,1]-re.adjc[,2], ylab="M", 
+   xlab="Average logCPM", main="Normalized", ylim=c(-2,2), xlim=c(0, 7))
+lines(abval[o], fit$fitted[o], col="red")
+@
+
+\setkeys{Gin}{width=0.98\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE,width=10,height=5>>=
+<<trendplot>>
+@
+\end{center}
+
+Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
+This is a stronger assumption than that for scaling methods, which only require a non-DB majority across all features.
+Removal of the trend may not be appropriate if it represents some genuine biological phenomenon, e.g., involving changes in overall binding. 
+In addition, the computed offsets are not compatible with the normalization factors from the scaling methods.
+Only one of these sets of values will ultimately be used by \edger{}.
+
+\section{A word on other biases}
+No normalization is performed to adjust for differences in mappability or sequencability between different regions of the genome. 
+Region-specific biases are assumed to be constant between libraries. 
+This is generally reasonable as the biases depend on fixed properties of the genome sequence such as GC content. 
+Thus, biases should cancel out during DB comparisons.
+Any variability in the bias between samples will be absorbed into the dispersion estimate. 
+
+% Note that Cheung (i.e. Ahringer) go about dividing ChIP samples by input
+% controls and stating that there are differences in the called regions between
+% replicates. If they had used a model that accounted for replicates in the
+% first place, different results should be avoided as the dispersion would be
+% higher.  Also, their method for avoiding biological signal in their
+% background model depends on a powerful peak caller to mark enriched regions.
+% Absence of evidence isn't evidence of absence, so if your peak caller is
+% weak, the method will be confounded by biological signal that leaks through
+% your filtering step.  Risso's definition of bias involves comparisons between
+% qPCR and RNA-seq fold changes. I suppose this is fair enough if you want to
+% improve comparisons between technologies. However, this isn't particularly
+% relevant to the correction of biases between samples.
+
+That said, explicit normalization to correct these biases can improve results for some datasets.
+Procedures like GC correction could decrease the observed variability by removing systematic differences between replicates. 
+Of course, this also assumes that the targeted differences have no biological relevance.
+Detection power may be lost if this is not true. 
+For example, differences in the GC content distribution can be driven by technical bias as well as biology, e.g., when protein binding is associated with a specific GC composition.
+
+%%%%%%%%%%%%%%%%%%%%%% 
+%It's worth dividing GC bias into two types. The first is where the variances
+%of independent sites are correlated with GC content. This suggests that you
+%might get more appropriate smoothing if you partitioned the sites according to
+%GC content first. This isn't too hard (find regions with desired GC content
+%and restrictRanges appropriately) but you will bleed degrees of freedom at
+%high counts where the number of sites isn't that high to begin with. GC
+%content is mostly interesting because of its effect on read abundance, and we
+%can smooth directly on that anyway. Otherwise, it's just another metric. We
+%could also smooth on other (equally arbitrary) parameters such as genomic
+%context, position to promoter, etc. but we have to draw the line somewhere. 
+%
+% The second type is that the variances of sites with similar GC contents are
+% similar because of direct correlations between the sites. This is what you
+% usually see when someone talks about GC bias correction i.e. the boxplot of
+% ratios of counts with similar GC contents need to be scaled to the y=0 line.
+% If the counts are consistently up in one replicate compared to the other for
+% a bunch of sites, you've got direct correlations between sites right there.
+% These correlations reduce the amount of information that can be extracted for
+% smoothing. Partitioning the sites by GC content for smoothing would make it
+% worse as each partition would become "concentrated" in the strength of the
+% correlations between sites.
+% 
+% On a related note, why should we smooth on GC content and not abundance (i.e.
+% quantile)? GC correction tries to correct for sequencing variability whereas
+% quantile abundance-based normalization tries to correct for IP variability.
+% While these two can occassionally overlap, there's no guarantee that one will
+% do the same job as the other, especially as the correlation between GC
+% content and abundance is not linear. I think that batch effects from IP
+% variability is more concerning than that from sequencing, especially as
+% sequencing gets better (e.g. multiplexing) but the IP skill set stays the
+% same.
+
+\section{Examining replicate similarity with MDS plots}
+On a semi-related note, the binned counts can be used to examine the similarity of replicates through multi-dimensional scaling (MDS) plots. 
+The distance between each pair of libraries is computed as the square root of the mean squared log-fold change across the top set of bins with the highest absolute log-fold changes.
+A small top set visualizes the most extreme differences whereas a large set visualizes overall differences.
+Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
+
+<<label=mds,eval=false>>=
+par(mfrow=c(2,2), mar=c(5,4,2,2))
+binned <- windowCounts(bam.files, bin=TRUE, width=2000L)
+adj.counts <- cpm(asDGEList(binned), log=TRUE)
+for (top in c(100, 500, 1000, 5000)) {
+    out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"), 
+        labels=c("es", "es", "tn", "tn"), top=top)
+}
+@
+
+\setkeys{Gin}{width=0.8\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<mds>>
+@
+\end{center}
+
+Replicates from different groups should form separate clusters in the plot.
+This indicates that the results are reproducible and that the effect sizes are large.
+Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
+Any outliers should also be noted as their presence may confound the downstream analysis.
+In the worst case, the removal of the corresponding libraries may be necessary to obtain sensible results.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Filtering prior to correction}
+\label{chap:filter}
+
+\begin{combox}
+This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
+We will also need the \code{normfacs} vector from Chapter~\ref{chap:norm}. 
+Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
+\end{combox}
+
+\section{Independent filtering for count data}
+Many of the low abundance windows in the genome correspond to background regions in which DB is not expected. 
+Indeed, windows with low counts will not provide enough evidence against the null hypothesis to obtain sufficiently low $p$-values for DB detection. 
+Similarly, some approximations used in the statistical analysis will fail at low counts. 
+Removing such uninteresting or ineffective tests reduces the severity of the multiple testing correction, increases detection power amongst the remaining tests and reduces computational work.
+
+Filtering is valid so long as it is independent of the test statistic under the null hypothesis \citep{bourgon2010}. 
+In the negative binomial (NB) framework, this (probably) corresponds to filtering on the overall NB mean. 
+The DB $p$-values retained after filtering should be uniform under the null hypothesis, assuming analogous behaviour to the normal case. 
+Row sums can also be used for datasets where the effective library sizes are not very different or where the counts are assumed to be Poisson-distributed between biological replicates. 
+
+In \edger{}, the log-transformed overall mean is defined as the average abundance.
+This is computed with the \code{aveLogCPM} function, as shown below.
+Note that the name is a bit of a misnomer - \code{aveLogCPM} computes the logarithm of the overall mean count (expressed as a per-million value), \textit{not} the mean of the log-count-per-million (CPM) values.
+
+<<>>=
+abundances <- aveLogCPM(asDGEList(data))
+summary(abundances)
+@
+
+For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
+This restricts the analysis to windows with abundances above this threshold.
+While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
+Downstream estimates of various statistics are also more relevant when restricted to the regions of interest. 
+That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
+
+<<>>=
+keep <- abundances > -1
+demo <- data[keep,]
+summary(keep)
+@
+
+The exact choice of filter threshold may not be obvious.
+This problem is exacerbated when there is no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
+A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
+Arbitrariness is unavoidable when balancing these opposing considerations.
+Nonetheless, several strategies for defining the threshold are described below.
+Users are directed to choose one of these filtering approaches for their own analyses.
+
+% Choosing the filter which gets you the greatest number of DE regions isn't
+% the best idea, simply because it means that it's not independent of the
+% p-values any more. At any given filter value, the expected FDR is controlled
+% by the BH method rather than the actual FDR. Trying to maximize the number of
+% significant tests will result in loss of FDR control as it's not an unbiased
+% expectation anymore. It's worst with strong correlations between the nulls.
+<<eval=FALSE,echo=FALSE>>=
+collected <- list()
+max.collect <- list()
+for (y in 1:50) {
+  subcol <- NULL
+  subfdr <- NULL
+  n <- 10000
+  infilter <- rep(runif(n, 0, 1), 10)
+  allps <- rep(runif(n, 0, 1), 10)
+  spike <- 500
+  for (x in 1:9/10) {
+     keep <- infilter>=x
+     combined <- c(rep(0, spike), allps[keep])
+     sig <- sum(p.adjust(combined, method="BH")<0.05)
+     subcol <- append(subcol, sig)
+     subfdr <- append(subfdr, 1-spike/sig)
+  }
+  collected[[y]] <- subfdr
+  max.collect[[y]] <- subfdr[which.max(subcol)]
+}
+out <- do.call(cbind, collected)
+rowMeans(out)
+mean(unlist(max.collect))
+@
+
+\section{By proportion}
+One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
+The number of windows corresponding to these bound regions can be calculated as the proportion of the total number of windows, the latter of which can be derived from the genome length and the \code{spacing} interval used in \code{windowCounts}. 
+Users can then construct a set of the computed size, using windows with the highest abundances.
+
+<<>>=
+spacing <- 50
+desired <- 0.001 
+genome.windows <- sum(seqlengths(rowData(data))/spacing)
+keep <- length(abundances) - rank(abundances) + 1 < genome.windows*desired
+sum(keep)
+@
+
+This approach is simple and has the practical advantage of maintaining a constant number of windows for the downstream analysis. 
+However, it may not adapt well to different datasets where the proportion of bound sites can vary.
+Using an inappropriate percentage of binding sites will result in the loss of potential DB regions or inclusion of background regions.
+
+\section{By global enrichment}
+An alternative approach involves choosing a filter threshold based on the fold change over the level of non-specific enrichment.
+The degree of background enrichment can be estimated by counting reads into large bins across the genome.
+Binning is necessary here to increase the size of the counts when examining low-density background regions. 
+This ensures that precision is maintained when estimating the background abundance.
+
+<<>>=
+bin.size <- 2000L
+binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
+@
+
+These abundances are computed with large bins so they must be scaled down for comparison to the window abundances. 
+Under a model of background enrichment, assume that reads are evenly distributed between strands and uniformly distributed across large genomic regions.
+Downscaling can then be directly performed based on differences in the size of the read counting interval between windows and bins.
+For windows with read extension, the size of the interval is equal to the sum of the window width and the fragment length.
+The fragment length is only added once because extension is strand-specific, i.e., only forward- and reverse-mapping reads are counted on the left and right of the window, respectively.
+Thus, only half of the reads are counted on the flanks of the extended interval.
+
+<<>>=
+scaled <- bin.size/(window.width + frag.len)
+scaled
+@
+
+The abundances of the bins are estimated and downscaled according to the computed \code{scaled} value.
+The window abundances are also re-estimated here to standardize the effect of the prior count.
+Adding a prior count avoids undefined/unstable estimates when the actual counts are low.
+However, if the same prior is used for both bin and window counts, downscaling will reduce the effective prior added to the former.
+Thus, the prior must also be adjusted by \code{scaled} when computing the bin abundances, as shown below.
+
+<<>>=
+pc <- 0.5
+win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
+bin.ab <- aveLogCPM(asDGEList(binned), prior.count=pc*scaled)
+bin.ab <- bin.ab - log2(scaled)
+@
+
+Finally, the median of the binned abundances can be used as a global estimate of the background coverage.
+Windows are filtered based on some minimum required fold change over this global background. 
+Here, a fold change of 5 is necessary for a window to be considered as containing a binding site. 
+This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
+
+<<>>=
+threshold <- median(bin.ab) + log2(5)
+keep <- win.ab >= threshold
+sum(keep)
+@
+
+The effect of filtering can also be visualized with a histogram. 
+This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
+Note that bins containing genuine binding sites will usually not be visible on such plots.
+This is due to the dominance of the background windows throughout the genome.
+
+<<eval=FALSE,label=binhist>>=
+hist(bin.ab, xlab="Adjusted bin log-CPM",  breaks=100, main="")
+abline(v=threshold, col="red")
+@
+
+\setkeys{Gin}{width=0.7\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<binhist>>
+@
+\end{center}
+
+Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
+For TF data, a large cut-off works well as narrow binding sites will have high read densities and are unlikely to be lost during filtering. 
+Smaller minimum fold changes are recommended for diffuse marks where the difference from background is less obvious. 
+
+\section{By local enrichment}
+
+\subsection{Mimicking single-sample peak callers}
+Local background estimators can also be constructed.
+This avoids inappropriate filtering when there are differences in background coverage across the genome. 
+Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
+The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
+This can be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
+
+<<>>=
+surrounds <- 2000
+neighbour <- suppressWarnings(resize(rowData(data), surrounds, fix="center"))
+wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
+@
+
+Counts for each window are subtracted from the counts for its neighbourhood. 
+This means that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.  
+Again, some scaling for the differences in width is required for a valid comparison between the average abundances for each window and its neighbourhood.
+This should also account for the aforementioned subtraction of counts.
+
+<<>>=
+neighbour.counts <- assay(wider) - assay(data)
+adj.win.len <- window.width + frag.len
+scaled <- (surrounds - adj.win.len)/adj.win.len
+@
+
+The average abundance for each neighbourhood is computed with \code{aveLogCPM}.
+A larger prior count is used here as each estimate of the local background is less stable than a single global value.
+Again, scaling of the prior is necessary when computing neighbourhood abundances.
+This avoids spurious differences with the window abundances at low counts.
+
+<<>>=
+pc <- 1
+win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
+neighbour.ab <- aveLogCPM(neighbour.counts, lib.size=wider$totals, prior.count=scaled*pc)
+neighbour.ab <- neighbour.ab - log2(scaled)
+@
+
+% I don't think this is avoidable; computing a p-value against the average
+% background using the raw counts might land us into trouble, particularly as
+% it could select against high- or low-variance windows.  It also reduces the
+% ease of interpretation. Small differences at high abundances could be enough
+% for retention because they'd get a small p-value. Our solution must be
+% derived from the abundances and the fold changes thereof; in which case, we
+% need to deal with prior counts.
+
+The enrichment for each window is defined as the difference between its average abundance and that of its local neighbourhood. 
+The distribution of enrichment values can be examined across all windows.
+Most values will lie somewhere above zero, given that some prefiltering has already been performed on the window counts during loading.
+
+<<eval=FALSE,label=enriched>>=
+enriched.fc <- win.ab - neighbour.ab
+hist(enriched.fc, xlab="Enrichment logFC")
+@
+
+\begin{center}
+<<echo=FALSE,fig=TRUE>>=
+<<enriched>>
+@
+\end{center}
+
+Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
+In this scenario, a 5-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
+This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
+
+<<>>=
+keep <- enriched.fc > log2(5)
+sum(keep)
+@
+
+Note that this procedure also assumes that no other enriched regions are present in each neighbourhood. 
+Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
+This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighbourhood.
+
+If this seems too complicated, a simpler alternative is to identify locally enriched regions using peak-callers like \macs{}. 
+Filtering can be performed to retain only windows within called peaks.  
+However, peak calling must be done independently of the DB status of each window. 
+If libraries are of similar size or biological variability is low, reads can be pooled into a single library for single-sample peak calling. 
+This is equivalent to filtering on the average count and avoids distortion of the type I error rates due to data snooping.
+
+\subsection{With negative controls}
+Negative controls for ChIP-seq refer to input or IgG libraries where the IP step has been skipped or compromised with an irrelevant antibody, respectively. 
+This accounts for sequencing/mapping biases in ChIP-seq data. 
+IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
+These controls are mostly irrelevant when testing for DB between ChIP samples. 
+However, they can be used to filter out windows with an average count in the ChIP sample below that of the control. 
+The dummy example below requires a 5-fold or greater increase over the control to retain the window.
+
+<<eval=FALSE>>=
+in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
+chip <- aveLogCPM(asDGEList(in.demo[,1:4]))
+control <- aveLogCPM(asDGEList(in.demo[,5]))
+keep <- chip > control + log2(5)
+@
+
+The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
+The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
+If this is the case, the filtering procedure described above is inappropriate as it will select for windows with differences between ChIP and control samples. 
+This compromises the assumption of the null hypothesis during testing, resulting in loss of type I error control.
+
+\section{By prior information}
+When only a subset of genomic regions are of interest, DB detection power can be improved by removing windows lying outside of these regions. 
+Such regions could include promoters, enhancers, gene bodies or exons. 
+The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
+
+<<>>=
+require(org.Mm.eg.db)
+suppressWarnings(anno <- select(org.Mm.eg.db, keys=keys(org.Mm.eg.db), 
+   col=c("CHRLOC", "CHRLOCEND"), keytype="ENTREZID"))
+anno <- anno[!is.na(anno$CHRLOCCHR),]
+extension <- 3000
+coord5 <- ifelse(anno$CHRLOC > 0, anno$CHRLOC-extension, -anno$CHRLOC)
+coord3 <- ifelse(anno$CHRLOC > 0, anno$CHRLOCEND, -anno$CHRLOCEND+extension)
+broads <- GRanges(paste0("chr", anno$CHRLOCCHR), IRanges(coord5, coord3)) 
+head(broads)
+@
+ 
+Windows can be filtered to only retain those which overlap with the regions of interest. 
+Discerning users may wish to distinguish between full and partial overlaps, though this should not be a significant issue for small windows.
+This could also be combined with abundance filtering to retain windows that contain putative binding sites in the regions of interest.
+
+<<>>=
+suppressWarnings(keep <- overlapsAny(rowData(data), broads))
+sum(keep)
+@
+
+Any information used here should be independent of the DB status under the null in the current dataset. 
+For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
+However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
+
+\section{Relationship between filtering and normalization}
+The NB mean computed by \code{aveLogCPM} depends on the library sizes. 
+In the example below, the effective library sizes after normalization are used after multiplying by \code{normfacs}. 
+This ensures that composition biases are considered when computing the average count. 
+However, this may result in some circular dependencies when filtering is also required prior to normalization, e.g., of efficiency biases in Section~\ref{sec:eff_norm}. 
+Users may wish to perform multiple iterations of filtering/normalization to check that the results are self-consistent. 
+
+<<>>=
+for (it in 1:3) {
+    ab <- aveLogCPM(assay(me.demo), lib.sizes=me.demo$total*me.norm)
+    keep <- rank(ab) > 0.99*length(ab)
+    me.norm <- normalize(me.demo[keep,])
+    cat("Iteration is", it, "\n")
+    print(me.norm)
+}
+@
+
+The \code{aveLogCPM} function depends similarly on NB dispersion (see Chapter~\ref{chap:stats}). 
+However, dispersion estimation can only proceed after normalization and filtering. 
+This results in another circular dependency that is resolved by using a sensible (but otherwise arbitrary) value for the NB dispersion in \code{aveLogCPM}. 
+The alternative would be to iterate over the entire DB analysis, which would be prohibitively time-consuming in most circumstances.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Testing for differential binding}
+\label{chap:stats}
+
+\begin{combox}
+For this next section, we'll be needing the \code{data} list from Chapter~\ref{chap:count} and filtered in Chapter~\ref{chap:filter}. 
+Just let me  assign the filtered list back to \code{data}, because I put it in a dummy variable:
+
+<<>>=
+original <- data
+data <- demo
+@
+
+You'll also need the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
+\end{combox}
+
+\section{Introduction to \edger{}}
+
+\subsection{Overview}
+Low counts per window are typically observed in ChIP-seq datasets, even for genuine binding sites. 
+Any statistical analysis to identify DB sites must be able to handle discreteness in the data. 
+Software packages using count-based models are ideal for this purpose. 
+In this guide, the quasi-likelihood (QL) framework in the \edger{} package is used \citep{lund2012}. 
+Counts are modelled using NB distributions that account for overdispersion between biological replicates \citep{robinson2008}. 
+Each window can then be tested for significant  differences between counts  for different biological conditions.
+
+Of course, any statistical method can be used if it is able to accept a count matrix and a vector of normalization factors (or more generally, a matrix of offsets). 
+The choice of \edger{} is primarily motivated by its performance relative to some published alternatives \citep{law2014}.
+This author's desire to increase his h-index may also be a factor \citep{chen2014}.
+
+\subsection{Setting up the data}
+A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
+Here, the \code{normfacs} vector from TMM normalization of background bins is used. 
+If an offset matrix is necessary (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
+
+<<>>=
+y <- asDGEList(data, norm.factors=normfacs)
+@
+
+%Observant readers will notice that the library size here and in all calls to
+%\code{normalize} and \code{aveLogCPM} is set to \code{...\$totals}.  This
+%is critical as it ensures consistency between normalization, filtering and the
+%downstream statistical processing, i.e., the same library sizes should be used
+%throughout all steps.  The \code{totals} vector is used as it is constant for
+%all window/bin sizes with any given dataset/read extraction parameters. Simply
+%taking the column sums is inappropriate due to overlaps between windows and the
+%effects of filtering.
+
+The experimental design is described by a design matrix. 
+In this case, the only relevant factor is the cell type of each sample. 
+A generalized linear model (GLM) will be fitted to the counts for each window using the specified design matrix \citep{mccarthy2012}. 
+This provides a general framework for the analysis of complex experiments with multiple factors. 
+Readers are referred to the user's guide in \edger{} for more details on parametrization.
+
+<<>>=
+design
+@
+
+\section{Estimating the dispersions}
+
+\subsection{Stabilising estimates with empirical Bayes}
+\label{sec:dispest}
+Under the QL framework, both the QL and NB dispersions are used to model biological variability in the data \citep{lund2012}. 
+The former ensures that the NB mean-variance relationship is properly specified with appropriate contributions from the Poisson and Gamma components. 
+The latter accounts for variability and uncertainty in the dispersion estimate. 
+However, limited replication in most ChIP-seq experiments means that each window does not contain enough information for precise estimation of either dispersion. 
+
+% Both parameters need to be estimated for optimal performance; using too high
+% a value for the NB dispersion means that the QL dispersion can't recover (as
+% it's very sensitive to the former). Also, using a constant value (e.g. 0, a
+% la quasi-poisson) puts a lot of pressure on the trend fitting as you're
+% trying to shoehorn a NB mean-variance relationship into a QL mean-varince
+% relationship (asymptotically the same, but different at low counts).
+
+This problem is overcome in \edger{} by sharing information across windows. 
+For the NB dispersions, a mean-dispersion trend is fitted across all windows to model the mean-variance relationship \citep{mccarthy2012}. 
+The raw QL dispersion for each window is estimated after fitting a GLM with the trended NB dispersion. 
+Another mean-dependent trend is fitted to the raw QL estimates.  
+An empirical Bayes (EB) strategy is then used to stabilize the raw QL dispersion estimates by shrinking them towards the second trend \citep{lund2012}. 
+The ideal amount of shrinkage is determined from the heteroskedasticity of the data.
+
+<<eval=FALSE,label=shrinkx>>=
+par(mfrow=c(1,2))
+y <- estimateDisp(y, design)
+o <- order(y$AveLogCPM)
+plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
+  ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"), 
+  ylab=("Biological coefficient of variation"))
+abline(h=0.2, col="red")
+fit <- glmQLFit(y, design, robust=TRUE)
+plotQLDisp(fit)
+@
+
+The effect of EB stabilisation can be visualized by examining the biological coefficient of variation (for the NB dispersion) and the quarter-root deviance (for the QL dispersion). 
+These plots can also be used to decide whether the fitted trend is appropriate. 
+Sudden irregulaties may be indicative of an underlying structure in the data which cannot be modelled with the mean-dispersion trend. 
+Discrete patterns in the raw dispersions are indicative of low counts and suggest that more aggressive filtering is required.
+
+\setkeys{Gin}{width=0.99\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE,width=10,height=5>>=
+<<shrinkx>>
+@
+\end{center}
+
+A strong trend may also be observed where the dispersion drops sharply with increasing average abundance.
+This is due to the disproportionate impact of artifacts such as mapping errors and PCR duplicates at low counts. 
+It is difficult to accurately fit an empirical curve to these strong trends.  
+Inaccurate fitting means that the dispersions at high abundances are often overestimated. 
+Users should check whether removal of the low abundance regions affects the dispersion estimate. 
+Large changes upon removal imply that more aggressive abundance-based filtering may be desirable, as described in Chapter~\ref{chap:filter}.
+
+<<label=rmchecker,eval=FALSE>>=
+yo <- asDGEList(original, norm.factors=normfacs)
+yo <- estimateDisp(yo, design)
+oo <- order(yo$AveLogCPM)
+plot(yo$AveLogCPM[oo], sqrt(yo$trended.dispersion[oo]), type="l", lwd=2,
+  ylim=c(0, max(sqrt(yo$trended))), xlab=expression("Ave."~Log[2]~"CPM"), 
+  ylab=("Biological coefficient of variation"))
+lines(y$AveLogCPM[o], sqrt(y$trended[o]), lwd=2, col="grey")
+legend("topright", c("raw", "filtered"), col=c("black", "grey"), lwd=2)
+@
+
+\setkeys{Gin}{width=0.8\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<rmchecker>>
+@
+\end{center}
+
+\subsection{Modelling heteroskedasticity}
+The heteroskedasticity of the data is modelled in \edger{} by the prior degrees of freedom (d.f.).
+A large value for the prior d.f. indicates that heteroskedasticity is low. 
+This means that more EB shrinkage can be performed to reduce uncertainty and maximize power. 
+However, strong shrinkage is not appropriate if the dispersions are highly variable. 
+Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
+
+<<>>=
+summary(fit$df.prior)
+@
+
+On occasion, the estimated prior degrees of freedom will be infinite. 
+This is indicative of a strong batch effect where the dispersions are consistently large.
+A typical example involves uncorrected differences in IP efficiency across replicates. 
+In severe cases, the trend may fail to pass through the bulk of points as the variability is too low to be properly modelled in the QL framework.
+This problem is usually resolved with appropriate normalization.
+
+Note that the prior degrees of freedom should be robustly estimated \citep{phipson2013}. 
+Obviously, this protects against large positive outliers (e.g., highly variable windows) but it also protects against near-zero dispersions at low counts. 
+These will manifest as large negative outliers after a log transformation step during estimation \citep{smyth2004}. 
+Without robustness, incorporation of these outliers will inflate the observed variability in the dispersions.
+This results in a lower estimated prior d.f. and reduced DB detection power.
+
+% If you've forgotten, you get near-zero dispersions because counts can be exactly equal.
+
+\section{Testing for DB windows}
+The effect of specific factors can be tested to identify windows with significant differential binding. 
+In the QL framework, $p$-values are computed using the F-test \citep{lund2012}. 
+This is more appropriate than using the likelihood ratio test as the F-test accounts for uncertainty in the dispersion estimates. 
+Associated statistics such as log-fold changes and log-counts per million are also computed for each window.
+
+<<>>=
+results <- glmQLFTest(fit, contrast=c(0, 1))
+head(results$table)
+@
+
+The null hypothesis here is that the cell type has no effect. 
+The \code{contrast} argument in the \code{glmQLFTest} function specifies which factors are of interest. 
+In this case, a contrast of \code{c(0, 1)} defines the null hypothesis as \code{0*intercept + 1*cell.type = 0}, i.e., that the log-fold change between cell types is zero. 
+DB windows can then be identified by rejecting the null. 
+Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Correction for multiple testing}
+
+\begin{combox}
+All right, we're almost there. 
+This chapter needs the \code{results} object from the last chapter. 
+You'll also need the filtered \code{data} list from Chapter~\ref{chap:count}, as well as the \code{broads} object from Chapter~\ref{chap:filter}. 
+\end{combox}
+
+\section{Problems with false discovery rate control}
+The false discovery rate (FDR) is usually the most appropriate measure of error for high-throughput experiments. 
+Control of the FDR can be provided by applying the Benjamini-Hochberg (BH) method \citep{benjamini1995} to a set of $p$-values. 
+This is less conservative than the alternatives (e.g., Bonferroni) yet still provides some measure of error control. 
+The most obvious approach is to apply the BH method to the set of $p$-values across all windows. 
+This will control the FDR across the set of putative DB windows.
+
+However, the FDR across all detected windows is not necessarily the most relevant error rate. 
+Interpretation of ChIP-seq experiments is more concerned with regions of the genome in which (differential) protein binding is found, rather than the individual windows. 
+In other words, the FDR across all detected DB regions is usually desired. 
+This is not equivalent to that across all DB windows as each region will often consist of multiple overlapping windows.
+Control of one will not guarantee control of the other \citep{lun2014}.
+
+To illustrate this difference, consider an analysis where the FDR across all window positions is controlled at 10\%. 
+In the results, there are 18 adjacent window positions forming one cluster and 2 windows forming a separate cluster.
+Each cluster represents a region. 
+The first set of windows is a truly DB region whereas the second set is a false positive. 
+A window-based interpretation of the FDR is correct as only 2 of the 20 window positions are false positives.
+However, a region-based interpretation results in an actual FDR of 50\%.
+
+% The BH method is particularly popular as it is simple to apply and robust to
+% correlations \citep{reiner2003,kim2008}.  Simes' is also pretty robust to
+% correlations \citep{samuel1996,sarkar1997}, in the same respect as the FDR.
+% Say you control the FDR within a cluster using the BH method, so
+% E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
+% be under 0.05 as well. So, if the BH method works, so does Simes' method.
+
+Problems from misinterpretation can be avoided by applying the BH method to a $p$-value from each region. 
+Windows can be clustered together into regions, using a number of different strategies. 
+Simes' method can then be used to compute a combined $p$-value for each cluster based on the $p$-values the constituent windows \citep{simes1986}.
+This tests the joint null hypothesis that no enrichment is observed across any sites within the region. 
+The combined $p$-values are then adjusted using the BH method to control the region-level FDR. 
+
+\section{Clustering with external information}
+Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
+The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
+Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping. 
+In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
+
+<<>>=
+olap <- findOverlaps(broads, rowData(data))
+olap
+@
+
+The \code{combineTests} function can then be used to combine the $p$-values for all windows in each region. 
+This provides a single combined $p$-value (and its FDR-adjusted value) for each region. 
+The row names of the output table correspond to the value of the cluster identifiers supplied in \code{ids}.
+These should, in turn, act as indices for the regions of interest in \code{broads}. 
+The average log-CPM and log-FC across all windows in each region are also computed.
+
+<<>>=
+cluster.ids <- queryHits(olap)
+window.ids <- subjectHits(olap)
+tabprom <- combineTests(cluster.ids, results$table[window.ids,,drop=FALSE])
+head(tabprom)
+@
+
+At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
+This is a valid strategy but will yield different results. 
+Consider a promoter containing two separate peaks that are identically DB in opposite directions. 
+Counting reads across the promoter will give equal counts for each group so changes within the promoter will not be detected. 
+For peaks, imprecise boundaries for the called peaks can lead to loss of DB detection power due to ``contamination'' by reads from background regions. 
+In both cases, window-based methods may be more robust as each interval of the promoter/peak region is examined separately \citep{lun2014}.
+
+% Same problems for DB shifting or shrinkage, or even noisy background where
+% the surrounding non-NB regions contaminate the DB enriched signal.  The only
+% way to find these buggers is to look for DE'ness at every place. In other
+% words, we're interested in differential binding rather than absolute
+% enrichment, and peak counts will give us the former rather than the latter.
+% Which is okay in other cases as you get a boost in power from larger counts
+% (though you can twiddle the width to deal with that - and then you get into
+% parameter dogfights).
+%
+% You could also get methods designed to create regions based on differences
+% in density but the magnitude of the difference required for the creation of
+% a new region is going to be arbitrary e.g. a slow decline in density from
+% high to low won't get picked up if you're looking for big differences.
+
+\section{Quick and dirty clustering}
+\label{sec:cluster}
+Clustering can also be performed inside \pkgname{} with a simple single-linkage algorithm, implemented in the \code{mergeWindows} function.
+This approach is useful as it avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
+Briefly, all high-abundance windows that are less than some distance apart - say, 1 kbp - are put in the same cluster. 
+The chosen distance reflects some arbitrary minimum distance at which two binding events are considered to be separate sites.
+
+<<>>=
+merged <- mergeWindows(rowData(data), tol=1000L)
+merged$region
+@
+
+A combined $p$-value is computed for each cluster as previously described.
+Application of the BH method controls the FDR across all detected clusters.
+Like before, the row names in the output table are indices for the corresponding coordinates of the clusters in \code{merged\$regions}. 
+This allows for simple correspondence between the results and the regions. 
+
+<<>>=
+tabcom <- combineTests(merged$id, results$table)
+head(tabcom)
+@
+
+If many overlapping windows are present, very large clusters may be formed that are difficult to interpret. 
+A simple check can be used to determine whether most clusters are of an acceptable size. 
+Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:filter} is required.  
+This mitigates chaining effects by reducing the density of windows in the genome.
+
+% Note that several large clusters may still be present due to high
+% coverage within long tandem repeat loci.
+
+<<>>=
+summary(width(merged$region))
+@
+
+Alternatively, chaining can be limited by setting \code{max.width} to restrict the size of the merged intervals.  
+The chosen value should be small enough so as to separate DB regions from unchanged neighbours, yet large enough to avoid misinterpretation of the FDR.
+Any value from 2000 to 10000 bp is recommended. 
+This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
+
+<<>>=
+merged.max <- mergeWindows(rowData(data), tol=1000L, max.width=5000L)
+summary(width(merged$max))
+@
+
+% Is there a better way to do this? I suppose we could choose the number of
+% clusters that maximises the average density. It's the most logical way to do
+% it, as we are interested in high-density regions. This will also avoid
+% chaining as clusters with a lot of empty space will be broken up. However, it
+% also requires an arbitrary compromise between the number of clusters and the
+% density. Specifically, there's liable to be a point at which chaining is
+% acceptable, e.g., satellite window adjacent to a peak, regions of diffuse 
+% continuous enrichment. And that's without considering the fact that multiple
+% peaks might need to be clustered together for proper FDR interpretation. So,
+% the question becomes, how big of a density penalty should be applied to a new
+% cluster? I think that this is more difficult to interpret compared to the
+% method described above, where parameters are expressed as distances. And besides,
+% it's fast enough to run a couple of times to check the parameters.
+
+There are also provisions for clustering based on the sign of the log-fold change. 
+The idea is that clusters will be broken up wherever the sign changes. 
+This will separate binding sites that are close together but are changing in opposite directions. 
+A vector can be supplied in \code{sign} to indicate whether each window has a positive log-fold change.
+
+<<>>=
+merged.sign <- mergeWindows(rowData(data), tol=1000L, sign=(results$table$logFC > 0))
+summary(width(merged.sign$region))
+@
+
+For routine analyses, sign-based filtering is not recommended as the sign of windows within each cluster is not independent of their DB status. 
+Windows in a genuine DB region will form one cluster (consistent sign) whereas those in non-DB regions will form many clusters (inconsistent sign, as the log-fold change is small).
+This results in conservativeness as more clusters will have large $p$-values.
+Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
+
+\section{Getting the most DB window}
+In some cases, it may be necessary to also report the window in which the strongest DB is found.
+This information can be useful for identifying the change in binding within large clusters, or to narrow down the relevant sequence for motif discovery.
+Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
+This reports the index of the window with the lowest $p$-value in each cluster.
+
+<<>>=
+tab.best <- getBestTest(merged$id, results$table)
+head(tab.best)
+@
+
+A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
+This fold change is often more useful than that reported by \code{combineTests}.
+The latter is an average across all windows in the cluster and will have little meaning for large clusters.
+Reporting the best fold change may be preferable as it focuses on the DB.
+
+<<>>=
+best.fc <- results$table$logFC[tab.best$best]
+head(best.fc)
+@
+
+Typically, the best window will only be used as a descriptive measure for each cluster.
+However, more statistical rigour is necessary if they are treated as the features of interest over which the error rate is to be controlled.
+A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
+This is necessary to account for the implicit multiple testing across all windows in each cluster.
+
+Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
+This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
+As the average abundance is independent of the $p$-value, no multiple testing correction is necessary under this definition.
+
+<<>>=
+tab.best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
+head(tab.best.2)
+@
+
+Arbitrary summarization schemes can be implemented manually with the \code{aggregate} function.
+For example, the code below finds the window with the largest absolute log-fold change in each cluster.
+
+<<>>=
+manual <- aggregate(results$table$logFC ~ merged$id,  
+    FUN=function(x) { which.max(abs(x)) })
+head(manual)
+@
+
+\chapter{Post-processing steps}
+
+\begin{combox}
+This is where we bring it all together.
+We'll need the \code{merged} list and the \code{tabcom} table from the previous chapter. 
+There's a bit about visualization at the end where we need the \code{y} object from Chapter~\ref{chap:stats} and the \code{bam.files} that we started off with.
+Oh, and the \code{org.Mm.eg.db} object that we loaded in Chapter~\ref{chap:filter}.
+\end{combox}
+
+\section{Adding gene-based annotation}
+Annotation can be added to a given set of regions using the \code{detailRanges} function. 
+This will identify overlaps between the regions and annotated genomic features such as exons, introns and promoters. 
+Here, the promoter region of each gene is defined as some interval 3 kbp up- and 1 kbp downstream of the TSS for that gene. 
+Any exonic features within \code{dist} on the left or right side of each supplied region will also be reported.
+
+<<>>=
+require(TxDb.Mmusculus.UCSC.mm10.knownGene)
+sig.bins <- merged$region[as.integer(rownames(tabcom))]
+anno <- detailRanges(sig.bins, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
+   orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
+head(anno$overlap)
+head(anno$left)
+head(anno$right)
+@
+
+Character vectors of compact string representations are provided to summarize the features overlapped by each supplied region. 
+Each pattern contains \code{GENE|EXONS|STRAND} to describe the strand and overlapped exons of that gene. 
+Promoters are labelled as exon \code{0} whereas introns are labelled as \code{I}. 
+For \code{left} and \code{right}, an additional \code{DISTANCE} field is included.
+This indicates the gap between the annotated feature and the supplied region.
+
+While the string representation saves space in the output, it is not easy to work with.
+If the annotation needs to manipulated directly, users can obtain it from the \code{detailRanges} command by not specifying the regions of interest. 
+This can then be used for interactive manipulation, e.g., to identify all genes where the promoter contains DB sites.
+
+<<>>=
+anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
+head(anno.ranges)
+@
+
+\section{Saving the results to file}
+It is a simple matter to save the results for later perusal. 
+This is done here in the \code{*.tsv} format where all detail is preserved. 
+Compression is used to reduce the file size. 
+Of course, other formats can be used depending on the purpose of the file, e.g., exporting to BED files through the \rtracklayer{} package for visual inspection of the data with genomic browsers.
+
+<<>>=
+ofile <- gzfile("clusters.gz", open="w")
+write.table(data.frame(chr=as.character(seqnames(sig.bins)), start=start(sig.bins), 
+    end=end(sig.bins), tabcom, anno), file=ofile, 
+    row.names=FALSE, quote=FALSE, sep="\t")
+close(ofile)
+@
+
+\section{Simple visualization of genomic coverage}
+Visualization of the read depth around interesting features is often desired.
+This is facilitated by the \code{extractReads} function, which pulls out the reads from the BAM file.
+The returned \code{GRanges} object can then be used to plot the sequencing coverage or any other statistic of interest.
+Note that the \code{extractReads} function also accepts a \code{readParam} object.
+This means that the same reads used in the analysis will be pulled out during visualization.
+
+<<>>=
+cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
+extractReads(cur.region, bam.files[1], param=readParam())
+@
+
+Here, coverage is visualized by showing the number of reads covering each base pair in the interval of interest.
+The height of each read coverage track is adjusted according to the library size.
+A larger library will have a greater maximum plot height, such that a greater number of reads in that library will not be represented by a larger peak.
+This avoids any misrepresentation of read depth when comparing between libraries.
+
+<<>>=
+lib.sizes <- exp(getOffset(y))
+mean.lib <- mean(lib.sizes)
+max.depth <- 20 * lib.sizes/mean.lib
+@
+
+The visualization itself is performed using methods from the \gviz{} package.
+The blue and red tracks represent the coverage on the forward and reverse strands, respectively. 
+This will not be relevant for paired-end data where coverage is plotted for fragments, i.e., read pairs.
+In such cases, the code below will need to be modified accordingly.
+
+<<eval=FALSE,label=regionplot>>=
+require(Gviz)
+collected <- list()
+for (i in 1:length(bam.files)) { 
+    reads <- extractReads(cur.region, bam.files[i])
+    pcov <- as(coverage(reads[strand(reads)=="+"]), "GRanges")
+    ncov <- as(coverage(reads[strand(reads)=="-"]), "GRanges")
+    ptrack <- DataTrack(pcov, type="histogram", lwd=0, 
+        fill=rgb(0,0,1,0.4), ylim=c(0, max.depth[i]), 
+        name=bam.files[i], col.axis="black", col.title="black")
+    ntrack <- DataTrack(ncov, type="histogram", lwd=0, 
+        fill=rgb(1,0,0,0.4), ylim=c(0, max.depth[i]))
+    collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
+}
+gax <- GenomeAxisTrack(col="black")
+plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
+@
+
+\setkeys{Gin}{width=.8\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<regionplot>>
+@
+\end{center}
+
+\chapter{Epilogue}
+
+\begin{combox}
+Congratulations on getting to the end. Here's a poem for your efforts.
+\begin{quote}
+There once was a man named Will \\
+Who never ate less than his fill. \\
+He ate meat and bread \\
+Until he was fed \\
+But died when he saw the bill. 
+\end{quote}
+\end{combox}
+
+\section{Datasets}
+\label{sec:dataset}
+
+\subsection{Obtaining the FastQ files}
+The main NFYA dataset used throughout the guide was first mentioned in Section~\ref{data:main}. 
+This was generated by \cite{tiwari2012} and is available from the NCBI Gene Expression Omnibus (GEO) with the accession number GSE25532. 
+FastQ files can be obtained from the Sequence Read Archive (SRA) with accession numbers of SRR074398 for \code{es\_1.bam}, SRR074399 for \code{es\_2.bam}, SRR074417 for \code{tn\_1.bam} and SRR074418 for \code{tn\_2.bam}.
+
+The paired-end dataset used in Section~\ref{data:pet} was generated by \cite{pal2013} and is available from the NCBI GEO under the accession GSE43212.
+The lone FastQ file can be obtained from the SRA with the accession SRR642390 for \code{example-pet.bam}.
+
+All libraries used in Section~\ref{data:ccf} were generated by \cite{zhang2012} and are available from the NCBI GEO under the accession GSE31233. 
+FastQ files can be obtained from the SRA under the accessions SRR330784 and SRR330785 for \code{h3ac.bam}; SRR330800 and SRR330801 for \code{h3k4me2.bam}; and SRR330814, SRR330815 and SRR330816 for \code{h3k27me3.bam}. 
+Multiple FastQ files represent technical replicates that were merged into a single BAM file.
+
+Finally, the H3K4me3 dataset in Section~\ref{data:norm} was generated by \cite{domingo2012} and is available under the accession GSE38046. 
+FastQ files can be obtained from the SRA under the accessions SRR499732 and SRR499733 for \code{h3k4me3\_pro.bam}, and SRR499716 and SRR499717 for \code{h3k4me3\_mat.bam}. 
+Again, technical replicates were merged together.
+For H3ac, the FastQ file at SRR330786 was also downloaded and used as \code{h3ac\_2.bam}.
+ 
+\subsection{Alignment and processing to produce BAM files}
+Technically, each of the libraries described above are downloaded in the SRA format. 
+These can be unpacked to yield FastQ files using the \code{fastq-dump} program from the SRA Toolkit (\url{http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software}). 
+For the one paired-end library, users will need to specify \code{fastq-dump --split-files} to ensure that two separate files are produced, i.e., one containing sequences from each end.
+
+The reads in the FastQ files can then be mapped. 
+For this particular guide, all reads were aligned to the mm10 build of the mouse genome using the subread program \citep{liao2013}. 
+This can be obtained from Bioconductor as Rsubread or as a standalone C program from \url{http://subread.sourceforge.net}. 
+Default settings were used with the exception of the consensus threshold, which was lowered to 2 to accommodate the short read lengths. 
+Paired-end data was aligned by supplying both FastQ files to subread in the same run.
+
+Once aligned, SAM files were converted to BAM files using the samtools suite \citep{li2009}. 
+BAM files were position-sorted with the \code{samtools sort} command, and duplicate reads were marked using the \code{MarkDuplicates} command from the Picard suite (\url{http://picard.sourceforge.net}).
+Any technical replicates were merged together using  \code{samtools merge} to form a single library. 
+Indexing was performed using \code{samtools index}.
+
+\section{Session information}
+<<>>=
+sessionInfo()
+@
+
+\section{References}
+
+\bibliographystyle{plainnat}
+\bibliography{ref_ug}
+
+\end{document}
+
