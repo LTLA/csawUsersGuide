@@ -1475,13 +1475,17 @@ wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 Counts for each window are subtracted from the counts for its neighbourhood. 
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
 The width of the window is also subtracted to obtain the effective size of the neighbourhood.
-The former should include the average fragment length as the counts for each window are obtained after read extension (use the median fragment length for paired-end data).
-The resulting widths can be supplied to \code{apkb}.
+These can then be supplied to \code{apkb}, as shown below.
+
+% Technically, the extension length should also be included when computing the widths.
+% However, the same extension is performed for both the window and its neighbourhood, so this will cancel out during subtraction.
+% A larger prior count could be used here, as each estimate of the local background is less stable than a single global value.
+% However, this would require that the window abundances-per-kilobase need to be recomputed with the new prior.
 
 <<>>=
-neighbour.width <- width(neighbour) - width(rowData(data)) - frag.len
+assay(wider) <- assay(wider) - assay(data)
+neighbour.width <- width(neighbour) - width(rowData(data)) 
 neighbour.ab <- apkb(wider, widths=neighbour.width)
-win.ab <- apkb(data)
 @
 
 % I don't think this is avoidable; computing a p-value against the average
@@ -1497,7 +1501,7 @@ The distribution of enrichment values can be examined across all windows.
 Most values will lie somewhere above zero, given that some prefiltering has already been performed on the window counts during loading.
 
 <<eval=FALSE,label=enriched>>=
-enriched.fc <- win.ab - neighbour.ab
+enriched.fc <- abundances - neighbour.ab
 hist(enriched.fc, xlab="Enrichment logFC")
 @
 
