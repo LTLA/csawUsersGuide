@@ -140,7 +140,8 @@ data <- data[keep,]
 <<>>=
 y <- asDGEList(data, norm.factors=normfacs)
 y <- estimateDisp(y, design)
-results <- glmQLFTest(y, design, robust=TRUE)
+fit <- glmQLFit(y, design, robust=TRUE)
+results <- glmQLFTest(fit)
 @
 \item Correcting for multiple testing.
 <<>>=
@@ -1723,7 +1724,8 @@ plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
   ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"), 
   ylab=("Biological coefficient of variation"))
 abline(h=0.2, col="red")
-results <- glmQLFTest(y, design, robust=TRUE, plot=TRUE)
+fit <- glmQLFit(y, design, robust=TRUE)
+plotQLDisp(fit)
 @
 
 The effect of EB stabilisation can be visualized by examining the biological coefficient of variation (for the NB dispersion) and the quarter-root deviance (for the QL dispersion). 
@@ -1771,7 +1773,7 @@ However, strong shrinkage is not appropriate if the dispersions are highly varia
 Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
 
 <<>>=
-summary(results$df.prior)
+summary(fit$df.prior)
 @
 
 On occasion, the estimated prior degrees of freedom will be infinite. 
@@ -1795,7 +1797,7 @@ This is more appropriate than using the likelihood ratio test as the F-test acco
 Associated statistics such as log-fold changes and log-counts per million are also computed for each window.
 
 <<>>=
-results <- glmQLFTest(y, design, robust=TRUE, contrast=c(0, 1))
+results <- glmQLFTest(fit, robust=TRUE, contrast=c(0, 1))
 head(results$table)
 @
 
@@ -1804,10 +1806,6 @@ The \code{contrast} argument in the \code{glmQLFTest} function specifies which f
 In this case, a contrast of \code{c(0, 1)} defines the null hypothesis as \code{0*intercept + 1*cell.type = 0}, i.e., that the log-fold change between cell types is zero. 
 DB windows can then be identified by rejecting the null. 
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
-
-As a side note, the \code{glmQLFTest} function will perform both the dispersion estimation and the hypothesis testing. 
-This means that it only needs to be called once for each DB analysis.
-Multiple calls are only shown here and in Section~\ref{sec:dispest} for demonstration purposes. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
