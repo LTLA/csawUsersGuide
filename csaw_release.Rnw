@@ -1896,7 +1896,7 @@ This paramater can also interpreted as the maximum distance at which two binding
 
 <<>>=
 merged.max <- mergeWindows(rowData(data), tol=1000L, max.width=5000L)
-summary(width(merged$max))
+summary(width(merged.max$region))
 @
 
 % Is there a better way to do this? I suppose we could choose the number of
