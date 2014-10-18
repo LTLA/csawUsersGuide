@@ -1337,22 +1337,23 @@ The DB $p$-values retained after filtering should be uniform under the null hypo
 Row sums can also be used for datasets where the effective library sizes are not very different or where the counts are assumed to be Poisson-distributed between biological replicates. 
 
 In \edger{}, the log-transformed overall mean is defined as the average abundance.
-This is computed with the \code{aveLogCPM} function, as shown below.
-Note that the name is a bit of a misnomer - \code{aveLogCPM} computes the logarithm of the overall mean count (expressed as a per-million value), \textit{not} the mean of the log-count-per-million (CPM) values.
+This is computed with the \code{aveLogCPM} function.
+In \pkgname{}, the average abundance is further adjusted for the size of the windows using the \code{apkb} function.
+This reports the average abundance-per-kilobase and allows comparison of abundances between regions of different sizes.
 
 <<>>=
-abundances <- aveLogCPM(asDGEList(data))
+abundances <- apkb(data)
 summary(abundances)
 @
 
-For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
+For demonstration purposes, an arbitrary threshold of 0 is used here to filter the window abundances. 
 This restricts the analysis to windows with abundances above this threshold.
 While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
 Downstream estimates of various statistics are also more relevant when restricted to the regions of interest. 
 That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
 
 <<>>=
-keep <- abundances > -1
+keep <- abundances > 2
 demo <- data[keep,]
 summary(keep)
 @
@@ -1421,41 +1422,17 @@ This ensures that precision is maintained when estimating the background abundan
 <<>>=
 bin.size <- 2000L
 binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
+bin.ab <- apkb(binned)
 @
 
-These abundances are computed with large bins so they must be scaled down for comparison to the window abundances. 
-Under a model of background enrichment, assume that reads are evenly distributed between strands and uniformly distributed across large genomic regions.
-Downscaling can then be directly performed based on differences in the size of the read counting interval between windows and bins.
-For windows with read extension, the size of the interval is equal to the sum of the window width and the fragment length.
-The fragment length is only added once because extension is strand-specific, i.e., only forward- and reverse-mapping reads are counted on the left and right of the window, respectively.
-Thus, only half of the reads are counted on the flanks of the extended interval.
-
-<<>>=
-scaled <- bin.size/(window.width + frag.len)
-scaled
-@
-
-The abundances of the bins are estimated and downscaled according to the computed \code{scaled} value.
-The window abundances are also re-estimated here to standardize the effect of the prior count.
-Adding a prior count avoids undefined/unstable estimates when the actual counts are low.
-However, if the same prior is used for both bin and window counts, downscaling will reduce the effective prior added to the former.
-Thus, the prior must also be adjusted by \code{scaled} when computing the bin abundances, as shown below.
-
-<<>>=
-pc <- 0.5
-win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
-bin.ab <- aveLogCPM(asDGEList(binned), prior.count=pc*scaled)
-bin.ab <- bin.ab - log2(scaled)
-@
-
-Finally, the median of the binned abundances can be used as a global estimate of the background coverage.
+The median of the binned abundances-per-kilobase can be used as a global estimate of the background coverage.
 Windows are filtered based on some minimum required fold change over this global background. 
 Here, a fold change of 5 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
 threshold <- median(bin.ab) + log2(5)
-keep <- win.ab >= threshold
+keep <- abundances >= threshold
 sum(keep)
 @
 
@@ -1496,26 +1473,15 @@ wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 @
 
 Counts for each window are subtracted from the counts for its neighbourhood. 
-This means that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.  
-Again, some scaling for the differences in width is required for a valid comparison between the average abundances for each window and its neighbourhood.
-This should also account for the aforementioned subtraction of counts.
+This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
+The width of the window is also subtracted to obtain the effective size of the neighbourhood.
+The former should include the average fragment length as the counts for each window are obtained after read extension (use the median fragment length for paired-end data).
+The resulting widths can be supplied to \code{apkb}.
 
 <<>>=
-neighbour.counts <- assay(wider) - assay(data)
-adj.win.len <- window.width + frag.len
-scaled <- (surrounds - adj.win.len)/adj.win.len
-@
-
-The average abundance for each neighbourhood is computed with \code{aveLogCPM}.
-A larger prior count is used here as each estimate of the local background is less stable than a single global value.
-Again, scaling of the prior is necessary when computing neighbourhood abundances.
-This avoids spurious differences with the window abundances at low counts.
-
-<<>>=
-pc <- 1
-win.ab <- aveLogCPM(asDGEList(data), prior.count=pc)
-neighbour.ab <- aveLogCPM(neighbour.counts, lib.size=wider$totals, prior.count=scaled*pc)
-neighbour.ab <- neighbour.ab - log2(scaled)
+neighbour.width <- width(neighbour) - width(rowData(data)) - frag.len
+neighbour.ab <- apkb(wider, widths=neighbour.width)
+win.ab <- apkb(data)
 @
 
 % I don't think this is avoidable; computing a p-value against the average
@@ -1797,7 +1763,7 @@ This is more appropriate than using the likelihood ratio test as the F-test acco
 Associated statistics such as log-fold changes and log-counts per million are also computed for each window.
 
 <<>>=
-results <- glmQLFTest(fit, robust=TRUE, contrast=c(0, 1))
+results <- glmQLFTest(fit, contrast=c(0, 1))
 head(results$table)
 @
 
