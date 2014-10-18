@@ -1974,18 +1974,28 @@ Furthermore, any attempt to filter away small clusters will cause liberalness if
 
 \section{Getting the most DB window}
 In some cases, it may be necessary to also report the window in which the strongest DB is found.
-This information can be useful for identifying the relevant window in large complex clusters, or to narrow down the relevant sequence for motif discovery.
+This information can be useful for identifying the change in binding within large clusters, or to narrow down the relevant sequence for motif discovery.
 Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
 This reports the index of the window with the lowest $p$-value in each cluster.
 
 <<>>=
-best <- getBestTest(merged$id, results$table)
-head(best)
+tab.best <- getBestTest(merged$id, results$table)
+head(tab.best)
 @
 
-In most cases, the cluster coordinates will be precise enough so that the best window need only be reported as a descriptive measure.
-However, more statistical rigour is necessary if the latter are to be reported directly, i.e., as the features of interest over which the error rate is to be controlled.
-To maintain error control, a Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{best}.
+A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
+This fold change is often more useful than that reported by \code{combineTests}.
+The latter is an average across all windows in the cluster and will have little meaning for large clusters.
+Reporting the best fold change may be preferable as it focuses on the DB.
+
+<<>>=
+best.fc <- results$table$logFC[tab.best$best]
+head(best.fc)
+@
+
+Typically, the best window will only be used as a descriptive measure for each cluster.
+However, more statistical rigour is necessary if they are treated as the features of interest over which the error rate is to be controlled.
+A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
 This is necessary to account for the implicit multiple testing across all windows in each cluster.
 
 Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
@@ -1993,8 +2003,8 @@ This represents the window with the strongest binding for the target protein, th
 As the average abundance is independent of the $p$-value, no multiple testing correction is necessary under this definition.
 
 <<>>=
-best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
-head(best.2)
+tab.best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
+head(tab.best.2)
 @
 
 Arbitrary summarization schemes can be implemented manually with the \code{aggregate} function.
