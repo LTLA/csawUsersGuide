@@ -1976,7 +1976,7 @@ head(tab.best.2)
 @
 
 Arbitrary summarization schemes can be implemented manually with the \code{aggregate} function.
-For example, the code below finds the window with the largest absolute log-fold change in each cluster.
+This example finds the window with the largest absolute log-fold change in each cluster.
 
 <<>>=
 manual <- aggregate(results$table$logFC ~ merged$id,  
