@@ -1828,16 +1828,28 @@ However, a region-based interpretation results in an actual FDR of 50\%.
 % E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
 % be under 0.05 as well. So, if the BH method works, so does Simes' method.
 
-Problems from misinterpretation can be avoided by applying the BH method to a $p$-value from each region. 
-Windows can be clustered together into regions, using a number of different strategies. 
-Simes' method can then be used to compute a combined $p$-value for each cluster based on the $p$-values the constituent windows \citep{simes1986}.
-This tests the joint null hypothesis that no enrichment is observed across any sites within the region. 
-The combined $p$-values are then adjusted using the BH method to control the region-level FDR. 
+\section{Restoring FDR control with clustered windows}
+Misinterpretation of the FDR can be avoided by obtaining a single $p$-value for each region.
+In particular, several strategies can be used to cluster adjacent windows into regions.
+A combined $p$-value can then be computed for each cluster, based on the $p$-values of the constituent windows \citep{simes1986}.
+This tests the joint null hypothesis for each cluster, i.e., that no enrichment is observed across any sites within the corresponding region. 
+The combined $p$-values are then adjusted using the BH method to control the region-level FDR.
+
+An alternative approach is to choose a single window to represent each cluster/region.
+For example, the window with the highest average abundance in each cluster can be used.
+This is sensible for analyses involving sharp binding events, where each cluster is expected to be small and contain no more than one binding site.
+Thus, a single window (and $p$-value) can reasonably be used as a representative of the entire region.
+The BH method can then be applied to the corresponding $p$-values of the representative windows from all clusters.
+
+Both approaches are available in the \pkgname{} package.
+The combining procedure is known as Simes' method and is implemented in the \code{combineTests} function.
+Similarly, selection of a representative window can be performed using the \code{getBestTest} function.
+Examples of their usage are shown below, along with demonstrations of the different clustering strategies.
 
 \section{Clustering with external information}
 Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
 The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
-Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping. 
+Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \citep{lun2014}.
 In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
 
 <<>>=
@@ -1846,15 +1858,13 @@ olap
 @
 
 The \code{combineTests} function can then be used to combine the $p$-values for all windows in each region. 
-This provides a single combined $p$-value (and its FDR-adjusted value) for each region. 
+This provides a single combined $p$-value (and its FDR-adjusted equivalent) for each region. 
 The row names of the output table correspond to the value of the cluster identifiers supplied in \code{ids}.
-These should, in turn, act as indices for the regions of interest in \code{broads}. 
+These should, in turn, act as indices for the regions in \code{broads}. 
 The average log-CPM and log-FC across all windows in each region are also computed.
 
 <<>>=
-cluster.ids <- queryHits(olap)
-window.ids <- subjectHits(olap)
-tabprom <- combineTests(cluster.ids, results$table[window.ids,,drop=FALSE])
+tabprom <- combineTests(queryHits(olap), results$table[subjectHits(olap),])
 head(tabprom)
 @
 
@@ -1966,7 +1976,7 @@ head(tab.best)
 A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
 This fold change is often more useful than that reported by \code{combineTests}.
 The latter is an average across all windows in the cluster and will have little meaning for large clusters.
-Reporting the best fold change may be preferable as it focuses on the DB.
+Reporting the \code{best} fold change may be preferable as it focuses on the DB interval.
 
 <<>>=
 best.fc <- results$table$logFC[tab.best$best]
@@ -1980,10 +1990,10 @@ This is necessary to account for the implicit multiple testing across all window
 
 Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
 This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
-As the average abundance is independent of the $p$-value, no multiple testing correction is necessary under this definition.
-For sharp binding events, it may be useful to restrict the analysis to these windows.
-This is slightly easier to interpret and avoids the conservativeness of Simes' method.
-However, multiple DB events in a cluster will not be reliably identified, e.g., multiple adjacent TF binding sites.
+As the average abundance is independent of the $p$-value, no correction for multiple testing within each cluster is necessary.
+For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
+This will usually provide more power as it avoids the conservativeness of Simes' method.
+However, multiple DB events in a cluster will not be reliably identified, e.g., adjacent TF binding sites.
 
 <<>>=
 tab.best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
