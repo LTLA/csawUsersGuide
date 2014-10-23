@@ -1981,6 +1981,9 @@ This is necessary to account for the implicit multiple testing across all window
 Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
 This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
 As the average abundance is independent of the $p$-value, no multiple testing correction is necessary under this definition.
+For sharp binding events, it may be useful to restrict the analysis to these windows.
+This is slightly easier to interpret and avoids the conservativeness of Simes' method.
+However, multiple DB events in a cluster will not be reliably identified, e.g., multiple adjacent TF binding sites.
 
 <<>>=
 tab.best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
