@@ -319,12 +319,15 @@ Reads from a DB site may be counted alongside reads from a non-DB site (e.g., no
 This will result in the loss of DB detection power.
 
 The window size can be interpreted as a measure of the width of the binding site. 
-Thus, TF analyses will typically use a window size of several base pairs. 
+Thus, TF analyses will typically use a small window size, e.g., 10 - 50 bp.
 This maximizes spatial resolution to allow optimal detection of narrow regions of enrichment. 
 For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
 This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
 For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
 Analyses with multiple widths can be combined to provide a comprehensive picture of DB at all resolutions. 
+
+For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size.
+See Section~\ref{sec:efficiency} for more details.
 
 %%%%%%%%%
 % There's two ways to deal with histone marks; clustering or using a width/bin
@@ -566,6 +569,7 @@ A good check for synchronisation is to ensure that the values of \code{...\$tota
 This means that the same reads are extracted from the BAM file in each call. 
 
 \subsection{Increasing speed and memory efficiency}
+\label{sec:efficiency}
 The \code{spacing} parameter controls the distance between adjacent windows in the genome.
 Using a higher value will reduce computational work as fewer features need to be counted.
 This may be useful when machine memory is limited. 
@@ -580,6 +584,14 @@ head(rowData(demo))
 For analyses with large windows, it is also worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
 Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
+Conversely, \code{spacing} should not be larger than \code{width} for analyses with small windows.
+This ensures that narrow binding sites are not overlooked when windows are shifted along the genome.
+
+% Easiest to imagine this for ext=1, but it also affects larger ext; if the
+% width is set to 1, a binding site anywhere between two windows will not be
+% represented ideally by either point, i.e., all reads associated with that
+% binding site (+- ext) will not be counted at either point. A larger width
+% ensures counting, at the cost of including some background contamination.
 
 Windows with a low sum of counts across all libraries can be filtered out using the \code{filter} argument. 
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
