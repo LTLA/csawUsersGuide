@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 19 October 2014}
+Last revised 25 October 2014}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -2016,7 +2016,7 @@ head(tabcom.w)
 @
 
 The exact value of the weight for the top window is arbitrary.
-Greater weight represents a stronger belief that the DB event occurs at the most abundant window.
+Greater weight represents a stronger belief that DB occurs at the most abundant window.
 In practical terms, the weighting scheme used here means that the combined $p$-value of the cluster will not be more than twice the $p$-value of the top window.
 Conversely, if the strongest DB occurs in a non-top window, the combined $p$-value with weighting will be no more than twice the corresponding value without weighting.
 This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster, while still focusing on the most abundant site.
