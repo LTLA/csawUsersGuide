@@ -1140,9 +1140,11 @@ See Chapter~\ref{chap:filter} for more details on selection of enriched regions.
 The results of normalization can again be visualized with MA plots. 
 Of particular interest is the cloud of points at high A-values.
 This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
-Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed). 
-The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events. 
-If not, they must represent efficiency biases and should be removed.
+Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed).
+These two normalization strategies are mutually exclusive, as only one set of factors will ultimately be used.
+The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
+If so, composition biases should be removed to preserve the assumed DB.
+Otherwise, the differences must represent efficiency biases and should be removed.
 
 <<eval=FALSE,label=methplot,strip.white=false>>=
 par(mfrow=c(1,2))
@@ -1348,8 +1350,7 @@ In the negative binomial (NB) framework, this (probably) corresponds to filterin
 The DB $p$-values retained after filtering should be uniform under the null hypothesis, assuming analogous behaviour to the normal case. 
 Row sums can also be used for datasets where the effective library sizes are not very different or where the counts are assumed to be Poisson-distributed between biological replicates. 
 
-In \edger{}, the log-transformed overall mean is defined as the average abundance.
-This is computed with the \code{aveLogCPM} function.
+In \edger{}, the log-transformed overall mean is defined as the average abundance and is computed with the \code{aveLogCPM} function.
 In \pkgname{}, the average abundance is further adjusted for the size of the windows using the \code{apkb} function.
 This reports the average abundance-per-kilobase and allows comparison of abundances between regions of different sizes.
 
@@ -1358,10 +1359,10 @@ abundances <- apkb(data)
 summary(abundances)
 @
 
-For demonstration purposes, an arbitrary threshold of 0 is used here to filter the window abundances. 
+For demonstration purposes, an arbitrary threshold of 2 is used here to filter the window abundances. 
 This restricts the analysis to windows with abundances above this threshold.
 While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
-Downstream estimates of various statistics are also more relevant when restricted to the regions of interest. 
+Estimates of downstream statistics are also more relevant when they are based on the windows of interest. 
 That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
 
 <<>>=
@@ -1371,11 +1372,13 @@ summary(keep)
 @
 
 The exact choice of filter threshold may not be obvious.
-This problem is exacerbated when there is no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
+In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
 A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
 Arbitrariness is unavoidable when balancing these opposing considerations.
+
 Nonetheless, several strategies for defining the threshold are described below.
-Users are directed to choose one of these filtering approaches for their own analyses.
+Users should choose one of these filtering approaches for their analyses.
+Different filters can also be combined for more stringency, though whether this is sensible depends on the situation.
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
 % the best idea, simply because it means that it's not independent of the
@@ -2009,7 +2012,7 @@ Loss of information also increases the sensitivity of the analysis to the cluste
 For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
 
 A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
-In the example below, the weight assigned to the top window is equal to twice the number of other windows in each cluster.
+In the example below, the weight assigned to the top window is equal to the total number of other windows in each cluster.
 This means that the behaviour of the top window will have a greater influence on the final result.
 That said, the other windows in the cluster still have non-zero weights.
 Any DB events in those windows will still be considered when the $p$-values are combined.
@@ -2017,16 +2020,17 @@ Any DB events in those windows will still be considered when the $p$-values are 
 <<>>=
 weights <- rep(1, length(merged$id))
 freq <- tabulate(merged$id)
-weights[tab.ave$best] <- 2*(freq[merged$id[tab.ave$best]] - 1)
+weights[tab.ave$best] <- freq[merged$id[tab.ave$best]] - 1
 weights <- pmax(weights, 1)
 tabcom.w <- combineTests(merged$id, results$table, weights=weights)
 head(tabcom.w)
 @
 
-The exact value of the weight for the top window is rather arbitrary.
+The exact value of the weight for the top window is arbitrary.
 Greater weight represents a stronger belief that the DB event occurs at the most abundant window.
-In practical terms, the doubling used to define \code{weights} means that the combined $p$-value of the cluster will not be more than 50\% larger than the $p$-value of the top window.
-This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster.
+In practical terms, the weighting scheme used here means that the combined $p$-value of the cluster will not be more than twice the $p$-value of the top window.
+Conversely, if the strongest DB occurs in a non-top window, the combined $p$-value with weighting will be no more than twice the corresponding value without weighting.
+This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster, while still focusing on the most abundant site.
 
 \chapter{Post-processing steps}
 
