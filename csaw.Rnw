@@ -2022,7 +2022,7 @@ weights <- rep(1, length(merged$id))
 freq <- tabulate(merged$id)
 weights[tab.ave$best] <- freq[merged$id[tab.ave$best]] - 1
 weights <- pmax(weights, 1)
-tabcom.w <- combineTests(merged$id, results$table, weights=weights)
+tabcom.w <- combineTests(merged$id, results$table, weight=weights)
 head(tabcom.w)
 @
 
