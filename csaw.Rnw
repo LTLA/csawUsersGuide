@@ -1962,7 +1962,9 @@ Windows in a genuine DB region will form one cluster (consistent sign) whereas t
 This results in conservativeness as more clusters will have large $p$-values.
 Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
-\section{Getting the most DB window}
+\section{Choosing a single representative window}
+
+\subsection{Based on differential binding}
 In some cases, it may be necessary to also report the window in which the strongest DB is found.
 This information can be useful for identifying the change in binding within large clusters, or to narrow down the relevant sequence for motif discovery.
 Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
@@ -1988,26 +1990,43 @@ However, more statistical rigour is necessary if they are treated as the feature
 A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
 This is necessary to account for the implicit multiple testing across all windows in each cluster.
 
+\subsection{Based on average abundance}
 Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
 This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
 As the average abundance is independent of the $p$-value, no correction for multiple testing within each cluster is necessary.
 For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
 This will usually provide more power as it avoids the conservativeness of Simes' method.
-However, multiple DB events in a cluster will not be reliably identified, e.g., adjacent TF binding sites.
 
 <<>>=
-tab.best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
-head(tab.best.2)
+tab.ave <- getBestTest(merged$id, results$table, mode="logCPM")
+head(tab.ave)
 @
 
-Arbitrary summarization schemes can be implemented manually with the \code{aggregate} function.
-This example finds the window with the largest absolute log-fold change in each cluster.
+The obvious drawback is that DB information is lost when the analysis is restricted to a single window.
+Detection will fail if the DB event does not occur at the most abundant window.
+This is relevant for consideration of complex events, e.g., adjacent TF binding sites.
+Loss of information also increases the sensitivity of the analysis to the clustering procedure.
+For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
+
+A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
+In the example below, the weight assigned to the top window is equal to twice the number of other windows in each cluster.
+This means that the behaviour of the top window will have a greater influence on the final result.
+That said, the other windows in the cluster still have non-zero weights.
+Any DB events in those windows will still be considered when the $p$-values are combined.
 
 <<>>=
-manual <- aggregate(results$table$logFC ~ merged$id,  
-    FUN=function(x) { which.max(abs(x)) })
-head(manual)
+weights <- rep(1, length(merged$id))
+freq <- tabulate(merged$id)
+weights[tab.ave$best] <- 2*(freq[merged$id[tab.ave$best]] - 1)
+weights <- pmax(weights, 1)
+tabcom.w <- combineTests(merged$id, results$table, weights=weights)
+head(tabcom.w)
 @
+
+The exact value of the weight for the top window is rather arbitrary.
+Greater weight represents a stronger belief that the DB event occurs at the most abundant window.
+In practical terms, the doubling used to define \code{weights} means that the combined $p$-value of the cluster will not be more than 50\% larger than the $p$-value of the top window.
+This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster.
 
 \chapter{Post-processing steps}
 
