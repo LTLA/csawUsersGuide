@@ -319,12 +319,15 @@ Reads from a DB site may be counted alongside reads from a non-DB site (e.g., no
 This will result in the loss of DB detection power.
 
 The window size can be interpreted as a measure of the width of the binding site. 
-Thus, TF analyses will typically use a window size of several base pairs. 
+Thus, TF analyses will typically use a small window size, e.g., 10 - 50 bp.
 This maximizes spatial resolution to allow optimal detection of narrow regions of enrichment. 
 For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
 This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
 For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
 Analyses with multiple widths can be combined to provide a comprehensive picture of DB at all resolutions. 
+
+For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size.
+See Section~\ref{sec:efficiency} for more details.
 
 %%%%%%%%%
 % There's two ways to deal with histone marks; clustering or using a width/bin
@@ -566,6 +569,7 @@ A good check for synchronisation is to ensure that the values of \code{...\$tota
 This means that the same reads are extracted from the BAM file in each call. 
 
 \subsection{Increasing speed and memory efficiency}
+\label{sec:efficiency}
 The \code{spacing} parameter controls the distance between adjacent windows in the genome.
 Using a higher value will reduce computational work as fewer features need to be counted.
 This may be useful when machine memory is limited. 
@@ -580,6 +584,14 @@ head(rowData(demo))
 For analyses with large windows, it is also worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
 Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
+Conversely, \code{spacing} should not be larger than \code{width} for analyses with small windows.
+This ensures that narrow binding sites are not overlooked when windows are shifted along the genome.
+
+% Easiest to imagine this for ext=1, but it also affects larger ext; if the
+% width is set to 1, a binding site anywhere between two windows will not be
+% represented ideally by either point, i.e., all reads associated with that
+% binding site (+- ext) will not be counted at either point. A larger width
+% ensures counting, at the cost of including some background contamination.
 
 Windows with a low sum of counts across all libraries can be filtered out using the \code{filter} argument. 
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
@@ -1086,9 +1098,11 @@ See Chapter~\ref{chap:filter} for more details on selection of enriched regions.
 The results of normalization can again be visualized with MA plots. 
 Of particular interest is the cloud of points at high A-values.
 This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
-Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed). 
-The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events. 
-If not, they must represent efficiency biases and should be removed.
+Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed).
+These two normalization strategies are mutually exclusive, as only one set of factors will ultimately be used.
+The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
+If so, composition biases should be removed to preserve the assumed DB.
+Otherwise, the differences must represent efficiency biases and should be removed.
 
 <<eval=FALSE,label=methplot,strip.white=false>>=
 par(mfrow=c(1,2))
@@ -1316,11 +1330,13 @@ summary(keep)
 @
 
 The exact choice of filter threshold may not be obvious.
-This problem is exacerbated when there is no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
+In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
 A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
 Arbitrariness is unavoidable when balancing these opposing considerations.
+
 Nonetheless, several strategies for defining the threshold are described below.
-Users are directed to choose one of these filtering approaches for their own analyses.
+Users should choose one of these filtering approaches for their analyses.
+Different filters can also be combined for more stringency, though whether this is sensible depends on the situation.
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
 % the best idea, simply because it means that it's not independent of the
@@ -1804,16 +1820,28 @@ However, a region-based interpretation results in an actual FDR of 50\%.
 % E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
 % be under 0.05 as well. So, if the BH method works, so does Simes' method.
 
-Problems from misinterpretation can be avoided by applying the BH method to a $p$-value from each region. 
-Windows can be clustered together into regions, using a number of different strategies. 
-Simes' method can then be used to compute a combined $p$-value for each cluster based on the $p$-values the constituent windows \citep{simes1986}.
-This tests the joint null hypothesis that no enrichment is observed across any sites within the region. 
-The combined $p$-values are then adjusted using the BH method to control the region-level FDR. 
+\section{Restoring FDR control with clustered windows}
+Misinterpretation of the FDR can be avoided by obtaining a single $p$-value for each region.
+In particular, several strategies can be used to cluster adjacent windows into regions.
+A combined $p$-value can then be computed for each cluster, based on the $p$-values of the constituent windows \citep{simes1986}.
+This tests the joint null hypothesis for each cluster, i.e., that no enrichment is observed across any sites within the corresponding region. 
+The combined $p$-values are then adjusted using the BH method to control the region-level FDR.
+
+An alternative approach is to choose a single window to represent each cluster/region.
+For example, the window with the highest average abundance in each cluster can be used.
+This is sensible for analyses involving sharp binding events, where each cluster is expected to be small and contain no more than one binding site.
+Thus, a single window (and $p$-value) can reasonably be used as a representative of the entire region.
+The BH method can then be applied to the corresponding $p$-values of the representative windows from all clusters.
+
+Both approaches are available in the \pkgname{} package.
+The combining procedure is known as Simes' method and is implemented in the \code{combineTests} function.
+Similarly, selection of a representative window can be performed using the \code{getBestTest} function.
+Examples of their usage are shown below, along with demonstrations of the different clustering strategies.
 
 \section{Clustering with external information}
 Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
 The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
-Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping. 
+Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \citep{lun2014}.
 In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
 
 <<>>=
@@ -1822,15 +1850,13 @@ olap
 @
 
 The \code{combineTests} function can then be used to combine the $p$-values for all windows in each region. 
-This provides a single combined $p$-value (and its FDR-adjusted value) for each region. 
+This provides a single combined $p$-value (and its FDR-adjusted equivalent) for each region. 
 The row names of the output table correspond to the value of the cluster identifiers supplied in \code{ids}.
-These should, in turn, act as indices for the regions of interest in \code{broads}. 
+These should, in turn, act as indices for the regions in \code{broads}. 
 The average log-CPM and log-FC across all windows in each region are also computed.
 
 <<>>=
-cluster.ids <- queryHits(olap)
-window.ids <- subjectHits(olap)
-tabprom <- combineTests(cluster.ids, results$table[window.ids,,drop=FALSE])
+tabprom <- combineTests(queryHits(olap), results$table[subjectHits(olap),])
 head(tabprom)
 @
 
@@ -1928,7 +1954,9 @@ Windows in a genuine DB region will form one cluster (consistent sign) whereas t
 This results in conservativeness as more clusters will have large $p$-values.
 Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
-\section{Getting the most DB window}
+\section{Choosing a single representative window}
+
+\subsection{Based on differential binding}
 In some cases, it may be necessary to also report the window in which the strongest DB is found.
 This information can be useful for identifying the change in binding within large clusters, or to narrow down the relevant sequence for motif discovery.
 Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
@@ -1942,7 +1970,7 @@ head(tab.best)
 A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
 This fold change is often more useful than that reported by \code{combineTests}.
 The latter is an average across all windows in the cluster and will have little meaning for large clusters.
-Reporting the best fold change may be preferable as it focuses on the DB.
+Reporting the \code{best} fold change may be preferable as it focuses on the DB interval.
 
 <<>>=
 best.fc <- results$table$logFC[tab.best$best]
@@ -1954,23 +1982,44 @@ However, more statistical rigour is necessary if they are treated as the feature
 A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
 This is necessary to account for the implicit multiple testing across all windows in each cluster.
 
+\subsection{Based on average abundance}
 Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
 This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
-As the average abundance is independent of the $p$-value, no multiple testing correction is necessary under this definition.
+As the average abundance is independent of the $p$-value, no correction for multiple testing within each cluster is necessary.
+For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
+This will usually provide more power as it avoids the conservativeness of Simes' method.
 
 <<>>=
-tab.best.2 <- getBestTest(merged$id, results$table, mode="logCPM")
-head(tab.best.2)
+tab.ave <- getBestTest(merged$id, results$table, mode="logCPM")
+head(tab.ave)
 @
 
-Arbitrary summarization schemes can be implemented manually with the \code{aggregate} function.
-This example finds the window with the largest absolute log-fold change in each cluster.
+The obvious drawback is that DB information is lost when the analysis is restricted to a single window.
+Detection will fail if the DB event does not occur at the most abundant window.
+This is relevant for consideration of complex events, e.g., adjacent TF binding sites.
+Loss of information also increases the sensitivity of the analysis to the clustering procedure.
+For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
+
+A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
+In the example below, the weight assigned to the top window is equal to the total number of other windows in each cluster.
+This means that the behaviour of the top window will have a greater influence on the final result.
+That said, the other windows in the cluster still have non-zero weights.
+Any DB events in those windows will still be considered when the $p$-values are combined.
 
 <<>>=
-manual <- aggregate(results$table$logFC ~ merged$id,  
-    FUN=function(x) { which.max(abs(x)) })
-head(manual)
+weights <- rep(1, length(merged$id))
+freq <- tabulate(merged$id)
+weights[tab.ave$best] <- freq[merged$id[tab.ave$best]] - 1
+weights <- pmax(weights, 1)
+tabcom.w <- combineTests(merged$id, results$table, weight=weights)
+head(tabcom.w)
 @
+
+The exact value of the weight for the top window is arbitrary.
+Greater weight represents a stronger belief that the DB event occurs at the most abundant window.
+In practical terms, the weighting scheme used here means that the combined $p$-value of the cluster will not be more than twice the $p$-value of the top window.
+Conversely, if the strongest DB occurs in a non-top window, the combined $p$-value with weighting will be no more than twice the corresponding value without weighting.
+This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster, while still focusing on the most abundant site.
 
 \chapter{Post-processing steps}
 
