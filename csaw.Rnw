@@ -2011,6 +2011,11 @@ This is relevant for consideration of complex events, e.g., adjacent TF binding 
 Loss of information also increases the sensitivity of the analysis to the clustering procedure.
 For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
 
+% This may be necessary if you don't want to have high spatial resolution, for whatever reason.
+% For example, if you have changes in the average fragment length between libraries, you don't want
+% to pick up shrunken peaks just because of that. Selecting the most abundant window will 
+% ensure that you don't pick up changes on the edges of the peak.
+
 A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
 In the example below, the weight assigned to the top window is equal to the total number of other windows in each cluster.
 This means that the behaviour of the top window will have a greater influence on the final result.
