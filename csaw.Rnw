@@ -1926,7 +1926,8 @@ This mitigates chaining effects by reducing the density of windows in the genome
 summary(width(merged$region))
 @
 
-Alternatively, chaining can be limited by setting \code{max.width} to restrict the size of the merged intervals.  
+Alternatively, chaining can be limited by setting \code{max.width} to restrict the size of the merged intervals. 
+Clusters substantially larger than \code{max.width} are split into several smaller subclusters of roughly equal size.
 The chosen value should be small enough so as to separate DB regions from unchanged neighbours, yet large enough to avoid misinterpretation of the FDR.
 Any value from 2000 to 10000 bp is recommended. 
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
