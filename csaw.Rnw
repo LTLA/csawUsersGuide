@@ -1914,13 +1914,16 @@ tabcom <- combineTests(merged$id, results$table)
 head(tabcom)
 @
 
-If many overlapping windows are present, very large clusters may be formed that are difficult to interpret. 
+If many adjacent windows are present, very large clusters may be formed that are difficult to interpret. 
 A simple check can be used to determine whether most clusters are of an acceptable size. 
 Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:filter} is required.  
 This mitigates chaining effects by reducing the density of windows in the genome.
 
-% Note that several large clusters may still be present due to high
-% coverage within long tandem repeat loci.
+% Note that several large clusters may still be present due to high coverage
+% within long tandem repeat loci.  In general, chaining isn't as bad as true
+% single-linkage, because windows that survive weak filtering should have
+% reasonably high read counts. So, it won't be as unstable as single-linkage
+% clustering on the reads themselves.
 
 <<>>=
 summary(width(merged$region))
