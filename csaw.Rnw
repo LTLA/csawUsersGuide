@@ -1347,26 +1347,25 @@ Removing such uninteresting or ineffective tests reduces the severity of the mul
 
 Filtering is valid so long as it is independent of the test statistic under the null hypothesis \citep{bourgon2010}. 
 In the negative binomial (NB) framework, this (probably) corresponds to filtering on the overall NB mean. 
-The DB $p$-values retained after filtering should be uniform under the null hypothesis, assuming analogous behaviour to the normal case. 
-Row sums can also be used for datasets where the effective library sizes are not very different or where the counts are assumed to be Poisson-distributed between biological replicates. 
+The DB $p$-values retained after filtering on the overall mean should be uniform under the null hypothesis, by analogy to the normal case. 
+Row sums can also be used for datasets where the effective library sizes are not very different, or where the counts are assumed to be Poisson-distributed between biological replicates. 
 
-In \edger{}, the log-transformed overall mean is defined as the average abundance and is computed with the \code{aveLogCPM} function.
-In \pkgname{}, the average abundance is further adjusted for the size of the windows using the \code{apkb} function.
-This reports the average abundance-per-kilobase and allows comparison of abundances between regions of different sizes.
+In \edger{}, the log-transformed overall NB mean is referred to as the average abundance.
+This is computed with the \code{aveLogCPM} function, as shown below for each region.
 
 <<>>=
-abundances <- apkb(data)
+abundances <- aveLogCPM(asDGEList(data))
 summary(abundances)
 @
 
-For demonstration purposes, an arbitrary threshold of 2 is used here to filter the window abundances. 
+For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
 This restricts the analysis to windows with abundances above this threshold.
 While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
 Estimates of downstream statistics are also more relevant when they are based on the windows of interest. 
 That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
 
 <<>>=
-keep <- abundances > 2
+keep <- abundances > -1
 demo <- data[keep,]
 summary(keep)
 @
@@ -1437,24 +1436,35 @@ This ensures that precision is maintained when estimating the background abundan
 <<>>=
 bin.size <- 2000L
 binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
-bin.ab <- apkb(binned)
 @
 
-The median of the binned abundances-per-kilobase can be used as a global estimate of the background coverage.
+The binned abundances can be computed and compared to the window-based abundances.
+This requires some subtlety as the sizes of the regions used for read counting are different.
+The average abundances of each window must be scaled up to be comparable to those of the bins.
+The \code{getWidths} function can be used to obtain the relative widths of the two sets of regions.
+Scaled abundances can then be computed the \code{scaledAverage} function.
+
+<<>>=
+bin.ab <- scaledAverage(asDGEList(binned))
+relative.width <- getWidths(data)/median(getWidths(binned))
+win.ab <- scaledAverage(asDGEList(data), scale=relative.width)
+@
+
+The median of the adjusted binned abundances can be used as a global estimate of the background coverage.
 Windows are filtered based on some minimum required fold change over this global background. 
 Here, a fold change of 5 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
 threshold <- median(bin.ab) + log2(5)
-keep <- abundances >= threshold
+keep <- win.ab >= threshold
 sum(keep)
 @
 
 The effect of filtering can also be visualized with a histogram. 
 This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
 Note that bins containing genuine binding sites will usually not be visible on such plots.
-This is due to the dominance of the background windows throughout the genome.
+This is due to the dominance of the background-containing bins throughout the genome.
 
 <<eval=FALSE,label=binhist>>=
 hist(bin.ab, xlab="Adjusted bin log-CPM",  breaks=100, main="")
@@ -1489,20 +1499,28 @@ wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 
 Counts for each window are subtracted from the counts for its neighbourhood. 
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
-The width of the window is also subtracted to obtain the effective size of the neighbourhood.
-These can then be supplied to \code{apkb}, as shown below.
+The width of the window is also subtracted to obtain the effective size of the neighbourhood, to reflect the change in the counts.
 
 % Technically, the extension length should also be included when computing the widths.
 % However, the same extension is performed for both the window and its neighbourhood, so this will cancel out during subtraction.
-% A larger prior count could be used here, as each estimate of the local background is less stable than a single global value.
-% However, this would require that the window abundances-per-kilobase need to be recomputed with the new prior.
 
 <<>>=
-assay(wider) <- assay(wider) - assay(data)
-neighbour.width <- width(neighbour) - width(rowData(data)) 
-neighbour.ab <- apkb(wider, widths=neighbour.width)
+ny <- asDGEList(wider)
+ny$counts <- ny$counts - assay(data)
+neighbour.width <- getWidths(wider) - getWidths(data) 
 @
 
+Relative widths are then supplied to \code{scaledAverage}.
+A larger prior count is used here, compared to the default value of 2.
+This is because each estimate of the local background is less stable than a single global value.
+A large prior avoids situations where a low-abundance window is retained simply because very few counts are observed in its local background.
+
+<<>>=
+prior.count <- 5
+neighbour.ab <- scaledAverage(ny, prior.count=pc)
+win.ab <- scaledAverage(asDGEList(data), prior.count=pc,
+    scale=getWidths(data)/neighbour.width)
+@
 % I don't think this is avoidable; computing a p-value against the average
 % background using the raw counts might land us into trouble, particularly as
 % it could select against high- or low-variance windows.  It also reduces the
@@ -1516,7 +1534,7 @@ The distribution of enrichment values can be examined across all windows.
 Most values will lie somewhere above zero, given that some prefiltering has already been performed on the window counts during loading.
 
 <<eval=FALSE,label=enriched>>=
-enriched.fc <- abundances - neighbour.ab
+enriched.fc <- win.ab - neighbour.ab
 hist(enriched.fc, xlab="Enrichment logFC")
 @
 
