@@ -1516,9 +1516,9 @@ This is because each estimate of the local background is less stable than a sing
 A large prior avoids situations where a low-abundance window is retained simply because very few counts are observed in its local background.
 
 <<>>=
-prior.count <- 5
-neighbour.ab <- scaledAverage(ny, prior.count=pc)
-win.ab <- scaledAverage(asDGEList(data), prior.count=pc,
+priorc <- 5
+neighbour.ab <- scaledAverage(ny, prior.count=priorc)
+win.ab <- scaledAverage(asDGEList(data), prior.count=priorc,
     scale=getWidths(data)/neighbour.width)
 @
 % I don't think this is avoidable; computing a p-value against the average
