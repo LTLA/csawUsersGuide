@@ -1445,9 +1445,8 @@ The \code{getWidths} function can be used to obtain the relative widths of the t
 Scaled abundances can then be computed the \code{scaledAverage} function.
 
 <<>>=
-bin.ab <- scaledAverage(asDGEList(binned))
-relative.width <- getWidths(data)/median(getWidths(binned))
-win.ab <- scaledAverage(asDGEList(data), scale=relative.width)
+relative.width <- median(getWidths(binned))/median(getWidths(data))
+bin.ab <- scaledAverage(asDGEList(binned), scale=relative.width)
 @
 
 The median of the adjusted binned abundances can be used as a global estimate of the background coverage.
@@ -1457,7 +1456,7 @@ This approach has an intuitive and experimentally relevant interpretation that a
 
 <<>>=
 threshold <- median(bin.ab) + log2(5)
-keep <- win.ab >= threshold
+keep <- abundances >= threshold
 sum(keep)
 @
 
@@ -1499,28 +1498,22 @@ wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 
 Counts for each window are subtracted from the counts for its neighbourhood. 
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
-The width of the window is also subtracted to obtain the effective size of the neighbourhood, to reflect the change in the counts.
+The width of the window is also subtracted to reflect the effective size of the neighbourhood.
+Relative widths are then supplied to \code{scaledAverage}.
 
 % Technically, the extension length should also be included when computing the widths.
 % However, the same extension is performed for both the window and its neighbourhood, so this will cancel out during subtraction.
+%A larger prior count is used here, compared to the default value of 2.
+%This is because each estimate of the local background is less stable than a single global value.
+%A large prior avoids situations where a low-abundance window is retained simply because very few counts are observed in its local background.
 
 <<>>=
 ny <- asDGEList(wider)
 ny$counts <- ny$counts - assay(data)
 neighbour.width <- getWidths(wider) - getWidths(data) 
+neighbour.ab <- scaledAverage(ny, scale=neighbour.width/getWidths(data))
 @
 
-Relative widths are then supplied to \code{scaledAverage}.
-A larger prior count is used here, compared to the default value of 2.
-This is because each estimate of the local background is less stable than a single global value.
-A large prior avoids situations where a low-abundance window is retained simply because very few counts are observed in its local background.
-
-<<>>=
-priorc <- 5
-neighbour.ab <- scaledAverage(ny, prior.count=priorc)
-win.ab <- scaledAverage(asDGEList(data), prior.count=priorc,
-    scale=getWidths(data)/neighbour.width)
-@
 % I don't think this is avoidable; computing a p-value against the average
 % background using the raw counts might land us into trouble, particularly as
 % it could select against high- or low-variance windows.  It also reduces the
@@ -1534,7 +1527,7 @@ The distribution of enrichment values can be examined across all windows.
 Most values will lie somewhere above zero, given that some prefiltering has already been performed on the window counts during loading.
 
 <<eval=FALSE,label=enriched>>=
-enriched.fc <- win.ab - neighbour.ab
+enriched.fc <- abundances - neighbour.ab
 hist(enriched.fc, xlab="Enrichment logFC")
 @
 
