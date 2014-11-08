@@ -530,28 +530,18 @@ demo <- windowCounts(bam.files, ext=frag.len, param=new.param)
 head(rowData(demo))
 @
 
-Coordinates of annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}.
-However, this requires some effort to parse.
-If possible, the simplest approach is to extract them from an appropriate \code{BSgenome} object. 
-The example below takes the repeats called by the RepeatMasker program in the hg19 build of the human genome.
-Blacklisted regions from the ENCODE project are another option \citep{landt2012}.
-
-<<>>=
-require(BSgenome.Hsapiens.UCSC.hg19.masked)
-bs <- BSgenome.Hsapiens.UCSC.hg19.masked
-all.masks <- list()
-for (i in 1:length(seqnames(bs))) { 
-    cur.chr <- seqnames(bs)[i]
-	all.masks[[i]] <- GRanges(cur.chr, masks(bs[[cur.chr]])$RM)
-}
-suppressWarnings(do.call(c, all.masks))
-@
+Coordinates of annotated repeats can be obtained from several different sources.
+A curated blacklist of problematic regions is available from the ENCODE project \citep{landt2012}, and can be obtained by following this \href{https://sites.google.com/site/anshulkundaje/projects/blacklists}{\textbf{link}}.
+This list is constructed empirically from the ENCODE datasets and includes obvious offenders like telomeres, microsatellites and some rDNA genes.
+Alternatively, repeats can be predicted from the genome sequence using software like RepeatMasker.
+These calls are available from the UCSC website (e.g., for \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}) or they can be extracted from an appropriate masked \code{BSgenome} object. 
 
 Using \code{discard} is safer than simply ignoring windows that overlap the repeats. 
 For example, a large window might contain both repeat regions and non-repeat regions. 
 Discarding the window because of the former will compromise detection of DB features in the latter. 
 Of course, any DB sites within the discarded regions will be lost from downstream analyses.  
 Some caution is therefore required when specifying the regions of disinterest.
+For example, many more repeats are called by RepeatMasker than are present in the ENCODE blacklist, so the use of the former may result in loss of potentially interesting features.
 
 \subsection{Additional notes about parameter specification}
 Users can modify an existing \code{readParam} object using the \code{reform} method.
