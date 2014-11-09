@@ -1760,7 +1760,7 @@ However, strong shrinkage is not appropriate if the dispersions are highly varia
 Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
 
 <<>>=
-summary(fit$df.prior)
+summary(fit$s2.fit$df.prior)
 @
 
 On occasion, the estimated prior degrees of freedom will be infinite. 
