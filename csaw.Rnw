@@ -751,20 +751,26 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 \end{center}
 
 \section{Choosing an appropriate window size}
-The coverage profile around potential binding sites can be obtained with the \code{profileSummit} function.
-This defines ``summits'' as local maxima in the read density across the genome.
-The coverage of the surrounding regions is recorded as a function of the distance from the summit.
-This is averaged across all summits to obtain a coverage profile for each library.
+The coverage profile around potential binding sites can be obtained with the \code{profileSites} function.
+Here, the binding sites are defined by taking high-abundance 50 bp windows and identifying those that are locally maximal using \code{findMaxima}.
+For each selected window, \code{profileSites} records the coverage across the flanking regions as a function of the distance from the edge of the window.
+This is divided by the count for the window itself to obtain a relative coverage, based on the specification of \code{weight}.
+The values are then averaged across all windows to obtain an aggregated coverage profile for each library.
 
 <<label=profiling,eval=FALSE>>=
-collected.ac <- profileSummit("h3ac.bam", param=dedup.on, min.depth=0.5)
-collected.me2 <- profileSummit("h3k4me2.bam", param=dedup.on, min.depth=0.5)
-collected.tf <- profileSummit("es_1.bam", param=dedup.on, min.depth=0.5)
-
-plot(collected.ac$span, collected.ac$coverage, type="l", col="blue", 
-    xlim=c(0, 5000), lwd=2, xlab="Window size", ylab="Relative coverage")
-lines(collected.me2$span, collected.me2$coverage, col="darkgreen", lwd=2)
-lines(collected.tf$span, collected.tf$coverage, lwd=2)
+all.bam <- c("h3ac.bam", "h3k4me2.bam", "es_1.bam")
+collected <- list()
+for (curbam in all.bam) {
+	windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
+	rwsms <- rowSums(assay(windowed))
+	maxed <- findMaxima(rowData(windowed), range=1000, metric=rwsms)
+	collected[[curbam]] <- profileSites(bam, rowData(windowed)[maxed], 
+        param=dedup.on, weight=1/rwsms[maxed])
+}
+plot(collected[[1]], type="l", col="blue", xlim=c(0, 5000), lwd=2, 
+    xlab="Window size", ylab="Relative coverage")
+lines(collected[[2]], col="darkgreen", lwd=2)
+lines(collected[[3]], col="black", lwd=2)
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -774,6 +780,7 @@ lines(collected.tf$span, collected.tf$coverage, lwd=2)
 @
 \end{center}
 
+The relative coverage represents the additional counts that can be obtained by expanding the region.
 The window size can then be identified as the distance at which the surrounding coverage becomes negligble.
 In the example above, a window size of around 500 - 1000 bp may be appropriate for the H3 acetylation and H3K4me2 datasets.
 This captures most of the additional coverage around the summit without risking contamination from non-enriched background.
@@ -1545,6 +1552,21 @@ Filtering can be performed to retain only windows within called peaks.
 However, peak calling must be done independently of the DB status of each window. 
 If libraries are of similar size or biological variability is low, reads can be pooled into a single library for single-sample peak calling. 
 This is equivalent to filtering on the average count and avoids distortion of the type I error rates due to data snooping.
+
+\subsection{Identifying local maxima}
+An alternative filter involves identifying local maxima in the read density across the genome.
+This can be achieved using the \code{findMaxima} function.
+The code below will determine if each window has the highest average abundance within 1 kbp on either side of that window.
+The data can then be filtered to retain only these locally maximal windows.
+
+<<>>=
+maxed <- findMaxima(rowData(data), range=1000, metric=abundances)
+summary(maxed)
+@
+
+This approach is very aggressive and should only be used (sparingly) in datasets where binding is sharp, simple and isolated.
+Complex binding events involving diffuse enrichment or adjacent binding sites will not be handled well.
+For example, DB detection will fail if a low-abundance DB window is ignored in favour of a high-abundance non-DB neighbour.
 
 \subsection{With negative controls}
 Negative controls for ChIP-seq refer to input or IgG libraries where the IP step has been skipped or compromised with an irrelevant antibody, respectively. 
