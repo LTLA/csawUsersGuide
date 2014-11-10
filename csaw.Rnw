@@ -662,7 +662,7 @@ demo$totals
 Paired-end data can also be treated as single-end data by specifiying \code{pet="first"} or \code{pet="second"}. 
 This will only take the first or second read of each pair as defined in the SAM flags. 
 Unlike \code{rescue.pairs}, the selection and use of one read is done for all read pairs regardless of validity. 
-This may be useful for comparing paired-end with single-end data, or in truly disastrous situations where paired-end sequencing has failed.
+This may be useful for comparing paired-end analyses with single-end analyses, or in truly disastrous situations where paired-end sequencing has failed.
 
 <<>>=
 first.param <- readParam(pet="first")
@@ -770,8 +770,10 @@ for (curbam in all.bam) {
 }
 plot(collected[[1]], type="l", col="blue", xlim=c(0, 5000), lwd=2, 
     xlab="Distance (bp)", ylab="Relative coverage per base")
-lines(collected[[2]], col="darkgreen", lwd=2)
+lines(collected[[2]], col="forestgreen", lwd=2)
 lines(collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
+legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
+    c("H3Ac", "H3K4me2", "NF-YA"), pch=16)
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -797,8 +799,8 @@ Thus, it may be preferable to err on the side of smaller windows to maintain spa
 The performance of this approach also deteriorates when background enrichment is prevalent.
 This makes it difficult to determine when the coverage becomes negligble.
 The problem is compounded for diffuse marks where the transition between enrichment and background is unclear.
-Indeed, summits are unlikely to be well-defined within diffuse regions.
-Users are advised to exercise caution when deciding on an appropriate window size.
+Indeed, local maxima are unlikely to be well-defined within diffuse regions.
+Thus, users are advised to exercise caution when picking a window size from these plots.
 
 \section{Counting over manually specified regions}
 The \pkgname{} package focuses on counting reads into windows. 
@@ -1065,7 +1067,7 @@ calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=1
 % combination doesn't really mean anything (especially if it's sensitive to the
 % prior count).
 
-\subsection{Visualizing normalization efforts with an MA plot}
+\subsection{Visualizing normalization efforts with MA plots}
 The effectiveness of normalization can be examined using a MA plot. 
 A single main cloud of points should be present that represents the background regions.
 Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
@@ -1095,6 +1097,8 @@ for (i in 1:(length(bam.files)-1)) {
 
 \section{Eliminating efficiency biases}
 \label{sec:eff_norm}
+
+\subsection{Using the TMM method on high-abundance regions}
 Efficiency biases are commonly observed in ChIP-seq data. 
 This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
 These technical differences are of no biological interest and must be removed. 
@@ -1133,8 +1137,9 @@ Any systematic changes must be caused by differences in IP efficiency or some ot
 However, genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
 Also, some care is required when choosing the top percentage of bins or windows to use for normalization.
 Using too many bins (or windows) will include background regions, while using too few will result in unstable estimates.
-See Chapter~\ref{chap:filter} for more details on selection of enriched regions.
+See Chapter~\ref{chap:filter} for more details on filtering to select enriched regions.
 
+\subsection{Checking normalization with MA plots}
 The results of normalization can again be visualized with MA plots. 
 Of particular interest is the cloud of points at high A-values.
 This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
