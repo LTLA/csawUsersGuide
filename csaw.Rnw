@@ -2210,16 +2210,17 @@ For H3ac, the FastQ file at SRR330786 was also downloaded and used as \code{h3ac
 \subsection{Alignment and processing to produce BAM files}
 Technically, each of the libraries described above are downloaded in the SRA format. 
 These can be unpacked to yield FastQ files using the \code{fastq-dump} program from the SRA Toolkit (\url{http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software}). 
-For the one paired-end library, users will need to specify \code{fastq-dump --split-files} to ensure that two separate files are produced, i.e., one containing sequences from each end.
+For the lone paired-end library, users will need to specify \code{fastq-dump --split-files} to ensure that two separate files are produced, i.e., containing sequences from either end of each fragment.
 
-The reads in the FastQ files can then be mapped. 
-For this particular guide, all reads were aligned to the mm10 build of the mouse genome using the subread program \citep{liao2013}. 
-This can be obtained from Bioconductor as Rsubread or as a standalone C program from \url{http://subread.sourceforge.net}. 
-Default settings were used with the exception of the consensus threshold, which was lowered to 2 to accommodate the short read lengths. 
-Paired-end data was aligned by supplying both FastQ files to subread in the same run.
+Reads in the FastQ files were then aligned to the mm10 build of the mouse genome using subread v1.4.6 \citep{liao2013}. 
+The subread software can be obtained from Bioconductor as the Rsubread package, or as a standalone C program from \url{http://subread.sourceforge.net}. 
+The consensus threshold for alignment was set at 2 to accommodate short read lengths ($<$ 45 bp in all datasets).
+Only unique alignments were reported, and any tied alignments were split by Hamming distance.
+Default values were used for all other parameters.
+Paired-end data was aligned by supplying both FastQ files to subread within the same run.
 
-Once aligned, SAM files were converted to BAM files using the samtools suite \citep{li2009}. 
-BAM files were position-sorted with the \code{samtools sort} command, and duplicate reads were marked using the \code{MarkDuplicates} command from the Picard suite (\url{http://picard.sourceforge.net}).
+Once aligned, SAM files were converted to BAM files using SAMtools v0.1.19 \citep{li2009}. 
+BAM files were position-sorted with the \code{samtools sort} command, and duplicate reads were marked using the \code{MarkDuplicates} command from the Picard suite v1.117 (\url{http://broadinstitute.github.io/picard}).
 Any technical replicates were merged together using  \code{samtools merge} to form a single library. 
 Indexing was performed using \code{samtools index}.
 
