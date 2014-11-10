@@ -193,7 +193,7 @@ A count is then obtained for each window in each library.
 
 <<>>=
 frag.len <- 110
-window.width <- 1
+window.width <- 50
 data <- windowCounts(bam.files, ext=frag.len, width=window.width)
 @
 
@@ -502,13 +502,13 @@ Reads can also be filtered out based on the minimum mapping score with the \code
 Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
 Removal of these reads is highly recommended as it will ensure that only the reliable alignments are supplied to \pkgname{}.
 The exact value of the threshold depends on the range of scores provided by the aligner. 
-The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 100 might be appropriate.
+The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 50 might be appropriate.
 
 An example of read counting with more stringent parameters is shown below.
 Comparison to the values in \code{data\$totals} indicates that fewer reads are used in each library.
 
 <<>>=
-param <- readParam(minq=100, dedup=TRUE)
+param <- readParam(minq=50, dedup=TRUE)
 demo <- windowCounts(bam.files, ext=frag.len, param=param)
 demo$totals
 @
@@ -561,6 +561,7 @@ This means that the same reads are extracted from the BAM file in each call.
 \subsection{Increasing speed and memory efficiency}
 \label{sec:efficiency}
 The \code{spacing} parameter controls the distance between adjacent windows in the genome.
+By default, this is set to 50 bp, i.e., sliding windows are shifted 50 bp forward at each step.
 Using a higher value will reduce computational work as fewer features need to be counted.
 This may be useful when machine memory is limited. 
 Of course, spatial resolution is lost with larger spacings.
@@ -688,7 +689,7 @@ For this dataset, an estimate of $\sim$110 bp is obtained from the plot below.
 
 <<label=ccf,eval=FALSE>>=
 max.delay <- 500
-dedup.on <- readParam(dedup=TRUE, minq=100)
+dedup.on <- readParam(dedup=TRUE, minq=50)
 x <- correlateReads(bam.files, max.delay, param=dedup.on)
 plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
 @
@@ -764,13 +765,13 @@ for (curbam in all.bam) {
 	windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
 	rwsms <- rowSums(assay(windowed))
 	maxed <- findMaxima(rowData(windowed), range=1000, metric=rwsms)
-	collected[[curbam]] <- profileSites(bam, rowData(windowed)[maxed], 
+	collected[[curbam]] <- profileSites(curbam, rowData(windowed)[maxed], 
         param=dedup.on, weight=1/rwsms[maxed])
 }
 plot(collected[[1]], type="l", col="blue", xlim=c(0, 5000), lwd=2, 
-    xlab="Window size", ylab="Relative coverage")
+    xlab="Distance (bp)", ylab="Relative coverage per base")
 lines(collected[[2]], col="darkgreen", lwd=2)
-lines(collected[[3]], col="black", lwd=2)
+lines(collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -781,9 +782,9 @@ lines(collected[[3]], col="black", lwd=2)
 \end{center}
 
 The relative coverage represents the additional counts that can be obtained by expanding the region.
-The window size can then be identified as the distance at which the surrounding coverage becomes negligble.
-In the example above, a window size of around 500 - 1000 bp may be appropriate for the H3 acetylation and H3K4me2 datasets.
-This captures most of the additional coverage around the summit without risking contamination from non-enriched background.
+The ideal increase in the window size can be defined as twice the distance at which the surrounding coverage becomes negligble.
+In the example above, a window size of $\sim$1 kbp may be most appropriate for the two histone marks.
+This corresponds to a distance of 500 bp, which captures most of the additional coverage without including too much background contamination.
 In contrast, the NF-YA profile drops off more sharply.
 This indicates that a smaller window size ($< 100$ bp) is probably adequate, consistent with sharp TF binding.
 
@@ -1448,11 +1449,11 @@ bin.ab <- scaledAverage(asDGEList(binned), scale=relative.width)
 
 The median of the adjusted binned abundances can be used as a global estimate of the background coverage.
 Windows are filtered based on some minimum required fold change over this global background. 
-Here, a fold change of 5 is necessary for a window to be considered as containing a binding site. 
+Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
-threshold <- median(bin.ab) + log2(5)
+threshold <- median(bin.ab) + log2(3)
 keep <- abundances >= threshold
 sum(keep)
 @
@@ -1535,11 +1536,11 @@ hist(enriched.fc, xlab="Enrichment logFC")
 \end{center}
 
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
-In this scenario, a 5-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
+In this scenario, a 3-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
 This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
 
 <<>>=
-keep <- enriched.fc > log2(5)
+keep <- enriched.fc > log2(3)
 sum(keep)
 @
 
@@ -1558,6 +1559,7 @@ An alternative filter involves identifying local maxima in the read density acro
 This can be achieved using the \code{findMaxima} function.
 The code below will determine if each window has the highest average abundance within 1 kbp on either side of that window.
 The data can then be filtered to retain only these locally maximal windows.
+This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
 
 <<>>=
 maxed <- findMaxima(rowData(data), range=1000, metric=abundances)
