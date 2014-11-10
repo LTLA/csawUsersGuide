@@ -1188,7 +1188,7 @@ One such implementation is provided in \code{normalize} by setting \code{type="l
 This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB.
-In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} normalization.
+In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization.
 The example below operates on the filtered counts for small bins, of which the top 5\% are assumed to contain binding sites. 
 
 <<>>=
@@ -1443,7 +1443,7 @@ binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
 
 The binned abundances can be computed and compared to the window-based abundances.
 This requires some subtlety as the sizes of the regions used for read counting are different.
-The average abundances of each window must be scaled up to be comparable to those of the bins.
+The average abundances of each bin must be scaled down to be comparable to those of the windows.
 The \code{getWidths} function can be used to obtain the relative widths of the two sets of regions.
 Scaled abundances can then be computed the \code{scaledAverage} function.
 
@@ -1491,7 +1491,7 @@ Local background estimators can also be constructed.
 This avoids inappropriate filtering when there are differences in background coverage across the genome. 
 Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
 The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
-This can be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
+This should be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
 
 <<>>=
 surrounds <- 2000
@@ -1502,7 +1502,7 @@ wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 Counts for each window are subtracted from the counts for its neighbourhood. 
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
 The width of the window is also subtracted to reflect the effective size of the neighbourhood.
-Relative widths are then supplied to \code{scaledAverage}.
+Relative widths are then supplied to \code{scaledAverage}, to scale down the abundance of the neighbourhood for comparison to that of the window.
 
 % Technically, the extension length should also be included when computing the widths.
 % However, the same extension is performed for both the window and its neighbourhood, so this will cancel out during subtraction.
@@ -1553,16 +1553,15 @@ Note that this procedure also assumes that no other enriched regions are present
 Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
 This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighbourhood.
 
-If this seems too complicated, a simpler alternative is to identify locally enriched regions using peak-callers like \macs{}. 
-Filtering can be performed to retain only windows within called peaks.  
+If this seems too complicated, an alternative is to identify locally enriched regions using peak-callers like \macs{}. 
+Filtering can then be performed to retain only windows within called peaks.  
 However, peak calling must be done independently of the DB status of each window. 
-If libraries are of similar size or biological variability is low, reads can be pooled into a single library for single-sample peak calling. 
-This is equivalent to filtering on the average count and avoids distortion of the type I error rates due to data snooping.
+If libraries are of similar size or biological variability is low, reads can be pooled into one library for single-sample peak calling \citep{lun2014}. 
+This is equivalent to filtering on the average count and avoids loss of the type I error control from data snooping.
 
 \subsection{Identifying local maxima}
-An alternative filter involves identifying local maxima in the read density across the genome.
-This can be achieved using the \code{findMaxima} function.
-The code below will determine if each window has the highest average abundance within 1 kbp on either side of that window.
+Another approach uses the \code{findMaxima} function to identify local maxima in the read density across the genome.
+The code below will determine if each window is a local maximum, i.e., whether it has the highest average abundance within 1 kbp on either side.
 The data can then be filtered to retain only these locally maximal windows.
 This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
 
