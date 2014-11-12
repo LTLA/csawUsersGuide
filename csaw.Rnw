@@ -827,6 +827,14 @@ You'll notice that that a number of other BAM files are used in this chapter.
 However, these are just present for demonstration purposes and aren't necessary for the main NFYA example.
 \end{combox}
 
+\section{Overview}
+The complexity of the ChIP-seq technique gives rise to a number of different biases in the data.
+For a DB analysis, library-specific biases are of particular interest as they can introduce spurious differences between conditions.
+This includes composition biases, efficiency biases and trended biases.
+Thus, normalization between libraries is required to remove these biases prior to any statistical analysis.
+Several normalization strategies are presented here, though users should only pick \textbf{one} to use for any given analysis.
+Advice on choosing the most appropriate method is scattered throughout the chapter, so read carefully.
+
 \section{Eliminating composition biases}
 
 \subsection{Using the TMM method on binned counts}
@@ -1375,12 +1383,13 @@ summary(keep)
 
 The exact choice of filter threshold may not be obvious.
 In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
-A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
+A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing true DB sites.
 Arbitrariness is unavoidable when balancing these opposing considerations.
 
 Nonetheless, several strategies for defining the threshold are described below.
-Users should choose one of these filtering approaches for their analyses.
-Different filters can also be combined for more stringency, though whether this is sensible depends on the situation.
+Users should start by choosing \textbf{one} of these filtering approaches for their analyses.
+Different filters can also be combined, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
+However, any benefit will depend on the type of filters being combined.
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
 % the best idea, simply because it means that it's not independent of the
