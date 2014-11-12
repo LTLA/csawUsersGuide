@@ -531,7 +531,7 @@ head(rowData(demo))
 @
 
 Coordinates of annotated repeats can be obtained from several different sources.
-A curated blacklist of problematic regions is available from the ENCODE project \citep{landt2012}, and can be obtained by following this \href{https://sites.google.com/site/anshulkundaje/projects/blacklists}{\textbf{link}}.
+A curated blacklist of problematic regions is available from the ENCODE project \citep{dunham2012}, and can be obtained by following this \href{https://sites.google.com/site/anshulkundaje/projects/blacklists}{\textbf{link}}.
 This list is constructed empirically from the ENCODE datasets and includes obvious offenders like telomeres, microsatellites and some rDNA genes.
 Alternatively, repeats can be predicted from the genome sequence using software like RepeatMasker.
 These calls are available from the UCSC website (e.g., for \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}) or they can be extracted from an appropriate masked \code{BSgenome} object. 
