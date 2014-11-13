@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 25 October 2014}
+Last revised 14 November 2014}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -326,9 +326,6 @@ This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the s
 For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
 Analyses with multiple widths can be combined to provide a comprehensive picture of DB at all resolutions. 
 
-For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size.
-See Section~\ref{sec:efficiency} for more details.
-
 %%%%%%%%%
 % There's two ways to deal with histone marks; clustering or using a width/bin
 % size. Both methods are designed to increase the size of the regions, and
@@ -502,13 +499,13 @@ Reads can also be filtered out based on the minimum mapping score with the \code
 Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
 Removal of these reads is highly recommended as it will ensure that only the reliable alignments are supplied to \pkgname{}.
 The exact value of the threshold depends on the range of scores provided by the aligner. 
-The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 100 might be appropriate.
+The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 50 might be appropriate.
 
 An example of read counting with more stringent parameters is shown below.
 Comparison to the values in \code{data\$totals} indicates that fewer reads are used in each library.
 
 <<>>=
-param <- readParam(minq=100, dedup=TRUE)
+param <- readParam(minq=50, dedup=TRUE)
 demo <- windowCounts(bam.files, ext=frag.len, param=param)
 demo$totals
 @
@@ -530,28 +527,18 @@ demo <- windowCounts(bam.files, ext=frag.len, param=new.param)
 head(rowData(demo))
 @
 
-Coordinates of annotated repeats can be found for a number of species on the UCSC website, e.g., \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}.
-However, this requires some effort to parse.
-If possible, the simplest approach is to extract them from an appropriate \code{BSgenome} object. 
-The example below takes the repeats called by the RepeatMasker program in the hg19 build of the human genome.
-Blacklisted regions from the ENCODE project are another option \citep{landt2012}.
-
-<<>>=
-require(BSgenome.Hsapiens.UCSC.hg19.masked)
-bs <- BSgenome.Hsapiens.UCSC.hg19.masked
-all.masks <- list()
-for (i in 1:length(seqnames(bs))) { 
-    cur.chr <- seqnames(bs)[i]
-	all.masks[[i]] <- GRanges(cur.chr, masks(bs[[cur.chr]])$RM)
-}
-suppressWarnings(do.call(c, all.masks))
-@
+Coordinates of annotated repeats can be obtained from several different sources.
+A curated blacklist of problematic regions is available from the ENCODE project \citep{dunham2012}, and can be obtained by following this \href{https://sites.google.com/site/anshulkundaje/projects/blacklists}{\textbf{link}}.
+This list is constructed empirically from the ENCODE datasets and includes obvious offenders like telomeres, microsatellites and some rDNA genes.
+Alternatively, repeats can be predicted from the genome sequence using software like RepeatMasker.
+These calls are available from the UCSC website (e.g., for \href{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz}{\texttt{mouse}}) or they can be extracted from an appropriate masked \code{BSgenome} object. 
 
 Using \code{discard} is safer than simply ignoring windows that overlap the repeats. 
 For example, a large window might contain both repeat regions and non-repeat regions. 
 Discarding the window because of the former will compromise detection of DB features in the latter. 
 Of course, any DB sites within the discarded regions will be lost from downstream analyses.  
 Some caution is therefore required when specifying the regions of disinterest.
+For example, many more repeats are called by RepeatMasker than are present in the ENCODE blacklist, so the use of the former may result in loss of potentially interesting features.
 
 \subsection{Additional notes about parameter specification}
 Users can modify an existing \code{readParam} object using the \code{reform} method.
@@ -584,8 +571,6 @@ head(rowData(demo))
 For analyses with large windows, it is also worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
 Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
-Conversely, \code{spacing} should not be larger than \code{width} for analyses with small windows.
-This ensures that narrow binding sites are not overlooked when windows are shifted along the genome.
 
 % Easiest to imagine this for ext=1, but it also affects larger ext; if the
 % width is set to 1, a binding site anywhere between two windows will not be
@@ -698,7 +683,7 @@ For this dataset, an estimate of $\sim$110 bp is obtained from the plot below.
 
 <<label=ccf,eval=FALSE>>=
 max.delay <- 500
-dedup.on <- readParam(dedup=TRUE, minq=100)
+dedup.on <- readParam(dedup=TRUE, minq=50)
 x <- correlateReads(bam.files, max.delay, param=dedup.on)
 plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
 @
@@ -784,6 +769,14 @@ This next chapter will need the \code{bam.files} vector again.
 You'll notice that that a number of other BAM files are used in this chapter. 
 However, these are just present for demonstration purposes and aren't necessary for the main NFYA example.
 \end{combox}
+
+\section{Overview}
+The complexity of the ChIP-seq technique gives rise to a number of different biases in the data.
+For a DB analysis, library-specific biases are of particular interest as they can introduce spurious differences between conditions.
+This includes composition biases, efficiency biases and trended biases.
+Thus, normalization between libraries is required to remove these biases prior to any statistical analysis.
+Several normalization strategies are presented here, though users should only pick \textbf{one} to use for any given analysis.
+Advice on choosing the most appropriate method is scattered throughout the chapter, so read carefully.
 
 \section{Eliminating composition biases}
 
@@ -1025,7 +1018,7 @@ calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=1
 % combination doesn't really mean anything (especially if it's sensitive to the
 % prior count).
 
-\subsection{Visualizing normalization efforts with an MA plot}
+\subsection{Visualizing normalization efforts with MA plots}
 The effectiveness of normalization can be examined using a MA plot. 
 A single main cloud of points should be present that represents the background regions.
 Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
@@ -1055,6 +1048,8 @@ for (i in 1:(length(bam.files)-1)) {
 
 \section{Eliminating efficiency biases}
 \label{sec:eff_norm}
+
+\subsection{Using the TMM method on high-abundance regions}
 Efficiency biases are commonly observed in ChIP-seq data. 
 This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
 These technical differences are of no biological interest and must be removed. 
@@ -1093,8 +1088,9 @@ Any systematic changes must be caused by differences in IP efficiency or some ot
 However, genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
 Also, some care is required when choosing the top percentage of bins or windows to use for normalization.
 Using too many bins (or windows) will include background regions, while using too few will result in unstable estimates.
-See Chapter~\ref{chap:filter} for more details on selection of enriched regions.
+See Chapter~\ref{chap:filter} for more details on filtering to select enriched regions.
 
+\subsection{Checking normalization with MA plots}
 The results of normalization can again be visualized with MA plots. 
 Of particular interest is the cloud of points at high A-values.
 This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
@@ -1143,7 +1139,7 @@ One such implementation is provided in \code{normalize} by setting \code{type="l
 This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB.
-In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} normalization.
+In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization.
 The example below operates on the filtered counts for small bins, of which the top 5\% are assumed to contain binding sites. 
 
 <<>>=
@@ -1305,8 +1301,8 @@ Removing such uninteresting or ineffective tests reduces the severity of the mul
 
 Filtering is valid so long as it is independent of the test statistic under the null hypothesis \citep{bourgon2010}. 
 In the negative binomial (NB) framework, this (probably) corresponds to filtering on the overall NB mean. 
-The DB $p$-values retained after filtering should be uniform under the null hypothesis, assuming analogous behaviour to the normal case. 
-Row sums can also be used for datasets where the effective library sizes are not very different or where the counts are assumed to be Poisson-distributed between biological replicates. 
+The DB $p$-values retained after filtering on the overall mean should be uniform under the null hypothesis, by analogy to the normal case. 
+Row sums can also be used for datasets where the effective library sizes are not very different, or where the counts are assumed to be Poisson-distributed between biological replicates. 
 
 In \edger{}, the log-transformed overall mean is defined as the average abundance.
 This is computed with the \code{aveLogCPM} function, as shown below.
@@ -1331,12 +1327,13 @@ summary(keep)
 
 The exact choice of filter threshold may not be obvious.
 In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
-A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing false nulls.
+A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing true DB sites.
 Arbitrariness is unavoidable when balancing these opposing considerations.
 
 Nonetheless, several strategies for defining the threshold are described below.
-Users should choose one of these filtering approaches for their analyses.
-Different filters can also be combined for more stringency, though whether this is sensible depends on the situation.
+Users should start by choosing \textbf{one} of these filtering approaches for their analyses.
+Different filters can also be combined, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
+However, any benefit will depend on the type of filters being combined.
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
 % the best idea, simply because it means that it's not independent of the
@@ -1424,19 +1421,19 @@ bin.ab <- bin.ab - log2(scaled)
 
 Finally, the median of the binned abundances can be used as a global estimate of the background coverage.
 Windows are filtered based on some minimum required fold change over this global background. 
-Here, a fold change of 5 is necessary for a window to be considered as containing a binding site. 
+Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
-threshold <- median(bin.ab) + log2(5)
-keep <- win.ab >= threshold
+threshold <- median(bin.ab) + log2(3)
+keep <- abundances >= threshold
 sum(keep)
 @
 
 The effect of filtering can also be visualized with a histogram. 
 This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
 Note that bins containing genuine binding sites will usually not be visible on such plots.
-This is due to the dominance of the background windows throughout the genome.
+This is due to the dominance of the background-containing bins throughout the genome.
 
 <<eval=FALSE,label=binhist>>=
 hist(bin.ab, xlab="Adjusted bin log-CPM",  breaks=100, main="")
@@ -1461,7 +1458,7 @@ Local background estimators can also be constructed.
 This avoids inappropriate filtering when there are differences in background coverage across the genome. 
 Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
 The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
-This can be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
+This should be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
 
 <<>>=
 surrounds <- 2000
@@ -1516,11 +1513,11 @@ hist(enriched.fc, xlab="Enrichment logFC")
 \end{center}
 
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
-In this scenario, a 5-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
+In this scenario, a 3-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
 This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
 
 <<>>=
-keep <- enriched.fc > log2(5)
+keep <- enriched.fc > log2(3)
 sum(keep)
 @
 
@@ -1528,8 +1525,8 @@ Note that this procedure also assumes that no other enriched regions are present
 Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
 This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighbourhood.
 
-If this seems too complicated, a simpler alternative is to identify locally enriched regions using peak-callers like \macs{}. 
-Filtering can be performed to retain only windows within called peaks.  
+If this seems too complicated, an alternative is to identify locally enriched regions using peak-callers like \macs{}. 
+Filtering can then be performed to retain only windows within called peaks.  
 However, peak calling must be done independently of the DB status of each window. 
 If libraries are of similar size or biological variability is low, reads can be pooled into a single library for single-sample peak calling. 
 This is equivalent to filtering on the average count and avoids distortion of the type I error rates due to data snooping.
@@ -1717,9 +1714,10 @@ Discrete patterns in the raw dispersions are indicative of low counts and sugges
 A strong trend may also be observed where the dispersion drops sharply with increasing average abundance.
 This is due to the disproportionate impact of artifacts such as mapping errors and PCR duplicates at low counts. 
 It is difficult to accurately fit an empirical curve to these strong trends.  
-Inaccurate fitting means that the dispersions at high abundances are often overestimated. 
-Users should check whether removal of the low abundance regions affects the dispersion estimate. 
-Large changes upon removal imply that more aggressive abundance-based filtering may be desirable, as described in Chapter~\ref{chap:filter}.
+As a consequence, the dispersions at high abundances may be overestimated. 
+Filtering of low-abundance regions (as described in Chapter~\ref{chap:filter}) provides some protection by removing the strongest part of the trend.
+Users can compare raw and filtered results to see whether this makes any difference.
+Such filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
 <<label=rmchecker,eval=FALSE>>=
 yo <- asDGEList(original, norm.factors=normfacs)
@@ -1747,7 +1745,7 @@ However, strong shrinkage is not appropriate if the dispersions are highly varia
 Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
 
 <<>>=
-summary(fit$df.prior)
+summary(fit$s2.fit$df.prior)
 @
 
 On occasion, the estimated prior degrees of freedom will be infinite. 
@@ -1903,13 +1901,16 @@ tabcom <- combineTests(merged$id, results$table)
 head(tabcom)
 @
 
-If many overlapping windows are present, very large clusters may be formed that are difficult to interpret. 
+If many adjacent windows are present, very large clusters may be formed that are difficult to interpret. 
 A simple check can be used to determine whether most clusters are of an acceptable size. 
 Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:filter} is required.  
 This mitigates chaining effects by reducing the density of windows in the genome.
 
-% Note that several large clusters may still be present due to high
-% coverage within long tandem repeat loci.
+% Note that several large clusters may still be present due to high coverage
+% within long tandem repeat loci.  In general, chaining isn't as bad as true
+% single-linkage, because windows that survive weak filtering should have
+% reasonably high read counts. So, it won't be as unstable as single-linkage
+% clustering on the reads themselves.
 
 <<>>=
 summary(width(merged$region))
@@ -1999,6 +2000,11 @@ Detection will fail if the DB event does not occur at the most abundant window.
 This is relevant for consideration of complex events, e.g., adjacent TF binding sites.
 Loss of information also increases the sensitivity of the analysis to the clustering procedure.
 For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
+
+% This may be necessary if you don't want to have high spatial resolution, for whatever reason.
+% For example, if you have changes in the average fragment length between libraries, you don't want
+% to pick up shrunken peaks just because of that. Selecting the most abundant window will 
+% ensure that you don't pick up changes on the edges of the peak.
 
 A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
 In the example below, the weight assigned to the top window is equal to the total number of other windows in each cluster.
@@ -2164,16 +2170,17 @@ For H3ac, the FastQ file at SRR330786 was also downloaded and used as \code{h3ac
 \subsection{Alignment and processing to produce BAM files}
 Technically, each of the libraries described above are downloaded in the SRA format. 
 These can be unpacked to yield FastQ files using the \code{fastq-dump} program from the SRA Toolkit (\url{http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software}). 
-For the one paired-end library, users will need to specify \code{fastq-dump --split-files} to ensure that two separate files are produced, i.e., one containing sequences from each end.
+For the lone paired-end library, users will need to specify \code{fastq-dump --split-files} to ensure that two separate files are produced, i.e., containing sequences from either end of each fragment.
 
-The reads in the FastQ files can then be mapped. 
-For this particular guide, all reads were aligned to the mm10 build of the mouse genome using the subread program \citep{liao2013}. 
-This can be obtained from Bioconductor as Rsubread or as a standalone C program from \url{http://subread.sourceforge.net}. 
-Default settings were used with the exception of the consensus threshold, which was lowered to 2 to accommodate the short read lengths. 
-Paired-end data was aligned by supplying both FastQ files to subread in the same run.
+Reads in the FastQ files were then aligned to the mm10 build of the mouse genome using subread v1.4.6 \citep{liao2013}. 
+The subread software can be obtained from Bioconductor as the Rsubread package, or as a standalone C program from \url{http://subread.sourceforge.net}. 
+The consensus threshold for alignment was set at 2 to accommodate short read lengths ($<$ 45 bp in all datasets).
+Only unique alignments were reported, and any tied alignments were split by Hamming distance.
+Default values were used for all other parameters.
+Paired-end data was aligned by supplying both FastQ files to subread within the same run.
 
-Once aligned, SAM files were converted to BAM files using the samtools suite \citep{li2009}. 
-BAM files were position-sorted with the \code{samtools sort} command, and duplicate reads were marked using the \code{MarkDuplicates} command from the Picard suite (\url{http://picard.sourceforge.net}).
+Once aligned, SAM files were converted to BAM files using SAMtools v0.1.19 \citep{li2009}. 
+BAM files were position-sorted with the \code{samtools sort} command, and duplicate reads were marked using the \code{MarkDuplicates} command from the Picard suite v1.117 (\url{http://broadinstitute.github.io/picard}).
 Any technical replicates were merged together using  \code{samtools merge} to form a single library. 
 Indexing was performed using \code{samtools index}.
 
