@@ -866,6 +866,7 @@ If any DB regions should survive trimming (e.g., those with less extreme fold ch
 In fact, users may wish to explicitly filter out such bins and run TMM only on putative background regions, as shown below.
 
 <<>>=
+require(edgeR)
 ab <- aveLogCPM(asDGEList(binned))
 keep <- ab <= quantile(ab, p=0.9)
 normalize(binned[keep,])
@@ -1348,6 +1349,7 @@ In the worst case, the removal of the corresponding libraries may be necessary t
 This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
 We will also need the \code{normfacs} vector from Chapter~\ref{chap:norm}. 
 Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
+Finally, we'll need the \code{aveLogCPM} function from the \edger{} package (that we've already loaded, unless you skipped the last chapter).
 \end{combox}
 
 \section{Independent filtering for count data}
@@ -1663,8 +1665,8 @@ The alternative would be to iterate over the entire DB analysis, which would be 
 \label{chap:stats}
 
 \begin{combox}
-For this next section, we'll be needing the \code{data} list from Chapter~\ref{chap:count} and filtered in Chapter~\ref{chap:filter}. 
-Just let me  assign the filtered list back to \code{data}, because I put it in a dummy variable:
+For this next section, we'll be needing the \code{data} list that was generated in Chapter~\ref{chap:count} and filtered in Chapter~\ref{chap:filter}. 
+Just let me  assign the filtered list back to \code{data}, because I put it in the dummy variable \code{demo} in the previous chapter:
 
 <<>>=
 original <- data
@@ -1672,6 +1674,8 @@ data <- demo
 @
 
 You'll also need the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
+Finally - it should be obvious, but several \edger{} functions will be needed here.
+Make sure the \edger{} package is loaded if you've been skipping chapters.
 \end{combox}
 
 \section{Introduction to \edger{}}
@@ -1840,7 +1844,7 @@ Specification of the contrast is explained in greater depth in the \edger{} user
 \begin{combox}
 All right, we're almost there. 
 This chapter needs the \code{results} object from the last chapter. 
-You'll also need the filtered \code{data} list from Chapter~\ref{chap:count}, as well as the \code{broads} object from Chapter~\ref{chap:filter}. 
+You'll also need the filtered \code{data} list from Chapter~\ref{chap:count} (see the comment box in the last chapter), as well as the \code{broads} object from Chapter~\ref{chap:filter}. 
 \end{combox}
 
 \section{Problems with false discovery rate control}
