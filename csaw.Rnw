@@ -2012,6 +2012,52 @@ Windows in a genuine DB region will form one cluster (consistent sign) whereas t
 This results in conservativeness as more clusters will have large $p$-values.
 Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
+\section{Integrating results from multiple window sizes}
+The sensitivity of the analysis to the choice of window size can be mitigated by testing a range of different widths.
+DB results from each width can be integrated by clustering adjacent windows together (even if they are of differing sizes), and combining $p$-values within each of the resulting clusters.
+The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
+Some filtering is performed to avoid excessive chaining in this demonstration.
+
+<<>>=
+h3.files <-  c("h3ac.bam", "h3ac_2.bam")
+ac.small <- windowCounts(h3.files, width=150L, spacing=100L, filter=25)
+ac.large <- windowCounts(h3.files, width=1000L, spacing=500L, filter=35)
+ac.all <- c(rowData(ac.small), rowData(ac.large))
+merged.ac <- mergeWindows(ac.all, tol=1000, max.width=10000)
+merged.ac$region
+@
+
+A corresponding table of DB results should also be constructed by \code{rbind}'ing the results from each window size.
+For brevity's sake, a pair of dummy tables will be used here.
+Combined $p$-values for each cluster can then be computed with \code{combineTests}.
+
+<<>>=
+dummy.small <- data.frame(logFC=numeric(nrow(ac.small)), logCPM=0, PValue=1) 
+dummy.large <- data.frame(logFC=numeric(nrow(ac.large)), logCPM=0, PValue=1) 
+dummy.all <- rbind(dummy.small, dummy.large)
+tabcom.ac <- combineTests(merged.ac$id, tab=dummy.all)
+@
+
+If all windows are supplied equal weight, numerous windows of small width will contribute most to each combined $p$-value.
+Equal contributions from each window width can be enforced by downweighting the $p$-values from smaller windows.
+The weight of each window is inversely proportional to the number of windows of that size in the same cluster.
+This \code{weight} vector can be supplied to \code{combineTests} to adjust the combined calculations accordingly.
+
+<<>>=
+small.id <- merged.ac$id[1:nrow(ac.small)]
+large.id <- merged.ac$id[nrow(ac.small)+1:nrow(ac.large)]
+freq.small <- tabulate(small.id)
+freq.large <- tabulate(large.id)
+freq.totals <- c(freq.small[small.id], freq.large[large.id])
+summary(freq.totals)
+weight <- 1/freq.totals
+tabcom.ac2 <- combineTests(merged.ac$id, tab=dummy.all, weight=weight)
+@
+
+In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
+This is most useful for histone marks and other analyses involving diffuse regions of enrichment.
+For such studies, the ideal bin size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
+
 \section{Choosing a single representative window}
 
 \subsection{Based on differential binding}
