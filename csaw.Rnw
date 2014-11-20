@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 19 November 2014}
+Last revised 20 November 2014}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -295,7 +295,7 @@ This maximizes spatial resolution to allow optimal detection of narrow regions o
 For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
 This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
 For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
-Analyses with multiple widths can be combined to comprehensively examine DB at all resolutions (see Section~\ref{sec:bin_integrate}).
+Analyses with multiple widths can be combined to examine DB across several resolutions (see Section~\ref{sec:bin_integrate}).
 
 For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size.
 See Section~\ref{sec:efficiency} for more details.
