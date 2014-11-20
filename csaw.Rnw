@@ -215,76 +215,47 @@ Typical values range from 100 to 300 bp, depending on the efficiency of sonicati
 
 %%%%%%%%%%%%%%%%%%%
 % It's a simplifying assumption that the fragment length is constant.
-% Variability in the fragment length between libraries is not considered.  If
-% you ever need to vary it, that suggests that you've used a different protocol
-% between libraries, which you really shouldn't do. In the best case, you use
-% the same protocol and the fragment size changes between groups because of a
-% biological difference e.g. more nucleosomes inhibiting fragmentation.
-% However, if you use different fragment lengths for different groups, you
-% could end up with spurious DB calls at constant regions just because of
-% fragment length. This is usually not interesting.
+% Different fragment lengths could arise from different protocols or from biological effects, e.g., tighter nucleosomal compaction.
+% If you use different fragment lengths for different libraries, you could end up with spurious DB calls just because of that.
+% This is usually not interesting.
 %
-% A related problem is whether you can allow the fragment length to vary within
-% the genome. For example, some places may be easier to fragment which leads to
-% heterogeneity in the fragment lengths at different locations. The problem
-% with trying to identify a fragment length for each location is that the
-% estimate wouldn't be very precise because you're calculating it from limited
-% data. It would really only work for large peaks where the large number of
-% reads stabilises the estimate. However, the advantage wouldn't be that great
-% as results for large peaks should be fairly stable anyway.
+% A related problem is whether you can allow the fragment length to vary within the genome, e.g., to handle heterogeneity in chromatin openness.
+% However, location-specific estimates for the fragment length wouldn't be very precise because you're calculating it from limited data. 
+% It would really only work for large peaks where the large number of reads stabilises the estimate. 
+% However, the advantage wouldn't be that great as results for large peaks should be fairly stable anyway.
 %
-% On real data, the cross-correlation plots are one smooth peak (excluding the
-% read-length spike). This suggests that there's no gross segregation of
-% fragment lengths in the population. Changing the fragment length doesn't seem
-% to change the results too much either. Of course, this whole discussion is
-% moot when we're working with histone marks as you can't really estimate the
-% fragment length from the data.
+% On real data, the cross-correlation plots are one smooth peak (excluding the read-length spike). 
+% This suggests that there's no gross segregation of fragment lengths in the population. 
+% Changing the fragment length doesn't seem to change the results too much either. 
+% Of course, this whole discussion is moot for diffuse marks, where the extension should be irrelevant compared to the bin size.
 
 %%%%%%%%%%%%%%%%%%%
-% An anticipated attack on this approach is why I don't filter for bimodality
-% to identify good candidate sites (a la MACS). It is said that this will
-% reduce the severity of the MTC procedure. I don't do this for several reasons:
+% An anticipated attack on this approach is why I don't filter for bimodality to identify good candidate sites (a la MACS). 
+% This could reduce the severity of the MTC procedure. 
+% However, every difference is interesting, even if it doesn't necessarily occur in a nice bimodal shape (e.g. histones + other proteins).
+% For example, you mightn't get pronounced bimodality if one half of the peak is sitting somewhere that's unmappable or difficult to sequence. 
 %
-% The first is that every difference is interesting, even if it doesn't
-% necessarily occur in a nice bimodal shape (e.g. histones + other proteins).
-% For example, you mightn't get nice bimodality if one half of the peak is
-% sitting somewhere that's unmappable or difficult to sequence. If you filter
-% by bimodality you'll miss it completely.
-%
-% The second is that defining bimodality is difficult. Arbitrary thresholds for
-% bimodality don't necessarily have a good physical interpretation.  This is
-% complicated by the fact that you have to combine background and enriched
-% samples to avoid data snooping; this can dilute bimodality for smaller peaks.
-% A problem specific to MACS is that single-sample mode won't pick up two peaks
-% within ~10 kbp; one peak will be used as the background for the other peak,
-% which means that it mightn't be significant.
-%
-% Read extension in the direction of the read means that bimodal structures
-% will have sites with greater enrichment depths than regions with the same
-% number of reads but random read directions. This brings looking for
-% bimodality under the framework of row sum filtering. It is also smoother; if
-% you're not bimodal but there is a difference, you still get picked up.
+% Defining bimodality is also difficult. 
+% Arbitrary thresholds for bimodality don't necessarily have a good physical interpretation.  
+% This is complicated by the fact that you have to combine background and enriched samples to avoid data snooping; this can dilute bimodality for smaller peaks.
+% A problem specific to MACS is that single-sample mode won't pick up two peaks within ~10 kbp; each peak will be increase the observed background for the other.
 % 
-% Finally, you can do whatever bimodal filtering you want implicitly, by
-% running the peak caller you want to emulate and then picking only those
-% windows that overlap called peaks. This will give you the MTC advantage
-% without requiring too much extra code.
+% Read extension means that bimodal structures will have higher counts than regions with the same number of reads but random read directions. 
+% This brings looking for bimodality under the framework of row sum filtering. 
+% It is also smoother; if you're not bimodal but there is a difference, you still get picked up.
+% 
+% Finally, you can do whatever bimodal filtering you want implicitly, by running your desired peak caller and then picking only those windows that overlap called peaks. 
+% This will give you the MTC advantage without requiring too much extra code on my part.
 
 %%%%%%%%%%%%%%%%%%%
-% Read extension results in strong correlations between adjacent sites as the
-% counts are mostly determined by the same set of reads. However, these
-% correlations have no effect on the statistical analysis. Consider a subset of
-% sites randomly sampled throughout the genome. Correlations within the subset
-% are weaker as the sites are more likely to be further apart and less likely
-% to be affected by the same reads. An (approximately) independent subset of
-% sites can then be obtained by infrequent sampling. The probability of
-% sampling a particular count combination is equal to its relative frequency
-% across the genome. This means that the expected composition of the sampled
-% set is equal to the set of all count combinations where each combination has
-% weight proportional to its frequency in the genome. Thus, an independent
-% subset will provide the same results as those obtained with the use of the
-% entire genome.  This is similar to the outcome of thinning in Markov chain
-% Monte Carlo procedures \citep{link2012}.
+% Read extension and general spatial proximity results in strong correlations between adjacent sites.
+% However, these correlations will not affect the estimates of the various EB statistics (only the precision of the estimates, but we don't use that anyway).
+% Consider a subset of sites randomly sampled throughout the genome. 
+% Correlations within the subset are weaker as the sites are less likely to be affected by the same reads. 
+% An (approximately) independent subset of sites can then be obtained by infrequent sampling. 
+% However, the expected composition of the sampled set is just that of the entire genome.
+% Thus, an independent subset will provide the same results (on average) as those obtained with the use of the entire genome.  
+% This is similar to the outcome of thinning in Markov chain Monte Carlo procedures.
 
 \begin{center}
 \begin{tikzpicture}[font=\sffamily]
@@ -324,112 +295,35 @@ This maximizes spatial resolution to allow optimal detection of narrow regions o
 For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
 This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
 For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
-Analyses with multiple widths can be combined to provide a comprehensive picture of DB at all resolutions. 
+Analyses with multiple widths can be combined to comprehensively examine DB at all resolutions (see Section~\ref{sec:bin_integrate}).
 
 For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size.
 See Section~\ref{sec:efficiency} for more details.
 
-%%%%%%%%%
-% There's two ways to deal with histone marks; clustering or using a width/bin
-% size. Both methods are designed to increase the size of the regions, and
-% hence the size of the counts. Both methods suffer the consequences from loss
-% of spatial resolution. Clustering can dynamically adjust to variable size
-% regions. However, this inherently results in changes to spatial resolution
-% which may or may not be appropriate. For example, there's no way you'd pick
-% up a shrinkage in enrichment spread in the optimal manner because everything
-% would always be clustered together. Using a width provides some more peace of
-% mind when you want these events picked up. 
+%%%%%%%%%%%%%%%%%%%
+% Peak-calling fundamentally involves the clustering of windows to get a peak interval for counting.
+% Clustering can adjust to variable size widths, whereas the use of a large bin does not (and can encounter edge effects). 
+% However, this depends heavily on the decisions made by the aggregation routine, as there's often insufficient data to direct unambiguous cluster boundaries at any single site.
+% Results might not be robust to tuning of parameters or even new datasets (cluster groupings can change which will change the manner in which counts are collected). 
+% Similarly, inappropriate inclusion of background regions can be problematic for DB detection.
+% Clustering must also be done independently of DB, such that changes to spatial resolution also may not be appropriate, e.g., for complex DB events.
 %
-% Clustering is also problematic because it only uses information at a single
-% location in the genome. This means that the cluster boundaries tend to be
-% quite imprecise when there is no outstanding enrichment signal. Results might
-% not be robust to such tuning or even new datasets (cluster groupings can
-% change which will change the manner in which counts are collected). On a
-% related note, clustering parameters are also more finicky/less intuitive.
-%
-% Clustering based on reads also has the claim that you get better resolution
-% because you don't have to account for the extra width of the sliding window
-% that kicks out the width of the region interval. However, this advantage
-% disappears when you get background reads. Clustering will include the
-% positions of those reads in the final output size when the clustering range
-% is large enough (e.g. epsilon for DBSCAN). Reporting the boundaries of the
-% cluster will then be affected by the value of the clustering range as more
-% background reads get included if the clustering range is larger.
-% 
-% All in all, clustering will give higher counts and better performance for
-% clusters where the DB status is homogenous throughout the cluster. For more
-% complex events, clustering will probably be suboptimal as the clustering
-% critera must remain blind to the DB status (see above). 
-%
-% So, widths are generally a simpler alternative. However, it is unable to deal
-% with variable sizes of enriched regions. Any given width will be optimized
-% for regions of a particular size so you might as well try out a bunch of
-% values. If an optimal non-zero width exists i.e. constant size regions, the
-% problem becomes that of trying to figure out the size. This is  easy for
-% sharp peaks where it's irrelevant (not much space between a small value and
-% zero) but hard diffuse regions where it is most needed (see
-% autocorrelations). Using a suboptimal value might reduce power but it
-% shouldn't change the rankings of the regions. 
-%
-% The argument for arbitrary resolution is akin to that when using a
-% microscope. Do you want to focus on the details or on the big picture? An
-% example of the necessarily arbitrary nature of width selection would be a
-% bunch of histone marks which are differentially enriched in short stretches.
-% These stretches are separated by short, non-DB spaces. In ``big picture''
-% terms, one would classify these stretches as part of the same region so you
-% would use a large width to increase counts and power. However, depending on
-% the definition of 'short', there may be some biological importance in the
-% details of the pattern which would be missed by a large width (e.g.
-% enrichment localized around TF sites, excluded at a gene).
-%
-% I don't think using gargantuan widths to maximize power for very diffuse
-% regions is a great idea. Strange things happen at low abundances (e.g.
-% correlations found during background normalization) which muddies the waters
-% in terms of validating very diffuse reigons. Ideally, local regions should be
-% able to carry their own weight in terms of power, which makes it much more
-% convincing when trying to eyeball the results.
+% All in all, clustering will give higher counts and better performance for clusters where the DB status is homogenous throughout the cluster. 
+% For more complex events, clustering will probably be suboptimal.
+% Widths are generally a simpler alternative. 
+% However, it is unable to deal with variable sizes of enriched regions, requiring testing of multiple bin sizes.
+% Using a suboptimal value might reduce power but it shouldn't change the rankings of the regions. 
 
-%%%%%%
-% My attempts to estimate the width include:
-%%
-% Autocorrelations. These are quite ineffective in guiding the choice of width.
-% This is because for diffuse marks where they are most needed, the poor
-% density of reads in enriched regions reduces the strength of the
-% correlations. This means that you almost start off at zero (whereas for more
-% punctate marks, the correlations at small lags are much higher). In short,
-% you can't distinguish between diffuse marks and random reads. 
+%%%%%%%%%%%%%%%%%%%
+% The argument for arbitrary resolution is akin to that when using a microscope. 
+% Do you want to focus on the details or on the big picture? 
+% For example, consider a cluster of DB regions separated by empty spaces.
+% terms, one would classify this cluster as part of the same region, so you would use a large width to increase counts and power. 
+% However, you could equally define each region as being of interest in its own right.
 %
-% More generally, autocorrelations aren't that great because there's nothing to
-% compare it to. It keeps dropping rather than becoming maximal at any point.
-% Trying to find when it elbows off is fairly arbitrary. Comparing it to a
-% threshold is also difficult i.e. distinguishing between negligble' and 'even
-% more negligble'. It also ceases to be robust to the choice of threshold when
-% relative scales are used, because the function begins asymptoting way above
-% zero (so small changes on the x-axis correspond to very large changes on the
-% estimated width).
-%
-% The autocorrelation function also depends on other factors such as the number
-% of peaks which complicates interpretation relative to a fixed threshold.  For
-% example, a mark with lots of small peaks will have a higher and more
-% persistent autocorrelation than a mark with fewer peaks, even if the latter's
-% peaks are larger. 
-%%
-% Masking reads from each strand with those from the other strand, and
-% computing cross-correlations using the remainders. The maximum point should
-% then depend on the value of the width. Problem is, the exact relationship
-% depends on the shape of the clusters. The effectiveness of masking also
-% depends on the shape of the cluster e.g. a triangular distribution for each
-% peak will have fewer overlaps and reduced masking. Increasing the
-% aggressiveness of the masking then raises problems with the reliability of
-% the results (as you start hitting the isolated forward/reverse flanks).
-%%
-% Alternatively, peak-calling programs like MACS \citep{zhang2008} can be used
-% in single sample mode on pooled libraries to determine the width of enriched
-% regions.  Pooling is necessary to avoid snooping on the DB status of regions.
-% Note that the width of enrichment may not necessarily be the optimal width
-% for detecting DB regions, especially for the more diffuse histone marks.
-% There is also an implicit assumption that the widths of the binding sites are
-% reasonably constant across the genome. 
+% I don't think using gargantuan widths to maximize power for very diffuse regions is a great idea. 
+% Strange things happen at low abundances (e.g. correlations found during background normalization) which complicates validation.
+% Ideally, local regions should be able to carry their own weight in terms of power, which makes it much more convincing when trying to eyeball the results.
 
 \subsection{Filtering out low-quality reads}
 Read extraction from the BAM files is controlled with the \code{param} argument in \code{windowCounts}.
@@ -753,6 +647,49 @@ This makes it difficult to determine when the coverage becomes negligble.
 The problem is compounded for diffuse marks where the transition between enrichment and background is unclear.
 Indeed, local maxima are unlikely to be well-defined within diffuse regions.
 Thus, users are advised to exercise caution when picking a window size from these plots.
+
+%%%%%%
+% Ironically, estimation is easy for sharp peaks where it's irrelevant (not much practical difference between a small value and zero) but hard for diffuse regions where it is most needed.
+% My attempts to estimate the width include:
+%%
+% Autocorrelations. These are quite ineffective in guiding the choice of width.
+% This is because for diffuse marks where they are most needed, the poor
+% density of reads in enriched regions reduces the strength of the
+% correlations. This means that you almost start off at zero (whereas for more
+% punctate marks, the correlations at small lags are much higher). In short,
+% you can't distinguish between diffuse marks and random reads. 
+%
+% More generally, autocorrelations aren't that great because there's nothing to
+% compare it to. It keeps dropping rather than becoming maximal at any point.
+% Trying to find when it elbows off is fairly arbitrary. Comparing it to a
+% threshold is also difficult i.e. distinguishing between negligble' and 'even
+% more negligble'. It also ceases to be robust to the choice of threshold when
+% relative scales are used, because the function begins asymptoting way above
+% zero (so small changes on the x-axis correspond to very large changes on the
+% estimated width).
+%
+% The autocorrelation function also depends on other factors such as the number
+% of peaks which complicates interpretation relative to a fixed threshold.  For
+% example, a mark with lots of small peaks will have a higher and more
+% persistent autocorrelation than a mark with fewer peaks, even if the latter's
+% peaks are larger. 
+%%
+% Masking reads from each strand with those from the other strand, and
+% computing cross-correlations using the remainders. The maximum point should
+% then depend on the value of the width. Problem is, the exact relationship
+% depends on the shape of the clusters. The effectiveness of masking also
+% depends on the shape of the cluster e.g. a triangular distribution for each
+% peak will have fewer overlaps and reduced masking. Increasing the
+% aggressiveness of the masking then raises problems with the reliability of
+% the results (as you start hitting the isolated forward/reverse flanks).
+%%
+% Alternatively, peak-calling programs like MACS \citep{zhang2008} can be used
+% in single sample mode on pooled libraries to determine the width of enriched
+% regions.  Pooling is necessary to avoid snooping on the DB status of regions.
+% Note that the width of enrichment may not necessarily be the optimal width
+% for detecting DB regions, especially for the more diffuse histone marks.
+% There is also an implicit assumption that the widths of the binding sites are
+% reasonably constant across the genome. 
 
 \section{Counting over manually specified regions}
 The \pkgname{} package focuses on counting reads into windows. 
@@ -1971,6 +1908,7 @@ This results in conservativeness as more clusters will have large $p$-values.
 Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
 \section{Integrating results from multiple window sizes}
+\label{sec:bin_integrate}
 The sensitivity of the analysis to the choice of window size can be mitigated by testing a range of different widths.
 DB results from each width can be integrated by clustering adjacent windows together (even if they are of differing sizes), and combining $p$-values within each of the resulting clusters.
 The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
