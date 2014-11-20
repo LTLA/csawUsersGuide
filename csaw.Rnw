@@ -389,54 +389,6 @@ See Section~\ref{sec:efficiency} for more details.
 % able to carry their own weight in terms of power, which makes it much more
 % convincing when trying to eyeball the results.
 
-%%%%%%%%%
-% Another important point is whether FDR control is maintained in the combined
-% set of results from analyses with differing widths. The answer is, "Most of
-% the time.".  If FDR control is maintained in each set of results, then the
-% combined set should also maintain FDR control (as the expected value of the
-% FDR doesn't change). However, the FDR concept has an implicit assumption that
-% there is at least one true positive in the significant set. Without this
-% assumption, the FDR calculation would just descend to FWER control using
-% Simes' method. This assumption is required for each set that is to be
-% combined i.e. one true positive in each set of results. If we were to compute
-% the FDR directly from the combined set of p-values/weights, we'd only require
-% the assumption of one true positive in the combined set.
-%
-% It's not hard to imagine instances where the first assumption is violated but
-% the second is not. Consider a set where there are no true positives and the
-% tests are all completely correlated. When you combine results, you're adding
-% an expected value of a*n (for threshold 'a' and number of tests 'n') to both
-% the numerator and denominator of false positives and total discoveries,
-% respectively. If you were controlling the FDR exactly before you added this
-% lot, then FDR control would now be lost. Of course, this is a rather extreme
-% example. More realistic situations wouldn't be so badly affected as the a*n
-% product would probably be small. In fact, the assumption of a true positive
-% in each set might not be all that strong as positive correlations exist
-% between tests corresponding to the same site using different widths.  This
-% means that a true positive at one width probably translates to a true
-% positive in another.
-%
-% To protect against this, two approaches are possible. The first is to
-% multiply the q-values by the number of different width analyses. This is a
-% Bonferroni approach which provides the most conservative protection (i.e.
-% everything is assumed to be the lowest q-value in the combined set). It is
-% also the simplest. The second approach is to dump the p-values (and logFC's
-% and logCPM's) and the weights into a file after each width analysis; then
-% reload them, merge them into a single DENList by rbinding, and compute
-% q-values with calcWeightedFDR. Then, split them up again for region assembly.
-% Complicated but scalable. To be honest, I put both under "too much effort"
-% and I just ride the assumption.
-%
-% Another warning with multiple analyses is that even if the FDR is controlled
-% in each one, you'll end up with the problem of overlapping results. If you
-% merge redundant DB tests, you can end up with a worst-case effective FDR
-% which is almost twice as large; this assumes that all true discoveries
-% overlap and all false discoveries are unique. So, you'll end up having to
-% multiply your q-values by the number of test sets you're merging. You could
-% probably get a tighter bound due to the correlations between corresponding
-% tests in different sets, but this approach dovetails nicely with my worries
-% above, so it's what I'm going with. 
-
 %%%%%%
 % My attempts to estimate the width include:
 %%
@@ -1250,12 +1202,18 @@ Removal of the trend may not be appropriate if it represents some genuine biolog
 In addition, the computed offsets are not compatible with the normalization factors from the scaling methods.
 Only one of these sets of values will ultimately be used by \edger{}.
 
+% I could iterate here, whereby I recompute the average abundance using the offsets.
+% Now, I'm not sure whether this would be any better or worse. 
+% On a practical level, though, the aveLogCPM calls in later functions do not use offset data.
+% So, you want to make sure you're removing the trend with respect to the average abundance that'll be used later on.
+% That's why I don't bother to iterate.
+
 \section{A word on other biases}
 No normalization is performed to adjust for differences in mappability or sequencability between different regions of the genome. 
 Region-specific biases are assumed to be constant between libraries. 
 This is generally reasonable as the biases depend on fixed properties of the genome sequence such as GC content. 
 Thus, biases should cancel out during DB comparisons.
-Any variability in the bias between samples will be absorbed into the dispersion estimate. 
+Any variability between samples will just be absorbed into the dispersion estimate. 
 
 % Note that Cheung (i.e. Ahringer) go about dividing ChIP samples by input
 % controls and stating that there are differences in the called regions between
@@ -2057,6 +2015,12 @@ tabcom.ac2 <- combineTests(merged.ac$id, tab=dummy.all, weight=weight)
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
 This is most useful for histone marks and other analyses involving diffuse regions of enrichment.
 For such studies, the ideal bin size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
+
+% This is better than the alternative, i.e., just merge regions from multiple
+% DB lists together.  You'll end up with overlapping results, which means that
+% you wouldn't be controlling the FDR across the merged set. In addition,
+% merging DB lists that have been controlled at a given FDR assumes that there
+% is at least one true positive in each list. 
 
 \section{Choosing a single representative window}
 
