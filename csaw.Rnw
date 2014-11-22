@@ -243,6 +243,7 @@ Typical values range from 100 to 300 bp, depending on the efficiency of sonicati
 % Read extension means that bimodal structures will have higher counts than regions with the same number of reads but random read directions. 
 % This brings looking for bimodality under the framework of row sum filtering. 
 % It is also smoother; if you're not bimodal but there is a difference, you still get picked up.
+% Unimodal events are only problematic if they are high-abundance, which shouldn't occur if you've removed repeats.
 % 
 % Finally, you can do whatever bimodal filtering you want implicitly, by running your desired peak caller and then picking only those windows that overlap called peaks. 
 % This will give you the MTC advantage without requiring too much extra code on my part.
