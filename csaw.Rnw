@@ -522,6 +522,8 @@ Any file manipulations that might break this synchronisation should be corrected
 
 \section{Estimating the average fragment length}
 \label{sec:ccf}
+
+\subsection{Using cross-correlation plots}
 Cross-correlation plots can be generated directly from BAM files using the \code{correlateReads} function. 
 This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment \citep{kharchenko2008}. 
 Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
@@ -597,6 +599,31 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 <<histone_ccf>>
 @
 \end{center}
+
+\subsection{Variable fragment lengths between libraries}
+The \code{windowCounts} function also supports the use of library-specific fragment lengths.
+For example, libraries with larger fragment lengths will have wider peaks.
+The single-end reads in those peaks will then require more extension, in order to impute a fragment interval that covers the binding site.
+This is done by supplying a vector to the \code{ext} argument.
+Each entry specifies the average fragment length to be used for the corresponding library.
+The extension lengths are also stored in the \code{SummarizedExperiment} output for future reference. 
+
+<<>>=
+frag.lens <- c(100, 150, 200, 250)
+demo <- windowCounts(bam.files, ext=frag.lens, filter=30)
+demo$ext
+@
+
+In general, use of different extension lengths is unnecessary in well-controlled datasets.
+Difference in lengths between libraries are usually smaller than 50 bp.
+This is less than the inherent variability in fragment lengths within each library (see the histogram for the paired-end demonstration).
+Such variability will affect the read coverage profile more than any difference in lengths, and is likely to mask the latter.
+Thus, an \code{ext} vector should only specified for datasets that exhibit large differences in the fragment sizes.
+However, caution is required to avoid detecting irrelevant DB from differences in peak widths.
+
+% As for the first point; the variability precludes identification of significant differences in lengths, if you were to treat forward/reverse strand peaks as distributions. 
+% As to the second point; there's no satisfactory way of dealing with differences in peak widths, because you need to account for the shape of the peak, and the position of each read therein.
+% For example, reads on the periphery of a wide peak need to be moved in more, whereas reads in the center of a wide peak don't really need to be moved at all.
 
 \section{Choosing an appropriate window size}
 The coverage profile around potential binding sites can be obtained with the \code{profileSites} function.
