@@ -400,8 +400,30 @@ another.param <- reform(param, minq=NA, discard=repeats)
 another.param
 @
 
+The \code{windowCounts} function will also accept a list of \code{readParam} objects. 
+Different read extraction parameters can then be specified for each library.
+Use of library-specific settings is dangerous as spurious differences can be introduced between libraries.
+Nonetheless, it may be unavoidable, e.g., if the dataset is composed of a mixture of single- and paired-end libraries.
+A hypothetical example is shown below with one single- and one paired-end library.
+To mimic single-end data in the second library, only the first read of the pair is used.
+
+<<>>=
+paramlist <- list(readParam(), readParam(pet="first"))
+checkList(paramlist)
+@
+
+For convenience, the \code{checkList} function is provided to identify those parameters that are different across the list.
+This can be useful to ensure that only the intended parameters are varied across libraries.
+Lists can also be manipulated with the \code{reformList} function, which sets parameters to their specified values in all elements of the list.
+In the code below, coercion of \code{pet} to a common value removes any differences between \code{readParam} objects.
+
+<<>>=
+paramlist <- reformList(paramlist, pet="none")
+checkList(paramlist)
+@
+
 For simplicity, most of the calls to \code{windowCounts} in this guide will use the default settings for \code{param}, i.e., \code{readParam()}.
-However, users are encouraged to construct their own \code{readParam} objects and apply them consistently throughout their analyses.
+However, users are encouraged to construct their own \code{readParam} objects (or lists thereof) and apply them consistently throughout their analyses.
 A good check for synchronisation is to ensure that the values of \code{...\$totals} are identical between calls. 
 This means that the same reads are extracted from the BAM file in each call. 
 
