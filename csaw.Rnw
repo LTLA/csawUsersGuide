@@ -679,10 +679,11 @@ for (curbam in all.bam) {
 	collected[[curbam]] <- profileSites(curbam, rowData(windowed)[maxed], 
         param=dedup.on, weight=1/rwsms[maxed])
 }
-plot(collected[[1]], type="l", col="blue", xlim=c(0, 5000), lwd=2, 
+xranged <- as.integer(names(collected[[1]]))
+plot(xranged, collected[[1]], type="l", col="blue", xlim=c(-1000, 1000), lwd=2, 
     xlab="Distance (bp)", ylab="Relative coverage per base")
-lines(collected[[2]], col="forestgreen", lwd=2)
-lines(collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
+lines(xranged, collected[[2]], col="forestgreen", lwd=2)
+lines(xranged, collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
 legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
     c("H3Ac", "H3K4me2", "NF-YA"), pch=16)
 @
@@ -694,10 +695,9 @@ legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
 @
 \end{center}
 
-The relative coverage represents the additional counts that can be obtained by expanding the region.
-The ideal increase in the window size can be defined as twice the distance at which the surrounding coverage becomes negligble.
-In the example above, a window size of $\sim$1 kbp may be most appropriate for the two histone marks.
-This corresponds to a distance of 500 bp, which captures most of the additional coverage without including too much background contamination.
+In the example above, the majority of enrichment for the two histone marks is focused within 500 bp around the maxima.
+This suggests that a window size of around 300 bp is ideal, given that directional extension by 100 bp has been performed on both sides of the peak.
+Most of the coverage can then be captured without including too much background contamination.
 In contrast, the NF-YA profile drops off more sharply.
 This indicates that a smaller window size ($< 100$ bp) is probably adequate, consistent with sharp TF binding.
 
