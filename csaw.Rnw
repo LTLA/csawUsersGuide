@@ -636,16 +636,31 @@ demo <- windowCounts(bam.files, ext=frag.lens, filter=30)
 demo$ext
 @
 
+Caution is required to avoid detecting irrelevant DB from differences in peak widths.
+Some protection is provided by the \code{final.ext} argument, which specifies the fragments length to which extended reads should be scaled in all libraries.
+Consider a bimodal peak across several libraries.
+Scaling ensures that all subpeaks on the forward strand are centered at the same location across all libraries.
+Similarly, all subpeaks on the reverse strand are centered at another location.
+This removes most of the differences in width and coverage between libraries.
+By default, the mean of \code{ext} is used if \code{final.ext} is not explicitly specified.
+
+% There's no satisfactory way of dealing with differences in the subpeak widths.
+% You'll need to shrink wide subpeaks towards the center of the subpeak.
+% This requires knowledge of where the read is in the subpeak, which is difficult to say.
+
+<<>>=
+exptData(demo)$final.ext
+@
+
 In general, use of different extension lengths is unnecessary in well-controlled datasets.
 Difference in lengths between libraries are usually smaller than 50 bp.
-This is less than the inherent variability in fragment lengths within each library (see the histogram for the paired-end demonstration).
+This is less than the inherent variability in fragment lengths within each library (see the histogram for the paired-end data in Section~\ref{data:pet}).
 Such variability will affect the read coverage profile more than any difference in lengths, and is likely to mask the latter.
 Thus, an \code{ext} vector should only specified for datasets that exhibit large differences in the fragment sizes.
-However, caution is required to avoid detecting irrelevant DB from differences in peak widths.
 
-% As for the first point; the variability precludes identification of significant differences in lengths, if you were to treat forward/reverse strand peaks as distributions. 
-% As to the second point; there's no satisfactory way of dealing with differences in peak widths, because you need to account for the shape of the peak, and the position of each read therein.
-% For example, reads on the periphery of a wide peak need to be moved in more, whereas reads in the center of a wide peak don't really need to be moved at all.
+% Variability precludes identification of significant differences in lengths, if you were to treat forward/reverse strand peaks as distributions. 
+% In the simplest case, with no variability, you'd just have read stacks where differences are clearcut.
+% As you add more variability, the waters become muddled and obvious differences disappear.
 
 \section{Choosing an appropriate window size}
 The coverage profile around potential binding sites can be obtained with the \code{profileSites} function.
