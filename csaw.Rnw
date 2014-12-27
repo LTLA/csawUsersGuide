@@ -408,17 +408,17 @@ A hypothetical example is shown below with one single- and one paired-end librar
 To mimic single-end data in the second library, only the first read of the pair is used.
 
 <<>>=
-paramlist <- list(readParam(), readParam(pet="first"))
+paramlist <- list(readParam(), readParam(pe="first"))
 checkList(paramlist)
 @
 
 For convenience, the \code{checkList} function is provided to identify those parameters that are different across the list.
 This can be useful to ensure that only the intended parameters are varied across libraries.
 Lists can also be manipulated with the \code{reformList} function, which sets parameters to their specified values in all elements of the list.
-In the code below, coercion of \code{pet} to a common value removes any differences between \code{readParam} objects.
+In the code below, coercion of \code{pe} to a common value removes any differences between \code{readParam} objects.
 
 <<>>=
-paramlist <- reformList(paramlist, pet="none")
+paramlist <- reformList(paramlist, pe="none")
 checkList(paramlist)
 @
 
@@ -476,26 +476,26 @@ head(rowData(demo))
 @
 
 \section{Experiments involving paired-end tags}
-ChIP experiments with paired-end sequencing can be accomodated by setting \code{pet="both"} in the \code{param} object supplied to \code{windowCounts}. 
+ChIP experiments with paired-end sequencing can be accomodated by setting \code{pe="both"} in the \code{param} object supplied to \code{windowCounts}. 
 Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined between the $5'$ positions of the paired reads.
 The number of fragments overlapping each window is then counted as described. 
 By default, only proper pairs are used whereby the two reads are on the same chromosome, face inward and are no more than \code{max.frag} apart.
 
 <<>>=
-petBamFile <- "example-pet.bam"
-pet.param <- readParam(max.frag=400, pet="both")
-demo <- windowCounts(petBamFile, param=pet.param)
+pe.bam <- "example-pet.bam"
+pe.param <- readParam(max.frag=400, pe="both")
+demo <- windowCounts(pe.bam, param=pe.param)
 demo$totals
 @
 \label{data:pet}
 
-A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes using the \code{getPETSizes} function. 
+A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes using the \code{getPESizes} function. 
 In this example, a user might use a value of around 500 bp as it covers most of the fragment size distribution. 
-The plot can also be used to examine the quality of the PET sequencing procedure. 
+The plot can also be used to examine the quality of the PE sequencing procedure. 
 The location of the peak should be consistent with the fragmentation and size selection steps in library preparation. 
 
 <<label=frag,eval=FALSE>>=
-out <- getPETSizes(petBamFile)
+out <- getPESizes(pe.bam)
 frag.sizes <- out$sizes[out$sizes<=800]
 hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
 abline(v=400, col="red")
@@ -509,7 +509,7 @@ abline(v=400, col="red")
 \end{center}
 
 The number of fragments exceeding the maximum size can be recorded for quality control. 
-The \code{getPETSizes} function also returns the number of single reads, pairs with one unmapped read, improperly orientated pairs and inter-chromosomal pairs.
+The \code{getPESizes} function also returns the number of single reads, pairs with one unmapped read, improperly orientated pairs and inter-chromosomal pairs.
 A non-negligble proportion of these reads may be indicative of problems with paired-end alignment or sequencing. 
 
 <<>>=
@@ -523,19 +523,19 @@ Counting will then be performed with these fragments in addition to those from t
 A value of \code{rescue.ext} can be chosen based on the mode of the distribution above.
 
 <<>>=
-rescue.param <- reform(pet.param, rescue.ext=200, rescue.pairs=TRUE)
-demo <- windowCounts(petBamFile, param=rescue.param)
+rescue.param <- reform(pe.param, rescue.ext=200, rescue.pairs=TRUE)
+demo <- windowCounts(pe.bam, param=rescue.param)
 demo$totals
 @
 
-Paired-end data can also be treated as single-end data by specifiying \code{pet="first"} or \code{pet="second"}. 
+Paired-end data can also be treated as single-end data by specifiying \code{pe="first"} or \code{pe="second"}. 
 This will only take the first or second read of each pair as defined in the SAM flags. 
 Unlike \code{rescue.pairs}, the selection and use of one read is done for all read pairs regardless of validity. 
 This may be useful for comparing paired-end analyses with single-end analyses, or in truly disastrous situations where paired-end sequencing has failed.
 
 <<>>=
-first.param <- readParam(pet="first")
-demo <- windowCounts(petBamFile, param=first.param)
+first.param <- readParam(pe="first")
+demo <- windowCounts(pe.bam, param=first.param)
 demo$totals
 @
 
