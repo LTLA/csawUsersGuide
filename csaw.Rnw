@@ -475,7 +475,7 @@ demo <- windowCounts(bam.files, width=1000, bin=TRUE)
 head(rowData(demo))
 @
 
-\section{Experiments involving paired-end tags}
+\section{Experiments involving paired-end data}
 ChIP experiments with paired-end sequencing can be accomodated by setting \code{pe="both"} in the \code{param} object supplied to \code{windowCounts}. 
 Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined between the $5'$ positions of the paired reads.
 The number of fragments overlapping each window is then counted as described. 
