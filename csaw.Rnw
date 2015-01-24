@@ -813,18 +813,15 @@ The size of each library is scaled by the corresponding factor to obtain an effe
 A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the (effective) library size will be smaller. 
 Check out the \edger{} user's guide for more information.
 
-Note that the default \code{normalize} method skips the precision weighting step in the TMM method.
+Note that the \code{normalize} method skips the precision weighting step in the TMM method.
 Weighting aims to increase the contribution of bins with high counts.
 However, these bins are more likely to contain binding sites and thus are more likely to be DB. 
-If any DB regions should survive trimming (e.g., those with less extreme fold changes), upweighting them would be counterproductive. 
-In fact, users may wish to explicitly filter out such bins and run TMM only on putative background regions, as shown below.
+If any DB regions should survive trimming, upweighting them would be counterproductive. 
 
-<<>>=
-require(edgeR)
-ab <- aveLogCPM(asDGEList(binned))
-keep <- ab <= quantile(ab, p=0.9)
-normalize(binned[keep,])
-@
+% By default, the top 5% of most abundant elements are already removed by TMM.
+% You can ask for more removal, which could help; but in general, binding sites
+% are so negligble in quantity compared to the background regions, it doesn't
+% really matter too much, so long as weighting isn't in play.
 
 \subsection{Choosing a bin size}
 By definition, read coverage is low for background regions. 
@@ -1065,25 +1062,30 @@ for (i in 1:(length(bam.files)-1)) {
 Efficiency biases are commonly observed in ChIP-seq data. 
 This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
 These technical differences are of no biological interest and must be removed. 
-This can be achieved by assuming some top percentage of bins or windows with the highest abundances contain binding sites. 
+This can be achieved by assuming that high-abundance bins contain binding sites. 
+In the example below, these bins are chosen based on the approach described in Section~\ref{sec:global_filter}. 
 The TMM method can then be applied to eliminate systematic differences in the counts across those bins. 
-In the example below, the top 1\% of bins are assumed to contain binding sites. 
-For consistency, the bin size in Section~\ref{sec:compo_norm} is re-used here though the counts for binding sites should be high enough for smaller bins.
 
 <<strip.white=false>>=
 me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
 ab <- aveLogCPM(asDGEList(me.demo))
-keep <- rank(ab) > 0.99*length(ab)
+keep <- ab > median(ab) + log2(10)
 me.norm <- normalize(me.demo[keep,])
 me.norm
 
 ac.demo <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=10000L)
 ab <- aveLogCPM(asDGEList(ac.demo))
-keep <- rank(ab) > 0.99*length(ab)
+keep <- ab > median(ab) + log2(10)
 ac.norm <- normalize(ac.demo[keep,])
 ac.norm
 @
 \label{data:norm}
+
+Note that the bin size in Section~\ref{sec:compo_norm} is only used here for consistency (and to allow comparison between the different normalization methods on a MA plot, later).
+The counts for binding sites should be high enough such that smaller bins can be used.
+TMM normalization can even be applied directly to the high-abundance windows of interest.
+This ensures that there is no systematic difference between libraries across these windows.
+In practice, the estimated normalization factors are usually robust to the choice of window/bin size. 
 
 % An equivalent approach is to apply TMM on each window directly. I generally
 % don't like doing this as it's harder to assess the context in which the
@@ -1150,15 +1152,15 @@ Rather, non-linear methods are required, such as cyclic loess or quantile normal
 One such implementation is provided in \code{normalize} by setting \code{type="loess"}. 
 This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
-This can be directly used in \edger{}, assuming that said bins or windows are also the ones to be tested for DB.
-In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization.
-The example below operates on the filtered counts for small bins, of which the top 5\% are assumed to contain binding sites. 
+This offset matrix can then be directly used in \edger{}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
+In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization step.
+The example below operates on the filtered counts for small 2 kbp bins. 
 
 <<>>=
-ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=2000L)
+ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), width=2000L)
 ac.dge <- asDGEList(ac.demo2)
 ab <- aveLogCPM(ac.dge)
-keep <- rank(ab) > 0.95*length(ab)
+keep <- ab > median(ab) + log2(3)
 ac.demo2 <- ac.demo2[keep,]
 ac.off <- normalize(ac.demo2, type="loess")
 head(ac.off)
@@ -1308,7 +1310,7 @@ In the worst case, the removal of the corresponding libraries may be necessary t
 \begin{combox}
 This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
 We will also need the \code{normfacs} vector from Chapter~\ref{chap:norm}. 
-Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
+%Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
 Finally, we'll need the \code{aveLogCPM} function from the \edger{} package (that we've already loaded, unless you skipped the last chapter).
 \end{combox}
 
@@ -1402,6 +1404,7 @@ However, it may not adapt well to different datasets where the proportion of bou
 Using an inappropriate percentage of binding sites will result in the loss of potential DB regions or inclusion of background regions.
 
 \section{By global enrichment}
+\label{sec:global_filter}
 An alternative approach involves choosing a filter threshold based on the fold change over the level of non-specific enrichment.
 The degree of background enrichment can be estimated by counting reads into large bins across the genome.
 Binning is necessary here to increase the size of the counts when examining low-density background regions. 
@@ -1595,14 +1598,10 @@ Any information used here should be independent of the DB status under the null 
 For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
 However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
 
-\section{Relationship between filtering and normalization}
-The NB mean computed by \code{aveLogCPM} depends on the library sizes. 
-In the example below, the effective library sizes after normalization are used after multiplying by \code{normfacs}. 
-This ensures that composition biases are considered when computing the average count. 
-However, this may result in some circular dependencies when filtering is also required prior to normalization, e.g., of efficiency biases in Section~\ref{sec:eff_norm}. 
-Users may wish to perform multiple iterations of filtering/normalization to check that the results are self-consistent. 
-
-<<>>=
+% The NB mean depends on the effective library size, so filtering for efficiency bias becomes a bit circular.
+% However, it shouldn't be too bad, as the normalization procedure isn't so sensitive to irregularities at the filter boundary.
+% In practice, there's little-to-no effect; I'd only expect something if the normalization factors are really crazy.
+<<eval=FALSE,echo=FALSE>>=
 for (it in 1:3) {
     ab <- aveLogCPM(assay(me.demo), lib.sizes=me.demo$total*me.norm)
     keep <- rank(ab) > 0.99*length(ab)
@@ -1611,12 +1610,11 @@ for (it in 1:3) {
     print(me.norm)
 }
 @
-
-The \code{aveLogCPM} function depends similarly on NB dispersion (see Chapter~\ref{chap:stats}) for datasets with different library sizes.
-However, dispersion estimation can only proceed after normalization and filtering. 
-This results in another circular dependency that is resolved by using a sensible (but otherwise arbitrary) value for the NB dispersion in \code{aveLogCPM}. 
-The alternative would be to iterate over the entire DB analysis, which would be prohibitively time-consuming in most circumstances.
-Of course, this is not an issue when library sizes are the same.
+% Filtering is also sensitive to the NB dispersion when library sizes are different.
+% However, dispersion estimation can only proceed after normalization and filtering. 
+% This results in another circular dependency that is resolved by using a sensible (but otherwise arbitrary) value for the NB dispersion in \code{aveLogCPM}. 
+% The alternative would be to iterate over the entire DB analysis, which would be prohibitively time-consuming in most circumstances.
+% Of course, this is not an issue when library sizes are the same.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
