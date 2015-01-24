@@ -1352,8 +1352,9 @@ Arbitrariness is unavoidable when balancing these opposing considerations.
 
 Nonetheless, several strategies for defining the threshold are described below.
 Users should start by choosing \textbf{one} of these filtering approaches for their analyses.
-Different filters can also be combined, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
-However, any benefit will depend on the type of filters being combined.
+Different filters can also be combined in more advanced applications, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
+However, any benefit will depend on the type of filters involved.
+The greatest effect is observed for filters that operate on different principles.
 
 % Choosing the filter which gets you the greatest number of DE regions isn't
 % the best idea, simply because it means that it's not independent of the
