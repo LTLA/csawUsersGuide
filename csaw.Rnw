@@ -637,19 +637,19 @@ demo$ext
 @
 
 Caution is required to avoid detecting irrelevant DB from differences in peak widths.
-Some protection is provided by the \code{final.ext} argument, which specifies the fragments length to which extended reads should be scaled in all libraries.
+Some protection is provided by scaling the extended reads to the same length in all libraries.
 Consider a bimodal peak across several libraries.
 Scaling ensures that all subpeaks on the forward strand are centered at the same location across all libraries.
-Similarly, all subpeaks on the reverse strand are centered at another location.
+Similarly, all subpeaks on the reverse strand are centered at another constant location across libraries.
 This removes most of the differences in width and coverage between libraries.
-By default, the mean of \code{ext} is used if \code{final.ext} is not explicitly specified.
+By default, the mean of \code{ext} is used as the standard extension length, although another value can also be specified.
 
 % There's no satisfactory way of dealing with differences in the subpeak widths.
 % You'll need to shrink wide subpeaks towards the center of the subpeak.
 % This requires knowledge of where the read is in the subpeak, which is difficult to say.
 
 <<>>=
-exptData(demo)$final.ext
+demo$final.ext
 @
 
 In general, use of different extension lengths is unnecessary in well-controlled datasets.
@@ -2060,7 +2060,7 @@ For sharp binding events, it may be preferable to restrict the DB analysis to th
 This will usually provide more power as it avoids the conservativeness of Simes' method.
 
 <<>>=
-tab.ave <- getBestTest(merged$id, results$table, mode="logCPM")
+tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
 head(tab.ave)
 @
 
