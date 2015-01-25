@@ -2043,8 +2043,9 @@ The latter is an average across all windows in the cluster and will have little 
 Reporting the \code{best} fold change may be preferable as it focuses on the DB interval.
 
 <<>>=
-best.fc <- results$table$logFC[tab.best$best]
-head(best.fc)
+tabcom$best.fc <- best.fc
+tabcom$best.start <- rowData(data)[tab.best$best] 
+head(tabcom$best.fc)
 @
 
 Typically, the best window will only be used as a descriptive measure for each cluster.
@@ -2080,14 +2081,13 @@ For example, a DB site will be ignored if it is clustered alongside a stronger n
 A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
 In the example below, the weight assigned to the top window is equal to the total number of other windows in each cluster.
 This means that the behaviour of the top window will have a greater influence on the final result.
-That said, the other windows in the cluster still have non-zero weights.
+That said, the other windows in the cluster still have unity weights.
 Any DB events in those windows will still be considered when the $p$-values are combined.
 
 <<>>=
 weights <- rep(1, length(merged$id))
 freq <- tabulate(merged$id)
-weights[tab.ave$best] <- freq[merged$id[tab.ave$best]] - 1
-weights <- pmax(weights, 1)
+weights[tab.ave$best] <- freq[merged$id[tab.ave$best]] 
 tabcom.w <- combineTests(merged$id, results$table, weight=weights)
 head(tabcom.w)
 @
@@ -2097,6 +2097,22 @@ Greater weight represents a stronger belief that DB occurs at the most abundant 
 In practical terms, the weighting scheme used here means that the combined $p$-value of the cluster will not be more than twice the $p$-value of the top window.
 Conversely, if the strongest DB occurs in a non-top window, the combined $p$-value with weighting will be no more than twice the corresponding value without weighting.
 This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster, while still focusing on the most abundant site.
+
+% To wit; let 'w' be the weight of the highest abundance window, and N be the number of windows in a cluster.
+% If the highest abundance window is the most DB, then the penalty is (N+w-1)/w, i.e., the multiplicity correction compared to just using the p-value of that window.
+% If another window is most DB, then the penalty is (N+w-1)/N, i.e., compared to unweighted Simes.
+% These two penalties can be made equal by setting w=N, which means the penalty is just below 2.
+
+Finally, a less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
+This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
+If not, the DB event may be complex, e.g., involving multiple peaks or peaks that change in shape or position between conditions.
+These require more careful interpretation than simpler ``binary'' (i.e., on/off) changes.
+
+<<>>=
+# 'mab' stands for most abundant.
+tabcom$mab.fc <- results$table$logFC[tab.ave$best]
+head(tabcom$mab.fc)
+@
 
 \chapter{Post-processing steps}
 
