@@ -516,22 +516,22 @@ A non-negligble proportion of these reads may be indicative of problems with pai
 c(out$diagnostics, too.large=sum(out$sizes > 400))
 @
 
-In datasets where many read pairs are invalid, the reads in those pairs can be rescued by setting \code{rescue.pairs=TRUE}. 
+In datasets where many read pairs are invalid, the reads in those pairs can be rescued by setting \code{rescue.ext} to a positive integer.
 For each invalid intra-chromosomal read pair, the read with the higher mapping quality score will be directionally extended by \code{rescue.ext} to impute the fragment. 
+The other read in the pair is ignored.
 For inter-chromosomal read pairs, both reads are extended in this manner. 
 Counting will then be performed with these fragments in addition to those from the valid pairs. 
-A value of \code{rescue.ext} can be chosen based on the mode of the distribution above.
+An appropriate value of \code{rescue.ext} can be chosen based on the mode of the fragment size distribution, above.
 
 <<>>=
-rescue.param <- reform(pe.param, rescue.ext=200, rescue.pairs=TRUE)
+rescue.param <- reform(pe.param, rescue.ext=200)
 demo <- windowCounts(pe.bam, param=rescue.param)
 demo$totals
 @
 
-Paired-end data can also be treated as single-end data by specifiying \code{pe="first"} or \code{pe="second"}. 
-This will only take the first or second read of each pair as defined in the SAM flags. 
-Unlike \code{rescue.pairs}, the selection and use of one read is done for all read pairs regardless of validity. 
-This may be useful for comparing paired-end analyses with single-end analyses, or in truly disastrous situations where paired-end sequencing has failed.
+Paired-end data can also be treated as single-end data by specifiying \code{pe="first"} or \code{pe="second"} in the \code{readParam} constructor. 
+This will only use the first or second read of each read pair, regardless of the validity of the pair or the relative quality of the read alignments.
+This setting may be useful for comparing paired-end analyses with single-end analyses, or in truly disastrous situations where paired-end sequencing has failed.
 
 <<>>=
 first.param <- readParam(pe="first")
