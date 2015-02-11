@@ -355,8 +355,8 @@ An example of read counting with more stringent parameters is shown below.
 Comparison to the values in \code{data\$totals} indicates that fewer reads are used in each library.
 
 <<>>=
-param <- readParam(minq=50, dedup=TRUE)
-demo <- windowCounts(bam.files, ext=frag.len, param=param)
+strict.param <- readParam(minq=50, dedup=TRUE)
+demo <- windowCounts(bam.files, ext=frag.len, param=strict.param)
 demo$totals
 @
 
@@ -396,7 +396,7 @@ The example below copies \code{param} and replaces \code{minq} and \code{discard
 This is safer than directly modifying the slots, as appropriate type/value checking of each class member is performed.
 
 <<>>=
-another.param <- reform(param, minq=NA, discard=repeats)
+another.param <- reform(default.param, minq=20, discard=repeats)
 another.param
 @
 
@@ -686,6 +686,7 @@ lines(xranged, collected[[2]], col="forestgreen", lwd=2)
 lines(xranged, collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
 legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
     c("H3Ac", "H3K4me2", "NF-YA"), pch=16)
+abline(v=c(-150,200), col="dodgerblue", lty=2)
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -695,8 +696,8 @@ legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
 @
 \end{center}
 
-In the example above, the majority of enrichment for the two histone marks is focused within 500 bp around the maxima.
-This suggests that a window size of around 300 bp is ideal, given that directional extension by 100 bp has been performed on both sides of the peak.
+In the example above, most enrichment for the two histone marks is focused within a 350 bp region around the maxima.
+This suggests that a window size of $\sim$150 bp is ideal, given that directional extension by 100 bp has been performed on both sides of the peak.
 Most of the coverage can then be captured without including too much background contamination.
 In contrast, the NF-YA profile drops off more sharply.
 This indicates that a smaller window size ($< 100$ bp) is probably adequate, consistent with sharp TF binding.
@@ -756,18 +757,39 @@ Thus, users are advised to exercise caution when picking a window size from thes
 % There is also an implicit assumption that the widths of the binding sites are
 % reasonably constant across the genome. 
 
-\section{Counting over manually specified regions}
+\section{Miscellaneous functions for non-standard counting}
+
+\subsection{Counting over manually specified regions}
 The \pkgname{} package focuses on counting reads into windows. 
 However, it may be occasionally desirable to use the same conventions (e.g., duplicate removal, quality score filtering) when counting reads into pre-specified regions. 
-This can be performed with the \code{regionCounts} function, which is largely a wrapper for \code{findOverlaps} from the \granges{} package.
+This can be performed with the \code{regionCounts} function, which is largely a wrapper for \code{countOverlaps} from the \granges{} package.
 
 <<>>=
 my.regions <- GRanges(c("chr11", "chr12", "chr15"),
     IRanges(c(75461351, 95943801, 21656501), 
     c(75461610, 95944810, 21657610)))
-reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
+reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=strict.param)
 head(assay(reg.counts))
 @ 
+
+\subsection{Strand-specific counting}
+Techniques like CLIP-seq, MeDIP-seq or CAGE provide strand-specific sequence information.
+The \pkgname{} package can analyze these datasets through strand-specific counting.
+This can be done manually setting the \code{forward} slot in the \code{readParam} object to \code{TRUE} or \code{FALSE}, to count only forward- or reverse-strand reads respectively.
+Alternatively, the \code{strandedCounts} wrapper function can be used to obtain strand-specific counts for each window or region.
+The strand of the output \code{rowData} indicates the strand on which reads were counted for that row.
+Up to two rows can be generated for each window or region, depending on filtering.
+
+<<>>=
+ss.param <- reform(default.param, forward=NULL)
+ss.counts <- strandedCounts(bam.files, ext=frag.len, param=ss.param)
+strand(rowData(ss.counts))
+@
+
+Note that \code{strandedCounts} operates internally by calling \code{windowCounts} (or \code{regionCounts}) twice with different settings for \code{param\$forward}. 
+Any value for \code{forward} in the input \code{param} object will be ignored.
+In fact, the function will \textit{only} accept a \code{NULL} value for this slot.
+This is intended to protect the user, as any attempt to re-use the \code{ss.param} object in functions that are not designed for strand specificity will (correctly) raise an error.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2043,9 +2065,9 @@ The latter is an average across all windows in the cluster and will have little 
 Reporting the \code{best} fold change may be preferable as it focuses on the DB interval.
 
 <<>>=
-tabcom$best.fc <- best.fc
-tabcom$best.start <- rowData(data)[tab.best$best] 
-head(tabcom$best.fc)
+tabcom$best.fc <- results$table$logFC[tab.best$best]
+tabcom$best.start <- start(rowData(data)[tab.best$best])
+head(tabcom[,c("best.fc", "best.start")])
 @
 
 Typically, the best window will only be used as a descriptive measure for each cluster.
