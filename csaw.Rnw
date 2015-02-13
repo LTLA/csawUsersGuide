@@ -631,25 +631,28 @@ Each entry specifies the average fragment length to be used for the correspondin
 The extension lengths are also stored in the \code{SummarizedExperiment} output for future reference. 
 
 <<>>=
-frag.lens <- c(100, 150, 200, 250)
-demo <- windowCounts(bam.files, ext=frag.lens, filter=30)
+multi.frag.lens <- c(100, 150, 200, 250)
+demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30)
 demo$ext
 @
 
 Caution is required to avoid detecting irrelevant DB from differences in peak widths.
-Some protection is provided by scaling the extended reads to the same length in all libraries.
+Some protection is provided by scaling extended reads to the same length in all libraries.
 Consider a bimodal peak across several libraries.
-Scaling ensures that all subpeaks on the forward strand are centered at the same location across all libraries.
-Similarly, all subpeaks on the reverse strand are centered at another constant location across libraries.
-This removes most of the differences in width and coverage between libraries.
-By default, the mean of \code{ext} is used as the standard extension length, although another value can also be specified.
+Scaling ensures that the subpeak on the forward strand is centered at the same location in each library.
+The same applies for the subpeak on the reverse strand.
+This removes most of the differences in width between libraries.
+The final fragment length is taken from the \code{final.ext} attribute of \code{multi.frag.lens}.
+This can be set with \code{makeExtVector}, and is defined as the mean of the fragment lengths by default.
+If \code{final.ext} is not present or is \code{NA}, no rescaling is performed.
 
 % There's no satisfactory way of dealing with differences in the subpeak widths.
 % You'll need to shrink wide subpeaks towards the center of the subpeak.
 % This requires knowledge of where the read is in the subpeak, which is difficult to say.
 
 <<>>=
-demo$final.ext
+scaled.frag.lens <- makeExtVector(multi.frag.lens)
+attributes(scaled.frag.lens)$final.ext
 @
 
 In general, use of different extension lengths is unnecessary in well-controlled datasets.
@@ -1590,6 +1593,10 @@ The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP li
 The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
 If this is the case, the filtering procedure described above is inappropriate as it will select for windows with differences between ChIP and control samples. 
 This compromises the assumption of the null hypothesis during testing, resulting in loss of type I error control.
+
+% This is the best way to deal with GC biases, as you can just grab an input off the web and use it (citation?).
+% You could do so with your existing ChIP data by constructing a GC-abundance curve, and then correcting your window abundances based on the fitted value.
+% However, that gets messed up if you have systematic genuine binding at any given GC content, which will kick up the curve.
 
 \section{By prior information}
 When only a subset of genomic regions are of interest, DB detection power can be improved by removing windows lying outside of these regions. 
