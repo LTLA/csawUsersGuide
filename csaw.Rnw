@@ -676,10 +676,10 @@ The values are then averaged across all windows to obtain an aggregated coverage
 all.bam <- c("h3ac.bam", "h3k4me2.bam", "es_1.bam")
 collected <- list()
 for (curbam in all.bam) {
-	windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
-	rwsms <- rowSums(assay(windowed))
-	maxed <- findMaxima(rowData(windowed), range=1000, metric=rwsms)
-	collected[[curbam]] <- profileSites(curbam, rowData(windowed)[maxed], 
+    windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
+    rwsms <- rowSums(assay(windowed))
+    maxed <- findMaxima(rowData(windowed), range=1000, metric=rwsms)
+    collected[[curbam]] <- profileSites(curbam, rowData(windowed)[maxed], 
         param=dedup.on, weight=1/rwsms[maxed])
 }
 xranged <- as.integer(names(collected[[1]]))
