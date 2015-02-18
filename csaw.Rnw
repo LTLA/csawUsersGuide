@@ -703,7 +703,7 @@ In the example above, most enrichment for the two histone marks is focused withi
 This suggests that a window size of $\sim$150 bp is ideal, given that directional extension by 100 bp has been performed on both sides of the peak.
 Most of the coverage can then be captured without including too much background contamination.
 In contrast, the NF-YA profile drops off more sharply.
-This indicates that a smaller window size ($< 100$ bp) is probably adequate, consistent with sharp TF binding.
+This indicates that a smaller window size ($< 50$ bp) is probably adequate, consistent with sharp TF binding.
 
 In practice, a clear-cut choice of distance/window size is rarely found in real datasets.
 For many non-TF targets, the widths of the enriched regions can be highly variable.
