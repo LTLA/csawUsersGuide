@@ -1167,6 +1167,20 @@ for (it in 1:2) {
 @
 \end{center}
 
+% Just because a high-abundance mass at a non-zero M-value is discrete, doesn't mean it's caused by efficiency differences.
+% You could imagine a consistent fold increase in the counts from a genuine increase in binding, if the protein level or deposition rate doubled in one condition.
+% Obviously, if you don't see a non-zero blob, then the argument is academic, as there's no difference between the two normalization methods.
+% 
+% You might also imagine that the presence of a high-abundance mass at a non-zero M-value between replicates would represent efficiency bias.
+% This is true, but it doesn't mean that binding is constant between conditions.
+% The variability might mask any DB, and absence of evidence is not evidence of absence.
+% Eliminating the efficiency bias will compromise detection of systematic DB, so you'll have to pick the lesser of two evils.
+% I suppose the exception is if you've enough replicates to get the true overall DB without being clouded by the variability, but that's rare for ChIP-seq data.
+%
+% Conversely, the presence of a non-zero mass between conditions but not between replicates does not mean that efficiency bias is absent.
+% While stochastic efficiency bias mightn't be generated between replicates, a systematic bias might be present between conditions.
+% This may be caused by condition-specific factors, e.g., differences in nuclear shape, changes in cross-linking due to serum concentrations.
+
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
 One possible explanation is that changes in IP efficiency will have little effect at low-abundance background regions and more effect at high-abundance binding sites. 
