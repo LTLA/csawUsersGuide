@@ -123,7 +123,7 @@ colnames(design) <- c("intercept", "cell.type")
 \item Loading in data from BAM files.
 <<>>=
 require(csaw)
-data <- windowCounts(bam.files, ext=110)
+data <- windowCounts(bam.files, ext=110, width=10)
 binned <- windowCounts(bam.files, bin=TRUE, width=10000)
 @
 \item Calculating normalization factors.
@@ -193,7 +193,7 @@ A count is then obtained for each window in each library.
 
 <<>>=
 frag.len <- 110
-window.width <- 50
+window.width <- 10
 data <- windowCounts(bam.files, ext=frag.len, width=window.width)
 @
 
@@ -291,7 +291,7 @@ Reads from a DB site may be counted alongside reads from a non-DB site (e.g., no
 This will result in the loss of DB detection power.
 
 The window size can be interpreted as a measure of the width of the binding site. 
-Thus, TF analyses will typically use a small window size, e.g., 10 - 50 bp.
+Thus, TF analyses will typically use a small window size, e.g., 10 - 20 bp.
 This maximizes spatial resolution to allow optimal detection of narrow regions of enrichment. 
 For histone marks, widths of at least 150 bp are recommended \citep{humburg2011}. 
 This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
@@ -356,7 +356,7 @@ Comparison to the values in \code{data\$totals} indicates that fewer reads are u
 
 <<>>=
 strict.param <- readParam(minq=50, dedup=TRUE)
-demo <- windowCounts(bam.files, ext=frag.len, param=strict.param)
+demo <- windowCounts(bam.files, ext=frag.len, width=window.width, param=strict.param)
 demo$totals
 @
 
@@ -373,7 +373,7 @@ Removal of reads within repeat regions can avoid detection of these irrelevant d
 <<>>=
 repeats <- GRanges("chr1", IRanges(3000001, 3002128))
 new.param <- readParam(discard=repeats, restrict=c("chr1", "chr10", "chrX"))
-demo <- windowCounts(bam.files, ext=frag.len, param=new.param)
+demo <- windowCounts(bam.files, ext=frag.len, width=window.width, param=new.param)
 head(rowData(demo))
 @
 
@@ -437,11 +437,11 @@ Of course, spatial resolution is lost with larger spacings.
 Adjacent positions are not counted and thus cannot be distinguished. 
 
 <<>>=
-demo <- windowCounts(bam.files, spacing=100, ext=frag.len)
+demo <- windowCounts(bam.files, spacing=100, ext=frag.len, width=window.width)
 head(rowData(demo))
 @
 
-For analyses with large windows, it is also worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
+For analyses with large windows, it is worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
 Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
 Conversely, \code{spacing} should not be larger than \code{width} for analyses with small windows.
@@ -460,7 +460,7 @@ This roughly corresponds to the minimum average count required for accurate stat
 Note that more sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
 <<>>=
-demo <- windowCounts(bam.files, ext=frag.len, filter=30)
+demo <- windowCounts(bam.files, ext=frag.len, width=window.width, filter=30)
 head(assay(demo))
 @
 
@@ -785,7 +785,7 @@ Up to two rows can be generated for each window or region, depending on filterin
 
 <<>>=
 ss.param <- reform(default.param, forward=NULL)
-ss.counts <- strandedCounts(bam.files, ext=frag.len, param=ss.param)
+ss.counts <- strandedCounts(bam.files, ext=frag.len, width=window.width, param=ss.param)
 strand(rowData(ss.counts))
 @
 
