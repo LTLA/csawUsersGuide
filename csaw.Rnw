@@ -444,8 +444,9 @@ head(rowData(demo))
 For analyses with large windows, it is worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
 Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
-Conversely, \code{spacing} should not be larger than \code{max(width, ext/2)} for analyses with small windows.
-This ensures that narrow binding sites are not overlooked when windows are shifted along the genome.
+Conversely, \code{spacing} should not be larger than \code{ext/2} for analyses with small windows.
+This ensures that a narrow binding site will not be overlooked if it falls between two windows.
+If \code{ext} is also very small, \code{spacing} should be set to \code{width} to avoid loading too many small windows.
 
 % The obvious case is when ext=1, where you would lose reads when windows are shifted. 
 % This can only be avoided by setting width=spacing.
@@ -455,11 +456,11 @@ This ensures that narrow binding sites are not overlooked when windows are shift
 % This is mitigated by putting an upper bound of ext/N on the spacing, such that the maximum distance of the site to any window is ext/(2N).
 % I think that N=2 is a good compromise between resolution and computational efficiency.
 
-Windows with a low sum of counts across all libraries can be filtered out using the \code{filter} argument. 
+Windows that are overlapped by few fragments can be filtered out using the \code{filter} argument. 
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
-By default, the value of the filter is defined as the number of libraries multiplied by 5. 
-This roughly corresponds to the minimum average count required for accurate statistical modelling. 
-Note that more sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
+Specifically, any window is removed if the sum of counts across all libraries is below \code{filter}.
+The default value of the filter threshold is 10, though it can be raised to reduce memory usage for large libraries.
+More sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
 <<>>=
 demo <- windowCounts(bam.files, ext=frag.len, width=window.width, filter=30)
