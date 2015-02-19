@@ -1095,14 +1095,12 @@ The TMM method can then be applied to eliminate systematic differences in the co
 
 <<strip.white=false>>=
 me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
-ab <- aveLogCPM(asDGEList(me.demo))
-keep <- ab > median(ab) + log2(10)
+keep <- filterWindows(me.demo, type="global")$filter > log2(10)
 me.norm <- normalize(me.demo[keep,])
 me.norm
 
 ac.demo <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=10000L)
-ab <- aveLogCPM(asDGEList(ac.demo))
-keep <- ab > median(ab) + log2(10)
+keep <- filterWindows(ac.demo, type="global")$filter > log2(10)
 ac.norm <- normalize(ac.demo[keep,])
 ac.norm
 @
@@ -1199,9 +1197,8 @@ The example below operates on the filtered counts for small 2 kbp bins.
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), width=2000L)
-ac.dge <- asDGEList(ac.demo2)
-ab <- aveLogCPM(ac.dge)
-keep <- ab > median(ab) + log2(3)
+filtered <- filterWindows(ac.demo2, type="global")
+keep <- filtered$filter > log2(3)
 ac.demo2 <- ac.demo2[keep,]
 ac.off <- normalize(ac.demo2, type="loess")
 head(ac.off)
@@ -1216,9 +1213,9 @@ Spurious trends that might affect normalization will not be introduced at the fi
 
 <<eval=FALSE,keep.source=true,label=trendplot>>=
 par(mfrow=c(1,2))
-abval <- ab[keep]
+abval <- filtered$abundances[keep]
 o <- order(abval)
-adjc <- cpm(ac.dge[keep,], log=TRUE)
+adjc <- cpm(asDGEList(ac.demo2), log=TRUE)
 mval <- adjc[,1]-adjc[,2]
 fit <- loessFit(x=abval, y=mval)
 smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
@@ -1430,14 +1427,13 @@ mean(unlist(max.collect))
 
 \section{By proportion}
 One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
-The number of windows corresponding to these bound regions can be calculated as the proportion of the total number of windows, the latter of which can be derived from the genome length and the \code{spacing} interval used in \code{windowCounts}. 
-Users can then construct a set of the computed size, using windows with the highest abundances.
+This corresponds to the top proportion of high-abundance windows.
+The total number of windows is calculated from the genome length and the \code{spacing} interval used in \code{windowCounts}. 
+The \code{filterWindows} function returns the ratio of the rank of each window to this total, where higher-abundance windows have larger ranks.
+Users can then retain those windows with rank ratios above the unbound proportion of the genome.
 
 <<>>=
-spacing <- 50
-desired <- 0.001 
-genome.windows <- sum(seqlengths(rowData(data))/spacing)
-keep <- length(abundances) - rank(abundances) + 1 < genome.windows*desired
+keep <- filterWindows(data, type="proportion")$filter > 0.999
 sum(keep)
 @
 
@@ -1458,24 +1454,22 @@ binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
 @
 
 The binned abundances can be computed and compared to the window-based abundances.
-This requires some subtlety as the sizes of the regions used for read counting are different.
-The average abundances of each bin must be scaled down to be comparable to those of the windows.
-The \code{getWidths} function can be used to obtain the relative widths of the two sets of regions.
-Scaled abundances can then be computed the \code{scaledAverage} function.
+This requires some care as the sizes of the regions used for read counting are different.
+The average abundance of each bin must be scaled down to be comparable to those of the windows.
+The median of the adjusted binned abundances is then used as a global estimate of the background coverage.
+With \code{type="global"}, the \code{filterWindows} function returns the increase in the abundance of each window over the global background estimate.
 
 <<>>=
-relative.width <- median(getWidths(binned))/median(getWidths(data))
-bin.ab <- scaledAverage(asDGEList(binned), scale=relative.width)
+filter.stat <- filterWindows(data, background=binned, type="global")
+summary(filter.stat$filter)
 @
 
-The median of the adjusted binned abundances can be used as a global estimate of the background coverage.
 Windows are filtered based on some minimum required fold change over this global background. 
 Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
-threshold <- median(bin.ab) + log2(3)
-keep <- abundances >= threshold
+keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
 
@@ -1485,8 +1479,8 @@ Note that bins containing genuine binding sites will usually not be visible on s
 This is due to the dominance of the background-containing bins throughout the genome.
 
 <<eval=FALSE,label=binhist>>=
-hist(bin.ab, xlab="Adjusted bin log-CPM",  breaks=100, main="")
-abline(v=threshold, col="red")
+hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="")
+abline(v=median(filter.stat$back.abundances)+log2(3), col="red")
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -1518,7 +1512,8 @@ wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 Counts for each window are subtracted from the counts for its neighbourhood. 
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
 The width of the window is also subtracted to reflect the effective size of the neighbourhood.
-Relative widths are then supplied to \code{scaledAverage}, to scale down the abundance of the neighbourhood for comparison to that of the window.
+Again, the abundance of the neighbourhood is scaled down for a valid comparison to that of the corresponding window.
+This work is done by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighbourhood.
 
 % Technically, the extension length should also be included when computing the widths.
 % However, the same extension is performed for both the window and its neighbourhood, so this will cancel out during subtraction.
@@ -1527,10 +1522,7 @@ Relative widths are then supplied to \code{scaledAverage}, to scale down the abu
 %A large prior avoids situations where a low-abundance window is retained simply because very few counts are observed in its local background.
 
 <<>>=
-ny <- asDGEList(wider)
-ny$counts <- ny$counts - assay(data)
-neighbour.width <- getWidths(wider) - getWidths(data) 
-neighbour.ab <- scaledAverage(ny, scale=neighbour.width/getWidths(data))
+filter.stat <- filterWindows(data, wider, type="local")
 @
 
 % I don't think this is avoidable; computing a p-value against the average
@@ -1541,13 +1533,12 @@ neighbour.ab <- scaledAverage(ny, scale=neighbour.width/getWidths(data))
 % derived from the abundances and the fold changes thereof; in which case, we
 % need to deal with prior counts.
 
-The enrichment for each window is defined as the difference between its average abundance and that of its local neighbourhood. 
 The distribution of enrichment values can be examined across all windows.
-Most values will lie somewhere above zero, given that some prefiltering has already been performed on the window counts during loading.
+Most values will lie somewhere above zero, given that some pre-filtering has already been performed on the window counts during loading in \code{windowCounts}.
 
 <<eval=FALSE,label=enriched>>=
-enriched.fc <- abundances - neighbour.ab
-hist(enriched.fc, xlab="Enrichment logFC")
+enriched.fc <- filter.stat$filter
+hist(enriched.fc, xlab="Enrichment log-FC")
 @
 
 \begin{center}
@@ -1598,11 +1589,11 @@ These controls are mostly irrelevant when testing for DB between ChIP samples.
 However, they can be used to filter out windows with an average count in the ChIP sample below that of the control. 
 The dummy example below requires a 5-fold or greater increase over the control to retain the window.
 
-<<eval=FALSE>>=
+<<>>=
 in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
-chip <- aveLogCPM(asDGEList(in.demo[,1:4]))
-control <- aveLogCPM(asDGEList(in.demo[,5]))
-keep <- chip > control + log2(5)
+chip <- in.demo[,1:4]
+control <- in.demo[,5]
+keep <- filterWindows(chip, control, type="control")$filter > log(5)
 @
 
 The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
