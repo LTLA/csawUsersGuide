@@ -444,14 +444,16 @@ head(rowData(demo))
 For analyses with large windows, it is worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
 Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
-Conversely, \code{spacing} should not be larger than \code{width} for analyses with small windows.
+Conversely, \code{spacing} should not be larger than \code{max(width, ext/2)} for analyses with small windows.
 This ensures that narrow binding sites are not overlooked when windows are shifted along the genome.
 
-% Easiest to imagine this for ext=1, but it also affects larger ext; if the
-% width is set to 1, a binding site anywhere between two windows will not be
-% represented ideally by either point, i.e., all reads associated with that
-% binding site (+- ext) will not be counted at either point. A larger width
-% ensures counting, at the cost of including some background contamination.
+% The obvious case is when ext=1, where you would lose reads when windows are shifted. 
+% This can only be avoided by setting width=spacing.
+% If ext is large, you won't lose reads so long as spacing is less than ext. 
+% However, if spacing >> width, a binding site between two windows will not be represented ideally by either window.
+% All reads associated with that binding site (+- ext) will not be counted at either point. 
+% This is mitigated by putting an upper bound of ext/N on the spacing, such that the maximum distance of the site to any window is ext/(2N).
+% I think that N=2 is a good compromise between resolution and computational efficiency.
 
 Windows with a low sum of counts across all libraries can be filtered out using the \code{filter} argument. 
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
