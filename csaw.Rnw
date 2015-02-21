@@ -1485,10 +1485,6 @@ The width of the window is also subtracted to reflect the effective size of the 
 Again, the abundance of the neighbourhood is scaled down for a valid comparison to that of the corresponding window.
 This work is done by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighbourhood.
 
-% A larger prior count of 5 is also used here, compared to the default value of 2.
-% This avoids situations where a window has high enrichment simply because very few counts are observed in its local background.
-% Otherwise, you might end up selecting for low-abundance windows.
-
 <<>>=
 filter.stat <- filterWindows(data, wider, type="local")
 @
@@ -1546,15 +1542,28 @@ Negative controls for ChIP-seq refer to input or IgG libraries where the IP step
 This accounts for sequencing/mapping biases in ChIP-seq data. 
 IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
 These controls are mostly irrelevant when testing for DB between ChIP samples. 
-However, they can be used to filter out windows with an average count in the ChIP sample below that of the control. 
-The dummy example below requires a 3-fold or greater increase over the control to retain the window.
+However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
 
 <<>>=
 in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
 chip <- in.demo[,1:4]
 control <- in.demo[,5]
-keep <- filterWindows(chip, control, type="control")$filter > log2(3)
 @
+
+The \code{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
+A larger \code{prior.count} of 5 is used to compute the average abundance.
+This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
+Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from  larger bins with more counts.
+The example below requires a 3-fold or greater increase over the control to retain the window.
+
+<<>>=
+filter.stat <- filterWindows(chip, control, type="control", prior.count=5)
+keep <- filter.stat$filter > log2(3)
+@
+
+% If you have a large bin, you get a precise estimate of the background rate, so you don't need a prior when computing the log-fold increase.
+% You'll still be susceptible when the background is completely empty; but in that case, there's probably nothing there, so the true fold change may actually be ~Inf.
+% If you have a small bin, the number of background reads fluctuates by sampling, so you need a large prior to avoid selecting for regions with randomly low background.
 
 The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
 The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
@@ -1617,7 +1626,7 @@ for (it in 1:3) {
 \section{Some additional comments about filtering}
 It should be stressed that these filtering strategies do not eliminate subjectivity.
 Some thought is still required in selecting an appropriate proportion of bound sites or minimum fold change above background for each method.
-Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold.
+Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold on the abundance.
 
 As a general rule, users should filter less aggressively if there is any uncertainty about the features of interest.
 This means that more potential DB windows are retained for testing.
@@ -1655,21 +1664,18 @@ rowMeans(out)
 mean(unlist(max.collect))
 @
 
-Finally, it is possible to develop a more sophisticated filter where each window is tested against a null background model.
-Windows with low $p$-values can be selected to remove background regions.
-In practice, the absolute size of this $p$-value tends to be difficult to interpret, especially once multiplicity corrections are applied.
-The philosophy of background-based filters in \pkgname{} is to use the log-fold increase relative to the background estimate.
-This is easier to compute, and the threshold is easier to pick and adjust for users.
+Finally, it is possible to develop a more sophisticated background-based filter where each window is tested against a null background model.
+Windows with low adjusted $p$-values can then be selected to obtain a set of potentially bound intervals at a certain false discovery rate.
+While this can be done in \pkgname{}, the philosophy of the background-based filters in \code{filterWindows} is to use the log-fold increase of each window relative to the background.
+This is easier to compute, and the threshold is easier to pick and interpret for users.
 
-% To compute a p-value, you'd need to work with the overall NB mean, not the raw counts, to avoid any lack of independence.
-% The advantage of putting a threshold on the p-values is that the filtering can account for changes in variance between datasets (also, we can avoid prior.counts).
-% The question is, how do you get this variance?
-% The gold standard would be to do repeated controls, and use the variance estimate between controls, but that's expensive.
-% Alternatively, you could use a global dispersion estimate across all windows in the same dataset.
-% This will increase p-values in datasets with more variability in the background, so filtering becomes more aggressive for both background and genuine regions.
-% For example, if the distribution of background abundances spreads enough to cover the distribution for genuine binding sites, you'd start losing the latter.
-% Finally, if you go Poisson, the variance function is constant with a global lambda, so you'd select the same windows as with a log-FC threshold across datasets.
-% For a local lambda, you'd end up picking high-abundance windows with low log-FC's that won't be significant in the NB model.
+% There's problems with computing the p-values and correcting for multiple tests, but we'll ignore those for now.
+% Consider the purest case, where you determine significance based on the enrichment values (use a constant variance, so same selection order).
+% If you pick a set based on the FDR, the selection of one region becomes dependent on how many other regions have higher enrichments.
+% This might be annoying if you're trying to use a stable pre-set threshold.
+% Another problem is that you're requiring rejection at an FDR of 5% in order to get into the retained set.
+% This may be too conservative for preliminary selection, where windows that cannot reject here might have a lot of evidence for DB.
+% In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20%), which gets us back to the problem of arbitrariness.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1680,7 +1686,7 @@ This is easier to compute, and the threshold is easier to pick and adjust for us
 
 \begin{combox}
 For this next section, we'll be needing the \code{data} list that was generated in Chapter~\ref{chap:count} and filtered in Chapter~\ref{chap:filter}. 
-Just let me  assign the filtered list back to \code{data}, because I put it in the dummy variable \code{demo} in the previous chapter:
+Just let me assign the filtered list back to \code{data}, because I put it in the dummy variable \code{demo} in the previous chapter:
 
 <<>>=
 original <- data
@@ -1789,7 +1795,8 @@ Users can compare raw and filtered results to see whether this makes any differe
 Such filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
 <<label=rmchecker,eval=FALSE>>=
-yo <- asDGEList(original, norm.factors=normfacs)
+relevant <- rowSums(assay(original)) >= 20 # some filtering; otherwise, it takes too long.
+yo <- asDGEList(original[relevant], norm.factors=normfacs)
 yo <- estimateDisp(yo, design)
 oo <- order(yo$AveLogCPM)
 plot(yo$AveLogCPM[oo], sqrt(yo$trended.dispersion[oo]), type="l", lwd=2,
