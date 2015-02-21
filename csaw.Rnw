@@ -1395,37 +1395,6 @@ Different filters can also be combined in more advanced applications, e.g., by r
 However, any benefit will depend on the type of filters involved.
 The greatest effect is observed for filters that operate on different principles.
 
-% Choosing the filter which gets you the greatest number of DE regions isn't
-% the best idea, simply because it means that it's not independent of the
-% p-values any more. At any given filter value, the expected FDR is controlled
-% by the BH method rather than the actual FDR. Trying to maximize the number of
-% significant tests will result in loss of FDR control as it's not an unbiased
-% expectation anymore. It's worst with strong correlations between the nulls.
-<<eval=FALSE,echo=FALSE>>=
-collected <- list()
-max.collect <- list()
-for (y in 1:50) {
-  subcol <- NULL
-  subfdr <- NULL
-  n <- 10000
-  infilter <- rep(runif(n, 0, 1), 10)
-  allps <- rep(runif(n, 0, 1), 10)
-  spike <- 500
-  for (x in 1:9/10) {
-     keep <- infilter>=x
-     combined <- c(rep(0, spike), allps[keep])
-     sig <- sum(p.adjust(combined, method="BH")<0.05)
-     subcol <- append(subcol, sig)
-     subfdr <- append(subfdr, 1-spike/sig)
-  }
-  collected[[y]] <- subfdr
-  max.collect[[y]] <- subfdr[which.max(subcol)]
-}
-out <- do.call(cbind, collected)
-rowMeans(out)
-mean(unlist(max.collect))
-@
-
 \section{By proportion}
 One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
 This corresponds to the top proportion of high-abundance windows.
@@ -1516,26 +1485,16 @@ The width of the window is also subtracted to reflect the effective size of the 
 Again, the abundance of the neighbourhood is scaled down for a valid comparison to that of the corresponding window.
 This work is done by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighbourhood.
 
-% Technically, the extension length should also be included when computing the widths.
-% However, the same extension is performed for both the window and its neighbourhood, so this will cancel out during subtraction.
-%A larger prior count is used here, compared to the default value of 2.
-%This is because each estimate of the local background is less stable than a single global value.
-%A large prior avoids situations where a low-abundance window is retained simply because very few counts are observed in its local background.
+% A larger prior count of 5 is also used here, compared to the default value of 2.
+% This avoids situations where a window has high enrichment simply because very few counts are observed in its local background.
+% Otherwise, you might end up selecting for low-abundance windows.
 
 <<>>=
 filter.stat <- filterWindows(data, wider, type="local")
 @
 
-% I don't think this is avoidable; computing a p-value against the average
-% background using the raw counts might land us into trouble, particularly as
-% it could select against high- or low-variance windows.  It also reduces the
-% ease of interpretation. Small differences at high abundances could be enough
-% for retention because they'd get a small p-value. Our solution must be
-% derived from the abundances and the fold changes thereof; in which case, we
-% need to deal with prior counts.
-
 The distribution of enrichment values can be examined across all windows.
-Most values will lie somewhere above zero, given that some pre-filtering has already been performed on the window counts during loading in \code{windowCounts}.
+Most values will lie somewhere above zero, given that some pre-filtering has already been performed to select for higher-abundance windows during counting in \code{windowCounts}.
 
 <<eval=FALSE,label=enriched>>=
 enriched.fc <- filter.stat$filter
@@ -1588,13 +1547,13 @@ This accounts for sequencing/mapping biases in ChIP-seq data.
 IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
 These controls are mostly irrelevant when testing for DB between ChIP samples. 
 However, they can be used to filter out windows with an average count in the ChIP sample below that of the control. 
-The dummy example below requires a 5-fold or greater increase over the control to retain the window.
+The dummy example below requires a 3-fold or greater increase over the control to retain the window.
 
 <<>>=
 in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
 chip <- in.demo[,1:4]
 control <- in.demo[,5]
-keep <- filterWindows(chip, control, type="control")$filter > log(5)
+keep <- filterWindows(chip, control, type="control")$filter > log2(3)
 @
 
 The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
@@ -1609,6 +1568,7 @@ This compromises the assumption of the null hypothesis during testing, resulting
 \section{By prior information}
 When only a subset of genomic regions are of interest, DB detection power can be improved by removing windows lying outside of these regions. 
 Such regions could include promoters, enhancers, gene bodies or exons. 
+Alternatively, sites could be defined from a previous experiment or based on the genome sequence, e.g., TF motif matches.
 The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
 
 <<>>=
@@ -1653,6 +1613,63 @@ for (it in 1:3) {
 % This results in another circular dependency that is resolved by using a sensible (but otherwise arbitrary) value for the NB dispersion in \code{aveLogCPM}. 
 % The alternative would be to iterate over the entire DB analysis, which would be prohibitively time-consuming in most circumstances.
 % Of course, this is not an issue when library sizes are the same.
+
+\section{Some additional comments about filtering}
+It should be stressed that these filtering strategies do not eliminate subjectivity.
+Some thought is still required in selecting an appropriate proportion of bound sites or minimum fold change above background for each method.
+Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold.
+
+As a general rule, users should filter less aggressively if there is any uncertainty about the features of interest.
+This means that more potential DB windows are retained for testing.
+Of course, if no such DB windows exist, then the greater number of tests will result in loss of power for the DB windows that would be retained by an aggressive filter.
+This is a necessary cost, as there is no way to know the DB status without actually testing.
+
+% Choosing the filter which gets you the greatest number of DE regions isn't
+% the best idea, simply because it means that it's not independent of the
+% p-values any more. At any given filter value, the expected FDR is controlled
+% by the BH method rather than the actual FDR. Trying to maximize the number of
+% significant tests will result in loss of FDR control as it's not an unbiased
+% expectation anymore. It's worst with strong correlations between the nulls.
+<<eval=FALSE,echo=FALSE>>=
+collected <- list()
+max.collect <- list()
+for (y in 1:50) {
+  subcol <- NULL
+  subfdr <- NULL
+  n <- 10000
+  infilter <- rep(runif(n, 0, 1), 10)
+  allps <- rep(runif(n, 0, 1), 10)
+  spike <- 500
+  for (x in 1:9/10) {
+     keep <- infilter>=x
+     combined <- c(rep(0, spike), allps[keep])
+     sig <- sum(p.adjust(combined, method="BH")<0.05)
+     subcol <- append(subcol, sig)
+     subfdr <- append(subfdr, 1-spike/sig)
+  }
+  collected[[y]] <- subfdr
+  max.collect[[y]] <- subfdr[which.max(subcol)]
+}
+out <- do.call(cbind, collected)
+rowMeans(out)
+mean(unlist(max.collect))
+@
+
+Finally, it is possible to develop a more sophisticated filter where each window is tested against a null background model.
+Windows with low $p$-values can be selected to remove background regions.
+In practice, the absolute size of this $p$-value tends to be difficult to interpret, especially once multiplicity corrections are applied.
+The philosophy of background-based filters in \pkgname{} is to use the log-fold increase relative to the background estimate.
+This is easier to compute, and the threshold is easier to pick and adjust for users.
+
+% To compute a p-value, you'd need to work with the overall NB mean, not the raw counts, to avoid any lack of independence.
+% The advantage of putting a threshold on the p-values is that the filtering can account for changes in variance between datasets (also, we can avoid prior.counts).
+% The question is, how do you get this variance?
+% The gold standard would be to do repeated controls, and use the variance estimate between controls, but that's expensive.
+% Alternatively, you could use a global dispersion estimate across all windows in the same dataset.
+% This will increase p-values in datasets with more variability in the background, so filtering becomes more aggressive for both background and genuine regions.
+% For example, if the distribution of background abundances spreads enough to cover the distribution for genuine binding sites, you'd start losing the latter.
+% Finally, if you go Poisson, the variance function is constant with a global lambda, so you'd select the same windows as with a log-FC threshold across datasets.
+% For a local lambda, you'd end up picking high-abundance windows with low log-FC's that won't be significant in the NB model.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
