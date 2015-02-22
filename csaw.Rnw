@@ -1680,9 +1680,13 @@ This is easier to compute, and the threshold is easier to pick and interpret for
 % In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20%), which gets us back to the problem of arbitrariness.
 % High FDR thresholds might also start to run into problems with monotonicity, where filter resolution is lost.
 %
-% In short, you can either get the minimum log-FC or FDR for the selected set, but neither tells us much about how our DB analysis will turn out.
-% The FDR does give us something in terms of the range of possible BH correction values, but this is pretty wide (as it depends on how many DB things are there).
-% I'm not sure that the extra work is worth this little information.
+% In short, you might get a FDR for your filter, but so what - now it's just another number with an arbitrary threshold.
+% It won't tell us much about the effect of the filter on our DB analysis, which is the whole point of filtering.
+% The FDR does give us something in terms of the range of possible BH correction values.
+% This depends on how many DB things are there, and assumes that all background is non-DB.
+% However, this range is pretty wide, and I'm not sure that the extra work is worth this little information.
+% Conversely, having a minimum log-fold change tells us a bit about the minimum maximum scope of DB change (assuming that background is non-DB).
+% For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions which scrape past the filter.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
