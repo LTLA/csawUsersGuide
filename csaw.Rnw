@@ -1630,7 +1630,8 @@ Some thought is still required in selecting an appropriate proportion of bound s
 Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold on the abundance.
 
 As a general rule, users should filter less aggressively if there is any uncertainty about the features of interest.
-This means that more potential DB windows are retained for testing.
+In particular, the thresholds shown in this chapter for each filtering statistic are fairly mild.
+This ensures that more potential DB windows are retained for testing.
 Of course, if no such DB windows exist, then the greater number of tests will result in loss of power for the DB windows that would be retained by an aggressive filter.
 This is a necessary cost, as there is no way to know the DB status without actually testing.
 
@@ -1677,6 +1678,11 @@ This is easier to compute, and the threshold is easier to pick and interpret for
 % Another problem is that you're requiring rejection at an FDR of 5% in order to get into the retained set.
 % This may be too conservative for preliminary selection, where windows that cannot reject here might have a lot of evidence for DB.
 % In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20%), which gets us back to the problem of arbitrariness.
+% High FDR thresholds might also start to run into problems with monotonicity, where filter resolution is lost.
+%
+% In short, you can either get the minimum log-FC or FDR for the selected set, but neither tells us much about how our DB analysis will turn out.
+% The FDR does give us something in terms of the range of possible BH correction values, but this is pretty wide (as it depends on how many DB things are there).
+% I'm not sure that the extra work is worth this little information.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
