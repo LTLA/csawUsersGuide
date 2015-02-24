@@ -81,7 +81,9 @@ Last revised 21 February 2015}
 \tableofcontents
 
 <<results=hide,echo=FALSE>>=
-dir.create("plots-ug")
+picdir <- "plots-ug"
+if (file.exists(picdir)) { unlink(picdir, recursive=TRUE) }
+dir.create(picdir)
 @
 
 \newpage
