@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 21 February 2015}
+Last revised 27 February 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -2051,7 +2051,7 @@ The sensitivity of the analysis to the choice of window size can be mitigated by
 DB results from each width can be integrated by clustering adjacent windows together (even if they are of differing sizes), and combining $p$-values within each of the resulting clusters.
 The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
 Some filtering is performed to avoid excessive chaining in this demonstration.
-Corresponding tables of DB results should also be obtained - though, for brevity's sake, a pair of dummy tables will be used here.
+Corresponding tables of DB results should also be obtained (for brevity, these will be dummied up here).
 
 <<>>=
 h3.files <-  c("h3ac.bam", "h3ac_2.bam")
