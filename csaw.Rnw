@@ -1491,26 +1491,12 @@ This work is done by setting \code{type="local"} for \code{filterWindows}, which
 filter.stat <- filterWindows(data, wider, type="local")
 @
 
-The distribution of enrichment values can be examined across all windows.
-Most values will lie somewhere above zero, given that some pre-filtering has already been performed to select for higher-abundance windows during counting in \code{windowCounts}.
-
-<<eval=FALSE,label=enriched>>=
-enriched.fc <- filter.stat$filter
-hist(enriched.fc, xlab="Enrichment log-FC")
-@
-
-\begin{center}
-<<echo=FALSE,fig=TRUE>>=
-<<enriched>>
-@
-\end{center}
-
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
 In this scenario, a 3-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
 This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
 
 <<>>=
-keep <- enriched.fc > log2(3)
+keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
 
