@@ -2051,41 +2051,29 @@ The sensitivity of the analysis to the choice of window size can be mitigated by
 DB results from each width can be integrated by clustering adjacent windows together (even if they are of differing sizes), and combining $p$-values within each of the resulting clusters.
 The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
 Some filtering is performed to avoid excessive chaining in this demonstration.
+Corresponding tables of DB results should also be obtained - though, for brevity's sake, a pair of dummy tables will be used here.
 
 <<>>=
 h3.files <-  c("h3ac.bam", "h3ac_2.bam")
 ac.small <- windowCounts(h3.files, width=150L, spacing=100L, filter=25)
 ac.large <- windowCounts(h3.files, width=1000L, spacing=500L, filter=35)
-ac.all <- c(rowData(ac.small), rowData(ac.large))
-merged.ac <- mergeWindows(ac.all, tol=1000, max.width=10000)
-merged.ac$region
+ns <- nrow(ac.small)
+dummy.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
+nl <- nrow(ac.large)
+dummy.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
 @
 
-A corresponding table of DB results should also be constructed by \code{rbind}'ing the results from each window size.
-For brevity's sake, a pair of dummy tables will be used here.
-Combined $p$-values for each cluster can then be computed with \code{combineTests}.
+The \code{consolidateSizes} function can then be applied to combine these results.
+This merges windows of all sizes into a single set of clusters, and computes a combined $p$-value from the associated $p$-values for each cluster.
+However, if a cluster contains many small windows, the DB results for the small window size will contribute most to the combined $p$-value.
+This is not ideal when results from all window sizes are of equal interest.
+Equal contributions from each window size can be enforced by setting \code{equiweight=TRUE}, whereby a weighted version of Simes' method \citep{benjamini1997} is used.
+The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
 
 <<>>=
-dummy.small <- data.frame(logFC=numeric(nrow(ac.small)), logCPM=0, PValue=1) 
-dummy.large <- data.frame(logFC=numeric(nrow(ac.large)), logCPM=0, PValue=1) 
-dummy.all <- rbind(dummy.small, dummy.large)
-tabcom.ac <- combineTests(merged.ac$id, tab=dummy.all)
-@
-
-If all windows are supplied equal weight, numerous windows of small width will contribute most to each combined $p$-value.
-Equal contributions from each window width can be enforced by downweighting the $p$-values from smaller windows.
-The weight of each window is inversely proportional to the number of windows of that size in the same cluster.
-This \code{weight} vector can be supplied to \code{combineTests} to adjust the combined calculations accordingly.
-
-<<>>=
-small.id <- merged.ac$id[1:nrow(ac.small)]
-large.id <- merged.ac$id[nrow(ac.small)+1:nrow(ac.large)]
-freq.small <- tabulate(small.id)
-freq.large <- tabulate(large.id)
-freq.totals <- c(freq.small[small.id], freq.large[large.id])
-summary(freq.totals)
-weight <- 1/freq.totals
-tabcom.ac2 <- combineTests(merged.ac$id, tab=dummy.all, weight=weight)
+cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
+    result.list=list(dummy.small, dummy.large), equiweight=TRUE)
+cons$region
 @
 
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
@@ -2152,30 +2140,18 @@ For example, a DB site will be ignored if it is clustered alongside a stronger n
 % maintain high resolution, i.e. you don't get contamination from miscalled
 % peak boundaries.
 
-A more graduated approach uses a weighted version of Simes' method \citep{benjamini1997}, where the highest-abundance window is upweighted.
-In the example below, the weight assigned to the top window is equal to the total number of other windows in each cluster.
-This means that the behaviour of the top window will have a greater influence on the final result.
+A more graduated approach uses the weighted version of Simes' method, where the window with the highest abundance is upweighted.
+In the example below, the weight assigned to the top window is increased relative to that of other windows in the same cluster.
+This means that the behaviour of the top window will have a greater influence on the final combined $p$-value.
 That said, the other windows in the cluster still have unity weights.
 Any DB events in those windows will still be considered when the $p$-values are combined.
 
 <<>>=
-weights <- rep(1, length(merged$id))
-freq <- tabulate(merged$id)
-weights[tab.ave$best] <- freq[merged$id[tab.ave$best]] 
+weights <- upweightSummit(merged$id, tab.ave$best)
+head(weights)
 tabcom.w <- combineTests(merged$id, results$table, weight=weights)
 head(tabcom.w)
 @
-
-The exact value of the weight for the top window is arbitrary.
-Greater weight represents a stronger belief that DB occurs at the most abundant window.
-In practical terms, the weighting scheme used here means that the combined $p$-value of the cluster will not be more than twice the $p$-value of the top window.
-Conversely, if the strongest DB occurs in a non-top window, the combined $p$-value with weighting will be no more than twice the corresponding value without weighting.
-This conservativeness is an acceptable cost for considering DB events elsewhere in the cluster, while still focusing on the most abundant site.
-
-% To wit; let 'w' be the weight of the highest abundance window, and N be the number of windows in a cluster.
-% If the highest abundance window is the most DB, then the penalty is (N+w-1)/w, i.e., the multiplicity correction compared to just using the p-value of that window.
-% If another window is most DB, then the penalty is (N+w-1)/N, i.e., compared to unweighted Simes.
-% These two penalties can be made equal by setting w=N, which means the penalty is just below 2.
 
 Finally, a less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
 This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
