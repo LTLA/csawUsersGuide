@@ -454,9 +454,16 @@ If \code{ext} is also very small, \code{spacing} should be set to \code{width} t
 % This can only be avoided by setting width=spacing.
 % If ext is large, you won't lose reads so long as spacing is less than ext. 
 % However, if spacing >> width, a binding site between two windows will not be represented ideally by either window.
-% All reads associated with that binding site (+- ext) will not be counted at either point. 
+% All reads associated with that binding site (+- ext) will not be counted at either point.
+%
 % This is mitigated by putting an upper bound of ext/N on the spacing, such that the maximum distance of the site to any window is ext/(2N).
 % I think that N=2 is a good compromise between resolution and computational efficiency.
+% If you set the spacing too low, the penalty from Simes will be such that you'll end up using the p-value from a suboptimal window anwyay.
+% You could avoid this with findMaxima(), in which case you can use any spacing you like (as you'll throw out > 99% of the windows at the end).
+%
+% In general, don't obsess about the window not getting all reads associated with a binding site.
+% You'll lose some even if the window was right on top of the site, due to some fragments having greater-than-average fragment lengths.
+% Practical usability (i.e., within memory constraints) is more important than some loss of power.
 
 Windows that are overlapped by few fragments can be filtered out using the \code{filter} argument. 
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
