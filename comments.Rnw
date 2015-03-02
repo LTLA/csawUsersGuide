@@ -1,0 +1,486 @@
+\documentclass[12pt]{report}
+\usepackage{fancyvrb,graphicx,natbib,url,comment,import,bm}
+\usepackage{tikz}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setlist{parsep=0pt,listparindent=\parindent}
+
+% Margins
+\topmargin -0.1in
+\headheight 0in
+\headsep 0in
+\oddsidemargin -0.1in
+\evensidemargin -0.1in
+\textwidth 6.5in
+\textheight 8.3in
+
+% Sweave options
+\usepackage{Sweave}
+\SweaveOpts{keep.source=TRUE,prefix.string=plots-com/ug,png=TRUE,pdf=FALSE}
+
+\DefineVerbatimEnvironment{Sinput}{Verbatim}{fontshape=sl,fontsize=\footnotesize}
+\DefineVerbatimEnvironment{Soutput}{Verbatim}{fontsize=\footnotesize}
+\DefineVerbatimEnvironment{Scode}{Verbatim}{fontsize=\footnotesize}
+\renewenvironment{Schunk}{\vspace{0pt}}{\vspace{0pt}}
+
+\DefineVerbatimEnvironment{Rcode}{Verbatim}{fontsize=\footnotesize}
+\newcommand{\edger}{edgeR}
+\newcommand{\pkgname}{csaw}
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+\newcommand{\R}{\textsf{R}}
+
+<<results=hide,echo=FALSE>>=
+#picdir <- "plots-com"
+#if (file.exists(picdir)) { unlink(picdir, recursive=TRUE) }
+#dir.create(picdir)
+require(edgeR)
+set.seed(238472)
+@
+
+\begin{document}
+
+\subsection*{Comments on counting}
+
+\subsubsection*{Fragment length}
+
+One might think of allowing the fragment length to vary within the genome, e.g., to handle heterogeneity in chromatin openness.
+However, location-specific estimates for the fragment length wouldn't be very precise because you're calculating it from limited data. 
+It would really only work for large peaks where the large number of reads stabilises the estimate. 
+However, the advantage wouldn't be that great as results for large peaks should be fairly stable anyway.
+
+On real data, the cross-correlation plots are one smooth peak (excluding the read-length spike). 
+This suggests that there's no gross segregation of fragment lengths in the population. 
+Changing the fragment length doesn't seem to change the results too much either. 
+Of course, this whole discussion is moot for diffuse marks, where the extension should be irrelevant compared to the bin size.
+
+\subsubsection*{Strand bimodality}
+
+An anticipated attack on this approach is why I don't filter for bimodality to identify good candidate sites (a la MACS). 
+This could reduce the severity of the MTC procedure. 
+However, every difference is interesting, even if it doesn't necessarily occur in a nice bimodal shape (e.g. histones + other proteins).
+For example, you mightn't get pronounced bimodality if one half of the peak is sitting somewhere that's unmappable or difficult to sequence. 
+
+Defining bimodality is also difficult. 
+Arbitrary thresholds for bimodality don't necessarily have a good physical interpretation.  
+This is complicated by the fact that you have to combine background and enriched samples to avoid data snooping; this can dilute bimodality for smaller peaks.
+A problem specific to MACS is that single-sample mode won't pick up two peaks within ~10 kbp; each peak will be increase the observed background for the other.
+
+Read extension means that bimodal structures will have higher counts than regions with the same number of reads but random read directions. 
+This brings looking for bimodality under the framework of row sum filtering. 
+It is also smoother; if you're not bimodal but there is a difference, you still get picked up.
+Unimodal events are only problematic if they are high-abundance, which shouldn't occur if you've removed repeats.
+
+Finally, you can do whatever bimodal filtering you want implicitly, by running your desired peak caller and then picking only those windows that overlap called peaks. 
+This will give you the MTC advantage without requiring too much extra code on my part.
+
+\subsubsection*{Window correlations}
+
+Read extension and general spatial proximity results in strong correlations between adjacent sites.
+However, these correlations will not affect the estimates of the various EB statistics (only the precision of the estimates, but we don't use that anyway).
+Consider a subset of sites randomly sampled throughout the genome. 
+Correlations within the subset are weaker as the sites are less likely to be affected by the same reads. 
+An (approximately) independent subset of sites can then be obtained by infrequent sampling. 
+However, the expected composition of the sampled set is just that of the entire genome.
+Thus, an independent subset will provide the same results (on average) as those obtained with the use of the entire genome.  
+This is similar to the outcome of thinning in Markov chain Monte Carlo procedures.
+
+\subsubsection*{Windows vs. peak calling}
+
+Peak-calling fundamentally involves the clustering of windows to get a peak interval for counting.
+Clustering can adjust to variable size widths, whereas the use of a large bin does not (and can encounter edge effects). 
+However, this depends heavily on the decisions made by the aggregation routine, as there's often insufficient data to direct unambiguous cluster boundaries at any single site.
+Results might not be robust to tuning of parameters or even new datasets (cluster groupings can change which will change the manner in which counts are collected). 
+Similarly, inappropriate inclusion of background regions can be problematic for DB detection.
+
+Clustering must also be done independently of DB, such that changes to spatial resolution also may not be appropriate, e.g., for complex DB events.
+This includes DB shifting or shrinkage, or even noisy background where the surrounding non-NB regions contaminate the DB enriched signal.  
+The only way to find these buggers is to look for DE'ness at every place. 
+In other words, we're interested in differential binding rather than absolute enrichment, and peak counts will give us the former rather than the latter.
+Which is okay in other cases as you get a boost in power from larger counts (though you can twiddle the width to deal with that - and then you get into parameter dogfights).
+
+All in all, clustering will give higher counts and better performance for clusters where the DB status is homogenous throughout the cluster. 
+For more complex events, clustering will probably be suboptimal.
+Widths are generally a simpler alternative. 
+However, it is unable to deal with variable sizes of enriched regions, requiring testing of multiple bin sizes.
+Using a suboptimal value might reduce power but it shouldn't change the rankings of the regions. 
+
+You could also get methods designed to create regions based on differences in density.
+But, the magnitude of the difference required for the creation of  a new region is going to be arbitrary.
+A slow decline in density from high to low won't get picked up if you're looking for big differences.
+
+\subsubsection*{Window resolution}
+
+The argument for arbitrary resolution with the window width is akin to that when using a microscope. 
+Do you want to focus on the details or on the big picture? 
+For example, consider a cluster of DB regions separated by empty spaces.
+terms, one would classify this cluster as part of the same region, so you would use a large width to increase counts and power. 
+However, you could equally define each region as being of interest in its own right.
+
+I don't think using gargantuan widths to maximize power for very diffuse regions is a great idea. 
+Strange things happen at low abundances (e.g. correlations found during background normalization) which complicates validation.
+Ideally, local regions should be able to carry their own weight in terms of power, which makes it much more convincing when trying to eyeball the results.
+
+Ironically, estimation of the width is easy for sharp peaks where it's irrelevant (not much practical difference between a small value and zero) but hard for diffuse regions where it is most needed.
+My attempts to estimate the width include:
+
+\begin{itemize}
+\item Autocorrelations. 
+These are quite ineffective in guiding the choice of width. 
+This is because for diffuse marks where they are most needed, the poor density of reads in enriched regions reduces the strength of the correlations. 
+This means that you almost start off at zero (whereas for more punctate marks, the correlations at small lags are much higher). 
+In short, you can't distinguish between diffuse marks and random reads. 
+
+More generally, autocorrelations aren't that great because there's nothing to compare it to. 
+It keeps dropping rather than becoming maximal at any point. 
+Trying to find when it elbows off is fairly arbitrary. 
+Comparing it to a threshold is also difficult i.e. distinguishing between negligble' and 'even more negligble'. 
+It also ceases to be robust to the choice of threshold when relative scales are used, because the function begins asymptoting way above zero.
+Small changes on the x-axis correspond to very large changes on the estimated width.
+
+The autocorrelation function also depends on other factors such as the number of peaks.
+This complicates interpretation relative to a fixed threshold.  
+For example, a mark with lots of small peaks will have a higher and more persistent autocorrelation than a mark with fewer peaks, even if the latter's peaks are larger. 
+
+\item Masking reads from each strand with those from the other strand, and computing cross-correlations using the remainders. 
+The maximum point should then depend on the value of the width. 
+Problem is, the exact relationship depends on the shape of the clusters. 
+The effectiveness of masking also depends on the shape of the cluster e.g. a triangular distribution for each peak will have fewer overlaps and reduced masking. 
+Increasing the aggressiveness of the masking then raises problems with the reliability of the results (as you start hitting the isolated forward/reverse flanks).
+
+\item Alternatively, peak-calling programs like MACS can be used in single sample mode on pooled libraries to determine the width of enriched regions.
+Pooling is necessary to avoid snooping on the DB status of regions.
+Note that the width of enrichment may not necessarily be the optimal width for detecting DB regions, especially for the more diffuse histone marks.
+There is also an implicit assumption that the widths of the binding sites are reasonably constant across the genome. 
+Finally, it depends on the resolution of the peak-caller, and whether you need to subtract the average fragment length, etc.
+\end{itemize}
+
+\subsubsection*{Window spacing}
+
+The obvious case is when ext=1, where you would lose reads when windows are shifted by a spacing larger than the window size.
+This can only be avoided by setting width=spacing.
+If ext is large, you won't lose reads so long as spacing is less than ext. 
+However, if spacing >> width, a binding site between two windows will not be represented ideally by either window.
+All reads associated with that binding site (+- ext) will not be counted at either point.
+
+This is mitigated by putting an upper bound of ext/N on the spacing, such that the maximum distance of the site to any window is ext/(2N).
+I think that N=2 is a good compromise between resolution and computational efficiency.
+If you set the spacing too low, the penalty from Simes will be such that you'll end up using the p-value from a suboptimal window anwyay.
+You could avoid this with findMaxima(), in which case you can use any spacing you like (as you'll throw out > 99% of the windows at the end).
+
+In general, don't obsess about the window not getting all reads associated with a binding site.
+You'll lose some even if the window was right on top of the site, due to some fragments having greater-than-average fragment lengths.
+Practical usability (i.e., within memory constraints) is more important than some loss of power.
+
+\subsubsection*{Cross-correlations}
+
+The use of CCF plots to get the average fragment length makes some assumptions about the shape of each peak. 
+In particular, it assumes that the peaks are symmetrical so that the distance between the modes is equal to the average fragment length. 
+I mean, it's probably not even the mean, it's just the mode of the fragment lengths. 
+
+The spike in the plot is due to uniqueness. 
+For a given background read, most aligners will prefer (or demand) unique mapping locations. 
+Any unique sequence in the genome will also have a unique reverse complement sequence which is also favoured by the aligner. 
+Reads end up ``stacking'' on top of these unique sequences in both the forward and reverse directions. 
+This results in an increase in correlations equal to the distance between the 5' ends of the forward and reverse reads i.e. the read length. 
+A spike at zero is not observed as duplicates are removed.
+
+For enrichment with any reasonably large width, we've assumed that the binding event provides no protection during sonication. 
+If it does, you should see bimodality where there's an empty gap between the forward/reverse clusters. 
+The estimated value from the cross-correlations then represents the length of the gap (i.e. the width of the binding site) plus a bit extra from variability in fragmentation sites at each end. 
+If this is true, you could just use the estimated fragment length without any width value because it is modelled for free.
+
+\subsubsection*{Variable fragment lengths}
+
+There's no satisfactory way of dealing with differences in the subpeak widths.
+You'll need to shrink wide subpeaks towards the center of the subpeak.
+This requires knowledge of where the read is in the subpeak, which is difficult to say without an explicit model.
+Fortunately, I don't think is a major issue.
+Variability in fragment lengths precludes identification of significant differences in lengths, if you were to treat forward/reverse strand peaks as distributions. 
+In the worst case, with no variability, you'd just have read stacks where differences are clearcut.
+As you add more variability, the waters become muddled and obvious differences disappear.
+
+\subsection*{Comments on normalization}
+\subsubsection*{TMM on the binned counts}
+
+Smaller counts do have greater variance in the resulting fold changes.
+This is because it's more possible for smaller counts to achieve a large fold change than it is for larger counts (as the former is less stable). 
+Clear evidence of this can be observed below, with concommitant effects on the estimates.
+
+<<>>=
+out <- (log(rnbinom(1000, mu=2, size=100)/rnbinom(1000, mu=2, size=100)))
+var(out[is.finite(out)])
+var(log(rnbinom(1000, mu=20, size=100)/rnbinom(1000, mu=20, size=100)))
+@
+
+The undefined nature of the log FC's with zero counts also complicates matters. Adding
+an offset doesn't help as the results will change dramatically with the value of the offset. 
+This is because the choice of offset is a massive contributor to the magnitude of the resulting fold change, and thus determines where that FC is placed in the distribution.
+Treatment as Inf or -Inf is suboptimal as a 1 vs 0 situation is usually not enriched (but will definitely be trimmed at Inf) whereas a 100 vs 10 situation is enriched but will be trimmed later. 
+
+Removal is definitely suboptimal as it results in loss of information when you have a non-zero count paired with a zero count. 
+The non-zero count can provide some evidence for undersampling (e.g. lots of [1, 0] pairs probably indicate undersampling). 
+Zero counts can only be overcome by incorporating a probability distribution to model its frequency. 
+However, this results in more pain due to the need to estimate distribution parameters and the possible lack of robustness to violation of the distributional assumptions.
+More generally, discreteness reduces the accuracy of the normalization factor estimate.
+
+<<>>=
+# Simulating undersampling with spiked-in genes.
+simulator <- function(ngenes, total.cols, spiked.cols, genes.spiked, mu.back, mu.spike, disp) {
+    x <- matrix(rnbinom(ngenes, mu=mu.back, size=1/disp), nrow=ngenes, ncol=total.cols);
+    normed <- mu.back*ngenes/(mu.back*(ngenes-genes.spiked)+mu.spike*genes.spiked);
+    x[,(spiked.cols+1):total.cols] <- rnbinom(ngenes, mu=mu.back*normed, size=1/disp);
+    spiked <- sample(ngenes, genes.spiked);
+    x[spiked,(spiked.cols+1):total.cols] <- rnbinom(genes.spiked,
+        mu=mu.spike*normed, size=1/disp);
+    return(list(counts=x, factor=normed, spiked=spiked));
+}
+ngenes <- 10000
+x <- simulator(ngenes, 2, 1, 200, 2, 10, 0.05)
+calcNormFactors(x$counts)
+x <- simulator(ngenes, 2, 1, 200, 5, 25, 0.05)
+calcNormFactors(x$counts)
+x <- simulator(ngenes, 2, 1, 200, 50, 250, 0.05)
+calcNormFactors(x$counts)
+@
+
+As to the choice of bin size, if you have libraries of similar size, you could just throw in a bunch of bin sizes and take the most extreme (i.e. different from 1) factors that you can find.
+This leverages off the fact that both too large and too small bins will underestimate the magnitude of the logarithm of the scaling factor; so, the most extreme intermediate is probably correct. 
+In particular, zero counts should cause underestimation because the undersampled library should have more zero counts paired with non-zero counts in the other library. 
+Thus, removal of zero counts is effectively removing evidence for undersampling. 
+However, this falls apart when the library sizes are dramatically different:
+
+<<echo=FALSE,eval=FALSE>>=
+calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=100)))
+@
+
+There actually isn't any undersampling but that doesn't stop us from producing an aggressive normalization estimate. 
+I think it's because you only get a zero count when the smaller library is unlucky enough to get a low value. 
+If you remove them, you're nibbling on just one side of the fold change distribution prior to the actual trimming. 
+This means that you end up  getting a biased estimate of the normalization factor.  
+So, we can't just rely on picking the biggest of the bunch anymore, particularly when the library sizes are hugely different.
+
+\subsubsection*{Handling the bias of the TMM method}
+Here I shall list the assorted failures in my attempts to truly solve this problem for low counts.
+
+\begin{itemize}
+\item Any sort of sitewise trimming procedure seemed to fail. 
+I've tried trimming on the deviance and on the p-value, neither have gone down well.  
+I suspect it is because of the sensitivity to the dispersion estimate, which I want to avoid estimating because it's a pain. 
+In particular, different dispersions will mean that tags with the same fold change but different count sizes will get trimmed differently (whereas really they should be trimmed together).
+Also, you basically convert the fold change distribution into a one-tailed thing where you only trim from one side. 
+This is problematic when everything is discrete as it means you trim off big chunks at a time. 
+Instability results as you will start to remove big chunks, each corresponding to opposite sides of the fold change distribution.
+
+\item  Finding the offset with the minimal sum of deviances across sites. 
+I used the tagwise dispersion estimate here.
+The hope was that, for DB sites, the dispersion would be large so the deviance wouldn't change much when you altered the dispersions. 
+However, this didn't work out too well as the influence of the truly DB sites would still be enough to underestimate the normalization factor. 
+Indeed, when the number of DB sites is large, this tends to do worse than TMM. 
+Looks like we have to remove them directly to avoid problems.
+
+\item Finding the offset where the number of sites with increasing deviance matches the number of sites with decreasing deviance.
+I've also tested variants thereof, all involving numbers of sites rather than the magnitude of the difference. 
+The use of the number of sites was designed to be more robust to the presence of DB sites, assuming that the majority of sites where non-DB. 
+However, this turned out to be quite imprecise as you could easily get a range of offsets with the same difference in the number of increasing/decreasing sites. 
+The  presence of tied counts exacerbates this for small offsets, because a little change results in (potentially) a big number of sites switching from an increase to a decrease in their deviance.
+
+\item Summing across background enriched regions. 
+The idea was that background regions should be constant, so identifying and crunching them would give us the normalization factor fairly easily. 
+Basically, we identify those bins that are likely to be background regions based on their average abundance in all libraries (trim away those high-abundance bins).
+We then sum across those bins in each library, and use the ratio of those sums as the effective library sizes.
+As we're dealing with a sum of counts, we can get a precise value without having to worry about discreteness. 
+
+This works great for simulated data, but strange things happen in real data. 
+The proportions doesn't change monotonically with increasing abundance, as you'd expect from increasing DE contamination. 
+Rather, it peaks/troughs at a row sum of 3-5 before returning to the center line. 
+This isn't just some random phenomenon - the standard errors of the proportions indicate that they are reliable (assuming independence), and it can be observed in at least three separate datasets. 
+My best guess to why this is happening is that there is some correlation between the regions corresponding to those abundances.
+This means that they change all at once which results in a smooth peak. 
+Finally, I did these for biological replicates for which no undersampling should occur at all (though that might be optimistic given the vagaries of immunoprecipitation). 
+
+All this results in considerable instability in the normalization procedure. 
+An excellent example is with the mitochondrial genome, reads for which must be due to non-specific enrichment. 
+Thus, the read count of the entire genome (without duplicate removal, because it's a bit small) can be used to get the normalization factor. 
+However, in practice this is a mess, with massive scaling factors often proposed between replicates.  
+The total counts are high enough for a precise estimate (~ several thousand) given independence; this suggests that our inaccuracies are due to strong correlations between counts.
+While there may also be additional problems for mitochondria over nuclear DNA, I think this is reasonably demonstrative of what happens with low counts.
+
+You can try to maximize the differences in the normalization factors within a range of thresholds to define the enriched regions.
+This could get weird, because of the instability in the curves at low abundances.
+Thus, you'll have to set a minimum on the threshold to avoid this.
+The curve should pass through (and stay at) 0 as it switches from suppressed background to DE, so the greatest difference in the normalization factor will occur at the minimum threshold.
+This means that there won't be any difference from the static method just using the minimum threshold directly.
+\end{itemize}
+
+\subsubsection*{TMM on high-abundance regions}
+
+I've dsecribed running TMM on the high-abundance bins, but an equivalent approach is to apply TMM on each window directly. 
+I generally don't like doing this as it's harder to assess the context in which the normalization factor is being chosen (and the potential effect of fiddling with the filter threshold). 
+The abundance range for window counts is too small for effective visualisation on an MA plot. 
+There's also the fact that each read is counted multiple times, though this isn't a real problem.
+The only thing to worry about is that it will effectively upweight high-abundance peaks which get caught by multiple windows, but everyone should have high abundances so it shouldn't matter.
+
+\subsubsection*{How to \textit{not} decide between normalization methods}
+
+Just because a high-abundance mass at a non-zero M-value is discrete, doesn't mean it's caused by efficiency differences.
+You could imagine a consistent fold increase in the counts from a genuine increase in binding, if the protein level or deposition rate doubled in one condition.
+Obviously, if you don't see a non-zero blob, then the argument is academic, as there's no difference between the two normalization methods.
+
+You might also imagine that the presence of a high-abundance mass at a non-zero M-value between replicates would represent efficiency bias.
+This is true, but it doesn't mean that binding is constant between conditions.
+The variability might mask any DB, and absence of evidence is not evidence of absence.
+Eliminating the efficiency bias will compromise detection of systematic DB, so you'll have to pick the lesser of two evils.
+I suppose the exception is if you've enough replicates to get the true overall DB without being clouded by the variability, but that's rare for ChIP-seq data.
+
+Conversely, the presence of a non-zero mass between conditions but not between replicates does not mean that efficiency bias is absent.
+While stochastic efficiency bias mightn't be generated between replicates, a systematic bias might be present between conditions.
+This may be caused by condition-specific factors, e.g., differences in nuclear shape, changes in cross-linking due to serum concentrations.
+
+\subsubsection*{Dealing with other biases}
+
+Note that Cheung (i.e. Ahringer) go about dividing ChIP samples by input controls and stating that there are differences in the called regions between replicates. 
+If they had used a model that accounted for replicates in the first place, different results should be avoided as the dispersion would be higher.  
+Also, their method for avoiding biological signal in their background model depends on a powerful peak caller to mark enriched regions. 
+Absence of evidence isn't evidence of absence, so if your peak caller is weak, the method will be confounded by biological signal that leaks through your filtering step.  
+Risso's definition of bias involves comparisons between qPCR and RNA-seq fold changes. 
+I suppose this is fair enough if you want to improve comparisons between technologies. 
+However, this isn't particularly relevant to the correction of biases between samples.
+
+Generally, it's worth dividing GC bias into two types:
+
+\begin{itemize}
+\item The first is where the true variances of independent sites are correlated with GC content. 
+This suggests that you might get more appropriate smoothing if you partitioned the sites according to GC content first. 
+This isn't too hard (find regions with desired GC content and split windows accordingly) but you will bleed degrees of freedom at high counts where the number of sites isn't that high to begin with. 
+GC content is mostly interesting because of its effect on read abundance, and we can smooth directly on that anyway. 
+Otherwise, it's just another metric. 
+We could also smooth on other (equally arbitrary) parameters such as genomic context, position to promoter, etc. but we have to draw the line somewhere. 
+
+\item The second type is that there is a systematic bias in the means of sites with similar GC contents.
+This is what you usually see when someone talks about GC bias correction i.e. the boxplot of ratios of counts with similar GC contents need to be scaled to the y=0 line. 
+If the counts are consistently up in one replicate compared to the other for a bunch of sites, you've got direct correlations between sites right there.
+It is reasonable to correct for these, though it may result in loss of power if GC content is correlated with DB.
+Also, the correction uses offsets which might not be compatible with non-linear normalization.
+Given a choice, I'd prefer to remove any trended bias directly, as I \textit{know} it would mess with my mean-dispersion trend estimation.
+\end{itemize}
+
+\subsection*{Comments on filtering}
+
+\subsubsection*{Circular dependencies between normalization and filtering}
+The NB mean depends on the effective library size, so filtering for efficiency bias becomes a bit circular.
+However, it shouldn't be too bad, as the normalization procedure isn't so sensitive to irregularities at the filter boundary.
+In practice, there's little-to-no effect; I'd only expect something if the normalization factors are really crazy.
+
+<<echo=FALSE,eval=FALSE>>=
+for (it in 1:3) {
+	ab <- aveLogCPM(assay(me.demo), lib.sizes=me.demo$total*me.norm)
+	keep <- rank(ab) > 0.99*length(ab)
+	me.norm <- normalize(me.demo[keep,])
+	cat("Iteration is", it, "\n")
+	print(me.norm)
+}
+@
+
+Filtering is also sensitive to the NB dispersion when library sizes are different.
+However, dispersion estimation can only proceed after normalization and filtering. 
+This results in another circular dependency that is resolved by using a sensible (but otherwise arbitrary) value for the NB dispersion in \code{aveLogCPM}. 
+The alternative would be to iterate over the entire DB analysis, which would be prohibitively time-consuming in most circumstances.
+Of course, this is not an issue when library sizes are the same.
+
+\subsubsection*{Choosing the filter with maximal discoveries}
+
+Choosing the filter which gets you the greatest number of DE regions isn't the best idea, simply because it means that it's not independent of the p-values any more. 
+At any given filter value, the expected FDR is controlled by the BH method rather than the actual FDR. 
+Trying to maximize the number of significant tests will result in loss of FDR control as it's not an unbiased expectation anymore. 
+It's worst with strong correlations between the nulls.
+	
+<<>>=
+collected <- list()
+max.collect <- list()
+for (y in 1:50) {
+	subcol <- NULL
+	subfdr <- NULL
+	n <- 10000
+	infilter <- rep(runif(n, 0, 1), 10)
+	allps <- rep(runif(n, 0, 1), 10)
+	spike <- 500
+	for (x in 1:9/10) {
+		keep <- infilter>=x
+		combined <- c(rep(0, spike), allps[keep])
+		sig <- sum(p.adjust(combined, method="BH")<0.05)
+		subcol <- append(subcol, sig)
+		subfdr <- append(subfdr, 1-spike/sig)
+	}
+	collected[[y]] <- subfdr
+	max.collect[[y]] <- subfdr[which.max(subcol)]
+}
+out <- do.call(cbind, collected)
+rowMeans(out)
+mean(unlist(max.collect))
+@
+
+\subsubsection*{Using the FDR over the log-fold change for filtering} 
+
+It is possible to develop a more sophisticated background-based filter where each window is tested against a null background model.
+Windows with low adjusted $p$-values can then be selected to obtain a set of potentially bound intervals at a certain false discovery rate.
+While this can be done in \pkgname{}, the philosophy of the background-based filters in \code{filterWindows} is to use the log-fold increase of each window relative to the background.
+This is easier to compute, and the threshold is easier to pick and interpret for users.
+
+In more detail; there's problems with computing the p-values and correcting for multiple tests, but we'll ignore those for now.
+Consider the purest case, where you determine significance based on the enrichment values (use a constant variance, so same selection order).
+If you pick a set based on the FDR, the selection of one region becomes dependent on how many other regions have higher enrichments.
+This might be annoying if you're trying to use a stable pre-set threshold.
+Another problem is that you're requiring rejection at an FDR of 5% in order to get into the retained set.
+This may be too conservative for preliminary selection, where windows that cannot reject here might have a lot of evidence for DB.
+In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20%), which gets us back to the problem of arbitrariness.
+High FDR thresholds might also start to run into problems with monotonicity, where filter resolution is lost.
+
+In short, you might get a FDR for your filter, but so what - now it's just another number with an arbitrary threshold.
+It won't tell us much about the effect of the filter on our DB analysis, which is the whole point of filtering.
+The FDR does give us something in terms of the range of possible BH correction values.
+This depends on how many DB things are there, and assumes that all background is non-DB.
+However, this range is pretty wide, and I'm not sure that the extra work is worth this little information.
+Conversely, having a minimum log-fold change tells us a bit about the minimum maximum scope of DB change (assuming that background is non-DB).
+For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions which scrape past the filter.
+
+\subsection*{Comments about FDR control}
+
+\subsubsection*{Algorithm for splitting large clusters}
+I suppose we could choose the number of clusters that maximises the average density. 
+It's the most logical way to do it, as we are interested in high-density regions. 
+This will also avoid chaining as clusters with a lot of empty space will be broken up. 
+However, it also requires an arbitrary compromise between the number of clusters and the density. 
+Specifically, there's liable to be a point at which chaining is acceptable, e.g., satellite window adjacent to a peak, regions of diffuse continuous enrichment. 
+And that's without considering the fact that multiple peaks might need to be clustered together for proper FDR interpretation. 
+So, the question becomes, how big of a density penalty should be applied to a new cluster? 
+I think that this is more difficult to interpret compared to the existing method, where parameters are expressed as distances. 
+And besides, the existing method is fast enough to run a couple of times to check the parameters.
+
+\subsubsection*{Arguments for proper consolidation}
+The \textit{ad hoc} alternative is to just merge regions from multiple DB lists together.  
+You'll end up with overlapping results, which means that you wouldn't be controlling the FDR across the merged set. 
+In addition, merging DB lists that have been controlled at a given FDR assumes that there is at least one true positive in each list. 
+This mightn't be true, in which case FDR control will be lost (you'll be increasing the FDR by adding to both the numerator and denominator).
+
+To illustrate, split a bunch of $p$-values into two sets, and control the FDR within each set.
+If you then merge the sets, the FDR should be controlled within the merged sets, right?
+However, if you take this to its extreme, you could split those $p$-values into trivially small sets, e.g., of size 1.
+Controlling the FDR within each set would not change the size of the $p$-values.
+So, upon merging, you'd be defining significance from the raw $p$-values, which doesn't control the FDR.
+
+<<>>=
+all.p <- c(rep(1e-8, 100), runif(900))
+sig <- p.adjust(all.p, method="BH") <= 0.05
+sum(sig[-(1:100)])/sum(sig)
+alt.sig <- all.p <= 0.05
+sum(alt.sig[-(1:100)])/sum(alt.sig)
+@
+
+\subsubsection*{Using the highest-abundance window as a representative}
+This may also be necessary if you don't want to have high spatial resolution, for whatever reason.  
+For example, if you just want to find peaks that are just on/off, then you look at the DB for the window with the maximum abundance.
+You can then avoid the difficult-to-interpret regions involving complex DB events.
+This still has some advantages over straight-up peak calling, as you still maintain high resolution, i.e. you don't get contamination from miscalled peak boundaries.
+
+\end{document}
+
