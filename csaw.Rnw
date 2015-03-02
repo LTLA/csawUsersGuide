@@ -1076,7 +1076,8 @@ This indicates that undersampling has been identified and corrected.
 % Genuine binding sites are mixed in with the background in this example, as
 % there's no clear distinction between the two. As one might expect, the bins
 % containing binding sites tend to be those with higher A-values. Most of the
-% bins should still be free of binding, though (4000/200000, based on filtered windows).
+% bins should still be free of binding, though (8000/260000 bins, based on 
+% those that overlap globally filtered windows in Chapter 4).
 
 <<eval=FALSE,label=normplot>>=
 par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
