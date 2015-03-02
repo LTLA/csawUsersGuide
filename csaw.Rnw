@@ -711,16 +711,12 @@ abline(v=c(-150,200), col="dodgerblue", lty=2)
 @
 \end{center}
 
-In the example above, most enrichment for the two histone marks is focused within a 350 bp region around the maxima.
+In the example above, enrichment for the two histone marks is mostly contained within a 350 bp region around the maxima (dashed lines).
 This suggests that a window size of $\sim$150 bp is ideal, given that directional extension by 100 bp has been performed on both sides of the peak.
-Most of the coverage can then be captured without including too much background contamination.
+Most of the coverage can then be captured without including too much background noise.
 In contrast, the NF-YA profile drops off more sharply.
 This indicates that a smaller window size ($< 50$ bp) is probably adequate, consistent with sharp TF binding.
-
-% Technically, you should also lop off 50 bp, because the loss of resolution inflates the apparent width.
-% Imagine if binding occured at 1 bp; random placement within the 50 bp bin would give a summit width of 50 bp.
-% However, it's all fairly approximate anyway, so I won't make too much of an issue about it.
-% I would only bother if I were to automate this step with another function, otherwise it's too much detail for the user.
+See the \code{wwhm} function for selection of a window width from the coverage profile.
 
 In practice, a clear-cut choice of distance/window size is rarely found in real datasets.
 For many non-TF targets, the widths of the enriched regions can be highly variable.
@@ -1071,11 +1067,16 @@ calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=1
 
 \subsection{Visualizing normalization efforts with MA plots}
 The effectiveness of normalization can be examined using a MA plot. 
-A single main cloud of points should be present that represents the background regions.
+A single main cloud of points should be present, consisting primarily of background regions.
 Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
 Composition biases manifest as a vertical shift in the position of this cloud. 
 Ideally, the log-ratios of the corresponding normalization factors should correspond to the centre of the cloud. 
 This indicates that undersampling has been identified and corrected.
+
+% Genuine binding sites are mixed in with the background in this example, as
+% there's no clear distinction between the two. As one might expect, the bins
+% containing binding sites tend to be those with higher A-values. Most of the
+% bins should still be free of binding, though (4000/200000, based on filtered windows).
 
 <<eval=FALSE,label=normplot>>=
 par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
