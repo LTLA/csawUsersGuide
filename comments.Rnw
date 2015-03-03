@@ -347,7 +347,6 @@ I suppose this is fair enough if you want to improve comparisons between technol
 However, this isn't particularly relevant to the correction of biases between samples.
 
 Generally, it's worth dividing GC bias into two types:
-
 \begin{itemize}
 \item The first is where the true variances of independent sites are correlated with GC content. 
 This suggests that you might get more appropriate smoothing if you partitioned the sites according to GC content first. 
@@ -362,6 +361,7 @@ If the counts are consistently up in one replicate compared to the other for a b
 It is reasonable to correct for these, though it may result in loss of power if GC content is correlated with DB.
 Also, the correction uses offsets which might not be compatible with non-linear normalization.
 Given a choice, I'd prefer to remove any trended bias directly, as I \textit{know} it would mess with my mean-dispersion trend estimation.
+Besides, the GC content vs. M-value plots are pretty tame; there's not much of a trend as the bulk of points occur in a limited range of GC contents.
 \end{itemize}
 
 \subsection*{Comments on filtering}

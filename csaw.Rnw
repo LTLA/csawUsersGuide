@@ -1164,6 +1164,7 @@ If this is the case, the filtering procedure described above is inappropriate as
 This compromises the assumption of the null hypothesis during testing, resulting in loss of type I error control.
 
 % This is the best way to deal with GC biases, as you can just grab any old input off the web and use it (citation?).
+% Alternatively, you could estimate the expected background from a GC content vs. abundance curve on the ChIP data, but that's susceptible to inflation from genuine binding.
 
 \section{By prior information}
 When only a subset of genomic regions are of interest, DB detection power can be improved by removing windows lying outside of these regions. 
