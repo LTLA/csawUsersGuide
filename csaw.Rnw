@@ -851,7 +851,7 @@ The example below operates on the filtered counts for small 2 kbp bins.
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), width=2000L)
 filtered <- filterWindows(ac.demo2, type="global")
-keep <- filtered$filter > log2(3)
+keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
 ac.off <- normalize(ac.demo2, type="loess")
 head(ac.off)
@@ -860,8 +860,8 @@ head(ac.off)
 MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. 
 Filtering is strongly recommended to remove low-abundance regions where loess curve fitting is inaccurate. 
-When doing so, the value computed by \code{aveLogCPM} should be used as the filter statistic.
-This is because an average count threshold will act as a clean vertical cutoff in the plots below. 
+When doing so, the filter statistic should be based on the average abundance from \code{aveLogCPM}.
+An average abundance threshold will act as a clean vertical cutoff in the plots below. 
 Spurious trends that might affect normalization will not be introduced at the filter boundary. 
 
 <<eval=FALSE,keep.source=true,label=trendplot>>=
@@ -875,7 +875,7 @@ smoothScatter(abval, mval, ylab="M", xlab="Average logCPM",
    main="Raw", ylim=c(-2,2), xlim=c(0, 7))
 lines(abval[o], fit$fitted[o], col="red")
 #
-# Repeating after normalization.
+## Repeating after normalization.
 re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
 mval <- re.adjc[,1]-re.adjc[,2]
 fit <- loessFit(x=abval, y=mval)
@@ -1029,22 +1029,18 @@ bin.size <- 2000L
 binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
 @
 
-The binned abundances can be computed and compared to the window-based abundances.
-This requires some care as the sizes of the regions used for read counting are different.
+The median of the average abundances across all bins can be computed and used as a global estimate of the background coverage.
+This global background can then be compared to the window-based abundances.
+However, some care is required as the sizes of the regions used for read counting are different between bins and windows.
 The average abundance of each bin must be scaled down to be comparable to those of the windows.
-The median of the adjusted binned abundances is then used as a global estimate of the background coverage.
-With \code{type="global"}, the \code{filterWindows} function returns the increase in the abundance of each window over the global background estimate.
 
-<<>>=
-filter.stat <- filterWindows(data, background=binned, type="global")
-summary(filter.stat$filter)
-@
-
-Windows are filtered based on some minimum required fold change over this global background. 
+With \code{type="global"}, the \code{filterWindows} function returns the increase in the abundance of each window over the global background.
+Windows can be filtered by setting some minimum threshold on this increase.
 Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
+filter.stat <- filterWindows(data, background=binned, type="global")
 keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
@@ -1055,8 +1051,11 @@ Note that bins containing genuine binding sites will usually not be visible on s
 This is due to the dominance of the background-containing bins throughout the genome.
 
 <<eval=FALSE,label=binhist>>=
-hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="")
-abline(v=median(filter.stat$back.abundances)+log2(3), col="red")
+hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="", 
+    xlim=c(min(filter.stat$back.abundances), 0))
+global.bg <- filter.stat$abundances - filter.stat$filter
+abline(v=global.bg[1], col="red")
+abline(v=global.bg[1]+log2(3), col="blue")
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -1666,7 +1665,7 @@ This can then be used for interactive manipulation, e.g., to identify all genes 
 
 <<>>=
 anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
-head(anno.ranges)
+anno.ranges
 @
 
 \section{Saving the results to file}
