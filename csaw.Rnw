@@ -1172,14 +1172,9 @@ Alternatively, sites could be defined from a previous experiment or based on the
 The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
 
 <<>>=
-require(org.Mm.eg.db)
-suppressWarnings(anno <- select(org.Mm.eg.db, keys=keys(org.Mm.eg.db), 
-   col=c("CHRLOC", "CHRLOCEND"), keytype="ENTREZID"))
-anno <- anno[!is.na(anno$CHRLOCCHR),]
-extension <- 3000
-coord5 <- ifelse(anno$CHRLOC > 0, anno$CHRLOC-extension, -anno$CHRLOC)
-coord3 <- ifelse(anno$CHRLOC > 0, anno$CHRLOCEND, -anno$CHRLOCEND+extension)
-broads <- GRanges(paste0("chr", anno$CHRLOCCHR), IRanges(coord5, coord3)) 
+require(TxDb.Mmusculus.UCSC.mm10.knownGene)
+broads <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)
+broads <- resize(broads, width(broads)+3000, fix="end")
 head(broads)
 @
  
@@ -1444,15 +1439,22 @@ olap <- findOverlaps(broads, rowData(data))
 olap
 @
 
-The \code{combineTests} function can then be used to combine the $p$-values for all windows in each region. 
-This provides a single combined $p$-value (and its FDR-adjusted equivalent) for each region. 
-The row names of the output table correspond to the value of the cluster identifiers supplied in \code{ids}.
-These should, in turn, act as indices for the regions in \code{broads}. 
+The \code{combineTests} function can be used to combine the $p$-values for all windows in each region. 
+This yields a single combined $p$-value (and its BH-adjusted value) for each region. 
 The average log-CPM and log-FC across all windows in each region are also computed.
 
 <<>>=
-tabprom <- combineTests(queryHits(olap), results$table[subjectHits(olap),])
-head(tabprom)
+tabbroad <- combineTests(queryHits(olap), results$table[subjectHits(olap),])
+head(tabbroad)
+@
+
+The row names of the output table correspond to the cluster identifiers supplied in \code{ids}.
+These should, in turn, act as indices for the regions in \code{broads}.
+It is usually worth subsetting \code{broads} so that each entry matches a row of \code{tabcom}, prior to any downstream operations.
+This is because not all entries in \code{broads} may be overlapped by a window in \code{data}.
+
+<<>>=
+used.broads <- broads[as.integer(rownames(data))]
 @
 
 At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
@@ -1476,8 +1478,8 @@ merged$region
 
 A combined $p$-value is computed for each cluster as previously described.
 Application of the BH method controls the FDR across all detected clusters.
-Like before, the row names in the output table are indices for the corresponding coordinates of the clusters in \code{merged\$regions}. 
-This allows for simple correspondence between the results and the regions. 
+Like before, the row names in the output table are indices for the corresponding clusters in \code{merged\$regions}. 
+This should have a 1:1 correspondence, as a cluster can only form if at least one window is present.
 
 <<>>=
 tabcom <- combineTests(merged$id, results$table)
@@ -1644,9 +1646,8 @@ Here, the promoter region of each gene is defined as some interval 3 kbp up- and
 Any exonic features within \code{dist} on the left or right side of each supplied region will also be reported.
 
 <<>>=
-require(TxDb.Mmusculus.UCSC.mm10.knownGene)
-sig.bins <- merged$region[as.integer(rownames(tabcom))]
-anno <- detailRanges(sig.bins, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
+require(org.Mm.eg.db)
+anno <- detailRanges(merged$region, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
    orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
 head(anno$overlap)
 head(anno$left)
@@ -1672,14 +1673,26 @@ anno.ranges
 It is a simple matter to save the results for later perusal. 
 This is done here in the \code{*.tsv} format where all detail is preserved. 
 Compression is used to reduce the file size. 
-Of course, other formats can be used depending on the purpose of the file, e.g., exporting to BED files through the \rtracklayer{} package for visual inspection of the data with genomic browsers.
 
 <<>>=
 ofile <- gzfile("clusters.gz", open="w")
-write.table(data.frame(chr=as.character(seqnames(sig.bins)), start=start(sig.bins), 
-    end=end(sig.bins), tabcom, anno), file=ofile, 
-    row.names=FALSE, quote=FALSE, sep="\t")
+write.table(data.frame(as.data.frame(merged$region)[,1:3], tabcom, anno), 
+    file=ofile, row.names=FALSE, quote=FALSE, sep="\t")
 close(ofile)
+@
+
+Of course, other formats can be used depending on the purpose of the file. 
+For example, significantly DB regions can be exported to BED files through the \rtracklayer{} package for visual inspection with genomic browsers.
+A transformed FDR is used here for the score field.
+
+<<>>=
+is.sig <- tabcom$FDR <= 0.05
+require(rtracklayer)
+test <- merged$region[is.sig]
+test$score <- -10*log10(tabcom$FDR[is.sig])
+names(test) <- paste0("region", 1:sum(is.sig))
+export(test, "clusters.bed")
+head(read.table("clusters.bed"))
 @
 
 \section{Simple visualization of genomic coverage}
