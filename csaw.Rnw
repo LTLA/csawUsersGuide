@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 5 March 2015}
+Last revised 9 March 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -147,7 +147,7 @@ results <- glmQLFTest(fit)
 @
 \item Correcting for multiple testing.
 <<>>=
-merged <- mergeWindows(rowData(data), tol=1000L)
+merged <- mergeWindows(rowRanges(data), tol=1000L)
 tabcom <- combineTests(merged$id, results$table)
 @
 \end{enumerate}
@@ -207,7 +207,7 @@ The total number of reads in each library are stored as \code{totals} in the \co
 
 <<>>=
 head(assay(data))
-head(rowData(data))
+head(rowRanges(data))
 data$totals
 @
 
@@ -306,7 +306,7 @@ Removal of reads within repeat regions can avoid detection of these irrelevant d
 repeats <- GRanges("chr1", IRanges(3000001, 3002128))
 new.param <- readParam(discard=repeats, restrict=c("chr1", "chr10", "chrX"))
 demo <- windowCounts(bam.files, ext=frag.len, width=window.width, param=new.param)
-head(rowData(demo))
+head(rowRanges(demo))
 @
 
 Coordinates of annotated repeats can be obtained from several different sources.
@@ -370,7 +370,7 @@ Adjacent positions are not counted and thus cannot be distinguished.
 
 <<>>=
 demo <- windowCounts(bam.files, spacing=100, ext=frag.len, width=window.width)
-head(rowData(demo))
+head(rowRanges(demo))
 @
 
 For analyses with large windows, it is worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
@@ -399,7 +399,7 @@ Otherwise, reads will be counted and reported for every single base in the genom
 
 <<>>=
 demo <- windowCounts(bam.files, width=1000, bin=TRUE)
-head(rowData(demo))
+head(rowRanges(demo))
 @
 
 \section{Experiments involving paired-end data}
@@ -575,8 +575,8 @@ collected <- list()
 for (curbam in all.bam) {
     windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
     rwsms <- rowSums(assay(windowed))
-    maxed <- findMaxima(rowData(windowed), range=1000, metric=rwsms)
-    collected[[curbam]] <- profileSites(curbam, rowData(windowed)[maxed], 
+    maxed <- findMaxima(rowRanges(windowed), range=1000, metric=rwsms)
+    collected[[curbam]] <- profileSites(curbam, rowRanges(windowed)[maxed], 
         param=dedup.on, weight=1/rwsms[maxed])
 }
 xranged <- as.integer(names(collected[[1]]))
@@ -635,13 +635,13 @@ Techniques like CLIP-seq, MeDIP-seq or CAGE provide strand-specific sequence inf
 The \pkgname{} package can analyze these datasets through strand-specific counting.
 This can be done manually setting the \code{forward} slot in the \code{readParam} object to \code{TRUE} or \code{FALSE}, to count only forward- or reverse-strand reads respectively.
 Alternatively, the \code{strandedCounts} wrapper function can be used to obtain strand-specific counts for each window or region.
-The strand of the output \code{rowData} indicates the strand on which reads were counted for that row.
+The strand of the output regions indicates the strand on which reads were counted for that row.
 Up to two rows can be generated for each window or region, depending on filtering.
 
 <<>>=
 ss.param <- reform(default.param, forward=NULL)
 ss.counts <- strandedCounts(bam.files, ext=frag.len, width=window.width, param=ss.param)
-strand(rowData(ss.counts))
+strand(rowRanges(ss.counts))
 @
 
 Note that \code{strandedCounts} operates internally by calling \code{windowCounts} (or \code{regionCounts}) twice with different settings for \code{param\$forward}. 
@@ -1080,7 +1080,7 @@ This should be synchronized with \code{windowCounts} by using the same \code{par
 
 <<>>=
 surrounds <- 2000
-neighbour <- suppressWarnings(resize(rowData(data), surrounds, fix="center"))
+neighbour <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
 wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
 @
 
@@ -1120,7 +1120,7 @@ The data can then be filtered to retain only these locally maximal windows.
 This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
 
 <<>>=
-maxed <- findMaxima(rowData(data), range=1000, metric=abundances)
+maxed <- findMaxima(rowRanges(data), range=1000, metric=abundances)
 summary(maxed)
 @
 
@@ -1183,7 +1183,7 @@ Discerning users may wish to distinguish between full and partial overlaps, thou
 This could also be combined with abundance filtering to retain windows that contain putative binding sites in the regions of interest.
 
 <<>>=
-suppressWarnings(keep <- overlapsAny(rowData(data), broads))
+suppressWarnings(keep <- overlapsAny(rowRanges(data), broads))
 sum(keep)
 @
 
@@ -1435,7 +1435,7 @@ Alternatively, called peaks can be used provided that sufficient care has been t
 In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
 
 <<>>=
-olap <- findOverlaps(broads, rowData(data))
+olap <- findOverlaps(broads, rowRanges(data))
 olap
 @
 
@@ -1472,14 +1472,15 @@ Briefly, all high-abundance windows that are less than some distance apart - say
 The chosen distance reflects some arbitrary minimum distance at which two binding events are considered to be separate sites.
 
 <<>>=
-merged <- mergeWindows(rowData(data), tol=1000L)
+merged <- mergeWindows(rowRanges(data), tol=1000L)
 merged$region
 @
 
-A combined $p$-value is computed for each cluster as previously described.
-Application of the BH method controls the FDR across all detected clusters.
+A combined $p$-value is computed for each cluster with the \code{combineTests} function.
+The BH method is then applied to control the FDR across all detected clusters.
 Like before, the row names in the output table are indices for the corresponding clusters in \code{merged\$regions}. 
-This should have a 1:1 correspondence, as a cluster can only form if at least one window is present.
+However, no subsetting is required here as all clusters reported by \code{mergeWindows} should be non-empty.
+This ensures that each cluster will be represented by a row in the table.
 
 <<>>=
 tabcom <- combineTests(merged$id, results$table)
@@ -1505,7 +1506,7 @@ Any value from 2000 to 10000 bp is recommended.
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
 <<>>=
-merged.max <- mergeWindows(rowData(data), tol=1000L, max.width=5000L)
+merged.max <- mergeWindows(rowRanges(data), tol=1000L, max.width=5000L)
 summary(width(merged.max$region))
 @
 
@@ -1515,7 +1516,7 @@ This will separate binding sites that are close together but are changing in opp
 A vector can be supplied in \code{sign} to indicate whether each window has a positive log-fold change.
 
 <<>>=
-merged.sign <- mergeWindows(rowData(data), tol=1000L, sign=(results$table$logFC > 0))
+merged.sign <- mergeWindows(rowRanges(data), tol=1000L, sign=(results$table$logFC > 0))
 summary(width(merged.sign$region))
 @
 
@@ -1579,7 +1580,7 @@ Reporting the \code{best} fold change may be preferable as it focuses on the DB 
 
 <<>>=
 tabcom$best.fc <- results$table$logFC[tab.best$best]
-tabcom$best.start <- start(rowData(data)[tab.best$best])
+tabcom$best.start <- start(rowRanges(data)[tab.best$best])
 head(tabcom[,c("best.fc", "best.start")])
 @
 
