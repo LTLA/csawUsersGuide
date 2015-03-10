@@ -725,6 +725,9 @@ demo <- windowCounts(bam.files, bin=TRUE, width=15000)
 normalize(demo)
 @
 
+These factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
+See Section~\ref{sec:eff_norm_ma} for some examples with greater bias.
+
 \subsection{Visualizing normalization efforts with MA plots}
 The effectiveness of normalization can be examined using a MA plot. 
 A single main cloud of points should be present, consisting primarily of background regions.
@@ -797,6 +800,8 @@ Using too many bins (or windows) will include background regions, while using to
 See Chapter~\ref{chap:filter} for more details on filtering to select enriched regions.
 
 \subsection{Checking normalization with MA plots}
+\label{sec:eff_norm_ma}
+
 The results of normalization can again be visualized with MA plots. 
 Of particular interest is the cloud of points at high A-values.
 This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
@@ -808,22 +813,17 @@ Otherwise, the differences must represent efficiency biases and should be remove
 
 <<eval=FALSE,label=methplot,strip.white=false>>=
 par(mfrow=c(1,2))
-for (it in 1:2) {
-    if (it==1) {
-        demo <- me.demo
-        norm <- me.norm
-        main <- "H3K4me3"
-    } else {
-        demo <- ac.demo
-        norm <- ac.norm
-        main <- "H3ac"
-    }
+collected.compo <- list()
+for (main in c("H3K4me3", "H3ac")) { 
+    if (main=="H3K4me3") { demo <- me.demo; norm <- me.norm }
+    else { demo <- ac.demo; norm <- ac.norm }
     adjc <- cpm(asDGEList(demo), log=TRUE)
     smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
         xlab="A", ylab="M", main=main)
     abline(h=log2(norm[1]/norm[2]), col="red")
     compo.fac <- normalize(demo)
     abline(h=log2(compo.fac[1]/compo.fac[2]), col="red", lty=2)
+    collected.compo[[main]] <- compo.fac
 }
 @
 
@@ -833,6 +833,14 @@ for (it in 1:2) {
 <<methplot>>
 @
 \end{center}
+
+For the sake of comparison, the sizes of the normalization factors for composition bias can also be examined.
+These will generally scale the library sizes in the opposite direction to the factors for efficiency bias.
+This is because any increase in IP efficiency in one library will lead to greater suppression of background regions in the same library.
+
+<<>>=
+collected.compo
+@
 
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
