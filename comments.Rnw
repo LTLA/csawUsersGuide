@@ -199,6 +199,14 @@ Variability in fragment lengths precludes identification of significant differen
 In the worst case, with no variability, you'd just have read stacks where differences are clearcut.
 As you add more variability, the waters become muddled and obvious differences disappear.
 
+\subsubsection*{Mapping quality and read stacks}
+
+Read stacks can be effectively eliminated by setting a non-negligble threshold on the mapping quality.
+I suspect it's because they're formed by repeat regions, and so MAPQ is low due to non-uniqueness.
+Alternatively, they might be contaminants that are just trying to find a (poorly aligned) home on the genome build.
+Use of \code{discard} to ignore blacklisted regions is less effective as these regions tend not to overlap unannotated repeats.
+At the very least, you'd have to use RepeatMasker annotations, which are too aggressive for my taste.
+
 \subsection*{Comments on normalization}
 \subsubsection*{TMM on the binned counts}
 
