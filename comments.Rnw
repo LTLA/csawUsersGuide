@@ -362,8 +362,8 @@ Normally, this isn't a problem, as the correct normalization for DE genes isn't 
 However, if you have more than two groups, DE in the third group would affect normalization for non-DE genes between the first two groups.
 
 This is shown in the example below.
-The first gene displayed should have no differences between the first two groups upon normalization, but DE in the third group prevents this from happening.
-Similarly, the second gene should have no differences between the first and last groups, but this is disrupted by DE in the second group.
+The first gene displayed should have no differences between the first two samples upon normalization, but DE in the third sample prevents this from happening.
+A similar case can be made for the second and third genes, in which there is DE in the second and first samples respectively.
 In contrast, the last gene is non-DE across all groups and behaves properly.
 
 <<echo=FALSE>>=
@@ -377,9 +377,9 @@ y <- matrix(0, nrow=ngenes, ncol=3)
 y[,1] <- rnorm(ngenes, mean=true.means)
 y[,2] <- rnorm(ngenes, mean=2*true.means)
 y[,3] <- rnorm(ngenes, mean=1.5*true.means)
-y <- rbind(y, c(2, 4, 10), c(2, 10, 3), c(2,4,3))	
+y <- rbind(y, c(2, 4, 10), c(2, 10, 3), c(10, 4, 3), c(2,4,3))	
 y.fast <- normalizeCyclicLoess(y, method="fast")
-tail(y.fast, 3)
+tail(y.fast, 4)
 @
 
 One might think to overcome this problem by using covariates computed in a pairwise manner, as in Affymetrix-based normalization.
@@ -389,21 +389,37 @@ In true pairwise normalization, adjustments are made immediately after each pair
 
 <<>>=
 y.affy <- normalizeCyclicLoess(y, method="affy") 
-tail(y.affy, 3)
+tail(y.affy, 4)
 @
 
-Using true pairwise cyclic normalization fixes the first gene, but the second gene still results in DE.
+Using true pairwise cyclic normalization fixes the first gene, but the second and third genes still have spurious DE.
 This is because the success of this procedure depends on the order with which the libraries are normalized.
 In the first gene, the first two libraries are equalized first, which results in consistent behaviour for those two libraries across the remaining normalization steps.
-This is not the case for the second gene.
+This is not the case for the second and third genes.
 
 <<>>=
 y.pair <- normalizeCyclicLoess(y, method="pair") 
-tail(y.pair, 3)
+tail(y.pair, 4)
 @
 
-Another disadvantage of pairwise normalization is that the covariates are less stable.
+Comparisons to a reference don't help consistently, as it depends on the choice of reference.
+In the code below, each reference fails for the gene in which DE is present in that reference.
+Another disadvantage of pairwise covariates is that they are less stable than the overall mean.
 This results in a modest increase in the normalization error, though nothing to really panic about.
+
+<<>>=
+for (ref in 1:3) {
+    y.x <- y
+    cat("Current reference is", ref, "\n")
+    for (x in 1:3) { 
+        if (x==ref) { next }
+        fit <- loessFit(y[,x] - y[,ref], rowMeans(y[,c(x, ref)]))
+        y.x[,x] <- y.x[,x] - fit$fitted
+    }
+    print(tail(y.x, 4))
+}
+@
+
 In short, there's no obvious solution to this problem.
 I'm going to stick with the what I've got right now, as it's easy to use and understand. 
 
