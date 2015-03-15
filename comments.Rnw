@@ -536,12 +536,8 @@ For example, a log-fold change of 2 suggests that you can get, at most, a DB fol
 
 \subsubsection*{Independence of the average abundance as a filter statistic}
 
-The analogy to the normal case suggests that the average abundance is independent of the $p$-values and variances.
-This means that it can be used as an independent filter statistic, without affecting EB shrinkage or DB testing.
-I guess that the variance is comprised of the QL and NB dispersions.
-Estimation of each parameter in \edger{} assumes that the other is known.
-If the mean is independent of the variance, then it implies that the mean is independent of each dispersion estimate.
-Independence also assumes that the null design matrix can be parametrized with an intercept column.
+The analogy to the normal case suggests that the average abundance is the independent filter statistic.
+Note that this assumes that the null design matrix can be parametrized with an intercept column.
 
 One common complaint with the average abundance is that performance will deteriorate as the number of groups increases.
 For example, if a peak was only present in one group, the average abundance of that peak would drop as the number of groups increases.
