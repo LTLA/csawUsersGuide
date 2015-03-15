@@ -534,6 +534,30 @@ However, this range is pretty wide, and I'm not sure that the extra work is wort
 Conversely, having a minimum log-fold change tells us a bit about the minimum maximum scope of DB change (assuming that background is non-DB).
 For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions which scrape past the filter.
 
+\subsubsection*{Independence of the average abundance as a filter statistic}
+
+The analogy to the normal case suggests that the average abundance is independent of the $p$-values and variances.
+This means that it can be used as an independent filter statistic, without affecting EB shrinkage or DB testing.
+I guess that the variance is comprised of the QL and NB dispersions.
+Estimation of each parameter in \edger{} assumes that the other is known.
+If the mean is independent of the variance, then it implies that the mean is independent of each dispersion estimate.
+Independence also assumes that the null design matrix can be parametrized with an intercept column.
+
+One common complaint with the average abundance is that performance will deteriorate as the number of groups increases.
+For example, if a peak was only present in one group, the average abundance of that peak would drop as the number of groups increases.
+This would affect the ability of the filter to retain that peak.
+To get around this, you can filter using the average abundance of the libraries involved in the DB contrast.
+This ensures that you're only selecting for high abundances in the libraries of interest.
+
+Selective filtering does require some care.
+You need to re-filter for each contrast, which necessitates re-estimation of the NB dispersion and repeated GLM fitting.
+Independence also requires that the null design has an all-ones column for those libraries involved in the contrast.
+The behaviour of the other libraries shouldn't matter, as they will only contribute to EB shrinkage.
+If libraries are independent, filtering on the involved subset shouldn't affect the information extracted from the other subset.
+
+% Cleanest under the null; selection of strong DB peaks might favour selection of other strong DB peaks in other groups that have lower dispersions in the mean-variance trend.
+% Though, for this to be an actual problem, it would need to break the assumption of constant dispersions across all libraries.
+
 \subsection*{Comments about FDR control}
 
 \subsubsection*{Algorithm for splitting large clusters}
