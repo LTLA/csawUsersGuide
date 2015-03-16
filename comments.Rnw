@@ -326,10 +326,12 @@ This means that there won't be any difference from the static method just using 
 
 \subsubsection*{TMM on high-abundance regions}
 
-I've dsecribed running TMM on the high-abundance bins, but an equivalent approach is to apply TMM on each window directly. 
-I generally don't like doing this as it's harder to assess the context in which the normalization factor is being chosen (and the potential effect of fiddling with the filter threshold). 
-The abundance range for window counts is too small for effective visualisation on an MA plot. 
-There's also the fact that each read is counted multiple times, though this isn't a real problem.
+You can also run TMM on high-abundance bins instead of windows.
+This uses larger counts that will be easier to visualize in a MA plot (can also see the behaviour of the entire genome on the plot).
+However, I prefer running it on the same windows you're going to use for the analysis.
+This synchronizes the normalization with the filtering, and guarantees that you're eliminating the biases in the counts of interest.
+It's also a step closer to the procedure for non-linear normalization, so you can switch to that, e.g., if you didn't filter away all of the background.
+Note that each read is counted multiple times with windows instead of bins, though this isn't a real problem.
 The only thing to worry about is that it will effectively upweight high-abundance peaks which get caught by multiple windows, but everyone should have high abundances so it shouldn't matter.
 
 \subsubsection*{How to \textit{not} decide between normalization methods}
