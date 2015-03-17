@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 9 March 2015}
+Last revised 17 March 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -769,28 +769,26 @@ for (i in 1:(length(bam.files)-1)) {
 Efficiency biases are commonly observed in ChIP-seq data. 
 This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
 These technical differences are of no biological interest and must be removed. 
-This can be achieved by assuming that high-abundance bins contain binding sites. 
-In the example below, these bins are chosen based on the approach described in Section~\ref{sec:global_filter}. 
-The TMM method can then be applied to eliminate systematic differences in the counts across those bins. 
+This can be achieved by assuming that high-abundance windows or bins contain binding sites. 
+In the examples below, reads are counted into 150 bp windows for histone mark data.
+High-abundance windows are chosen using a global filtering approach described in Section~\ref{sec:global_filter}. 
+The TMM method can then be applied to eliminate systematic differences across those windows.
 
-<<strip.white=false>>=
-me.demo <- windowCounts(c("h3k4me3_mat.bam", "h3k4me3_pro.bam"), bin=TRUE, width=10000L)
-keep <- filterWindows(me.demo, type="global")$filter > log2(10)
-me.norm <- normalize(me.demo[keep,])
-me.norm
-
-ac.demo <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), bin=TRUE, width=10000L)
-keep <- filterWindows(ac.demo, type="global")$filter > log2(10)
-ac.norm <- normalize(ac.demo[keep,])
-ac.norm
+<<>>=
+me.files <- c("h3k4me3_mat.bam", "h3k4me3_pro.bam")
+me.demo <- windowCounts(me.files, width=150)
+me.bin <- windowCounts(me.files, bin=TRUE, width=10000) 
+keep <- filterWindows(me.demo, me.bin, type="global")$filter > log2(3)
+me.eff <- normalize(me.demo[keep,])
+me.eff
+ac.files <- c("h3ac.bam", "h3ac_2.bam")
+ac.demo <- windowCounts(ac.files, width=150)
+ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000)
+keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
+ac.eff <- normalize(ac.demo[keep,])
+ac.eff
 @
 \label{data:norm}
-
-Note that the bin size in Section~\ref{sec:compo_norm} is only used here for consistency (and to allow comparison between the different normalization methods on a MA plot, later).
-The counts for binding sites should be high enough such that smaller bins can be used.
-TMM normalization can even be applied directly to the high-abundance windows of interest.
-This ensures that there is no systematic difference between libraries across these windows.
-In practice, the estimated normalization factors are usually robust to the choice of window/bin size. 
 
 This method assumes that most high-abundance bins are not DB. 
 Any systematic changes must be caused by differences in IP efficiency or some other technical issue. 
@@ -799,31 +797,41 @@ Also, some care is required when choosing the top percentage of bins or windows 
 Using too many bins (or windows) will include background regions, while using too few will result in unstable estimates.
 See Chapter~\ref{chap:filter} for more details on filtering to select enriched regions.
 
+Note that window counts can be used directly as they should be large enough for fold change-based normalization.
+Indeed, users should perform normalization \textit{after} any necessary filtering on the windows (see Chapter~\ref{chap:filter}).
+This ensures that there is no systematic difference between libraries across these windows during DB testing.
+In practice, the estimated normalization factors are usually robust to the choice of window/bin size. 
+
 \subsection{Checking normalization with MA plots}
 \label{sec:eff_norm_ma}
 
-The results of normalization can again be visualized with MA plots. 
-Of particular interest is the cloud of points at high A-values.
-This represents a systematic fold change in the bound regions between libraries, either due to genuine DB or variable IP efficiency. 
-Note the difference in the normalization factors from removal of efficiency bias (full) against that of composition bias (dashed).
-These two normalization strategies are mutually exclusive, as only one set of factors will ultimately be used.
-The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
-If so, composition biases should be removed to preserve the assumed DB.
-Otherwise, the differences must represent efficiency biases and should be removed.
+The effect of normalization can be visualized with MA plots. 
+Plots are constructed using counts for 10 kbp bins, rather than with those from the windows.
+This is useful as the behaviour of the entire genome can be examined, rather than just that of the high-abundance windows.
+It also allows calculation of and comparison to the factors for composition bias.
+
+<<>>=
+me.comp <- normalize(me.bin)
+me.comp
+ac.comp <- normalize(ac.bin)
+ac.comp
+@
+
+The clouds at low and high A-values represent the background and bound regions, respectively.
+The normalization factors from removal of composition bias (dashed) pass through the former, whereas the factors to remove efficiency bias (full) pass through the latter.
+A non-zero M-value location for the high A-value cloud represents a systematic difference between libraries for the bound regions, either due to genuine DB or variable IP efficiency. 
+This also induces composition bias, leading to a non-zero M-value for the background cloud.
 
 <<eval=FALSE,label=methplot,strip.white=false>>=
 par(mfrow=c(1,2))
-collected.compo <- list()
 for (main in c("H3K4me3", "H3ac")) { 
-    if (main=="H3K4me3") { demo <- me.demo; norm <- me.norm }
-    else { demo <- ac.demo; norm <- ac.norm }
-    adjc <- cpm(asDGEList(demo), log=TRUE)
+    if (main=="H3K4me3") { bins <- me.bin; comp <- me.comp; eff <- me.eff }
+    else { bins <- ac.bin; comp <- ac.comp; eff <- ac.eff }
+    adjc <- cpm(asDGEList(bins), log=TRUE)
     smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
         xlab="A", ylab="M", main=main)
-    abline(h=log2(norm[1]/norm[2]), col="red")
-    compo.fac <- normalize(demo)
-    abline(h=log2(compo.fac[1]/compo.fac[2]), col="red", lty=2)
-    collected.compo[[main]] <- compo.fac
+    abline(h=log2(eff[1]/eff[2]), col="red")
+    abline(h=log2(comp[1]/comp[2]), col="red", lty=2)
 }
 @
 
@@ -834,13 +842,11 @@ for (main in c("H3K4me3", "H3ac")) {
 @
 \end{center}
 
-For the sake of comparison, the sizes of the normalization factors for composition bias can also be examined.
-These will generally scale the library sizes in the opposite direction to the factors for efficiency bias.
-This is because any increase in IP efficiency in one library will lead to greater suppression of background regions in the same library.
-
-<<>>=
-collected.compo
-@
+These two normalization strategies are mutually exclusive, as only one set of factors will ultimately be used.
+The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
+If so, composition biases should be removed to preserve the assumed DB.
+Otherwise, the differences must represent efficiency biases and should be removed.
+Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are generally expected to be consistent in most conditions.
 
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
@@ -853,12 +859,15 @@ One such implementation is provided in \code{normalize} by setting \code{type="l
 This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This offset matrix can then be directly used in \edger{}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
-In that respect, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization step.
-The example below operates on the filtered counts for small 2 kbp bins. 
+Thus, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization step.
+
+The example below operates on the filtered counts for 2000 bp windows.
+This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
+Obviously, users should pick a more appropriate value for their analysis.
 
 <<>>=
 ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), width=2000L)
-filtered <- filterWindows(ac.demo2, type="global")
+filtered <- filterWindows(ac.demo2, ac.bin, type="global")
 keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
 ac.off <- normalize(ac.demo2, type="loess")
