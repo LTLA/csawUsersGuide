@@ -1245,10 +1245,10 @@ Make sure the \edger{} package is loaded if you've been skipping chapters.
 \subsection{Overview}
 Low counts per window are typically observed in ChIP-seq datasets, even for genuine binding sites. 
 Any statistical analysis to identify DB sites must be able to handle discreteness in the data. 
-Software packages using count-based models are ideal for this purpose. 
+Count-based models are ideal for this purpose. 
 In this guide, the quasi-likelihood (QL) framework in the \edger{} package is used \citep{lund2012}. 
 Counts are modelled using NB distributions that account for overdispersion between biological replicates \citep{robinson2008}. 
-Each window can then be tested for significant  differences between counts  for different biological conditions.
+Each window can then be tested for significant DB between conditions.
 
 Of course, any statistical method can be used if it is able to accept a count matrix and a vector of normalization factors (or more generally, a matrix of offsets). 
 The choice of \edger{} is primarily motivated by its performance relative to some published alternatives \citep{law2014}.
@@ -1718,41 +1718,30 @@ Visualization of the read depth around interesting features is often desired.
 This is facilitated by the \code{extractReads} function, which pulls out the reads from the BAM file.
 The returned \code{GRanges} object can then be used to plot the sequencing coverage or any other statistic of interest.
 Note that the \code{extractReads} function also accepts a \code{readParam} object.
-This means that the same reads used in the analysis will be pulled out during visualization.
+This ensures that the same reads used in the analysis will be pulled out during visualization.
 
 <<>>=
 cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
 extractReads(cur.region, bam.files[1], param=readParam())
 @
 
-Here, coverage is visualized by showing the number of reads covering each base pair in the interval of interest.
-The height of each read coverage track is adjusted according to the library size.
-A larger library will have a greater maximum plot height, such that a greater number of reads in that library will not be represented by a larger peak.
-This avoids any misrepresentation of read depth when comparing between libraries.
-
-<<>>=
-lib.sizes <- exp(getOffset(y))
-mean.lib <- mean(lib.sizes)
-max.depth <- 20 * lib.sizes/mean.lib
-@
-
-The visualization itself is performed using methods from the \gviz{} package.
+Here, coverage is visualized as the number of reads covering each base pair in the interval of interest.
+Specifically, the reads-per-million is shown to allow comparisons between libraries of different size.
+The plots themselves are constructed using methods from the \gviz{} package.
 The blue and red tracks represent the coverage on the forward and reverse strands, respectively. 
-This will not be relevant for paired-end data where coverage is plotted for fragments, i.e., read pairs.
-In such cases, the code below will need to be modified accordingly.
+Strong strand bimodality is consistent with a genuine TF binding site.
+For paired-end data, coverage can be similarly plotted for fragments, i.e., proper read pairs.
 
 <<eval=FALSE,label=regionplot>>=
 require(Gviz)
 collected <- list()
 for (i in 1:length(bam.files)) { 
     reads <- extractReads(cur.region, bam.files[i])
-    pcov <- as(coverage(reads[strand(reads)=="+"]), "GRanges")
-    ncov <- as(coverage(reads[strand(reads)=="-"]), "GRanges")
-    ptrack <- DataTrack(pcov, type="histogram", lwd=0, 
-        fill=rgb(0,0,1,0.4), ylim=c(0, max.depth[i]), 
+    pcov <- as(coverage(reads[strand(reads)=="+"])/data$totals[i]*1e6, "GRanges")
+    ncov <- as(coverage(reads[strand(reads)=="-"])/data$totals[i]*1e6, "GRanges")
+    ptrack <- DataTrack(pcov, type="histogram", lwd=0, fill=rgb(0,0,1,.4), ylim=c(0,1.1), 
         name=bam.files[i], col.axis="black", col.title="black")
-    ntrack <- DataTrack(ncov, type="histogram", lwd=0, 
-        fill=rgb(1,0,0,0.4), ylim=c(0, max.depth[i]))
+    ntrack <- DataTrack(ncov, type="histogram", lwd=0, fill=rgb(1,0,0,.4), ylim=c(0,1.1))
     collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
 }
 gax <- GenomeAxisTrack(col="black")
