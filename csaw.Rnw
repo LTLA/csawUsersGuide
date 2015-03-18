@@ -653,6 +653,264 @@ This is intended to protect the user, as any attempt to re-use the \code{ss.para
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Filtering prior to correction}
+\label{chap:filter}
+
+\begin{combox}
+This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
+We will also need the \code{normfacs} vector from Chapter~\ref{chap:norm}. 
+%Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
+Finally, we'll need the \code{aveLogCPM} function from the \edger{} package (that we've already loaded, unless you skipped the last chapter).
+\end{combox}
+
+\section{Independent filtering for count data}
+Many of the low abundance windows in the genome correspond to background regions in which DB is not expected. 
+Indeed, windows with low counts will not provide enough evidence against the null hypothesis to obtain sufficiently low $p$-values for DB detection. 
+Similarly, some approximations used in the statistical analysis will fail at low counts. 
+Removing such uninteresting or ineffective tests reduces the severity of the multiple testing correction, increases detection power amongst the remaining tests and reduces computational work.
+
+Filtering is valid so long as it is independent of the test statistic under the null hypothesis \citep{bourgon2010}. 
+In the negative binomial (NB) framework, this (probably) corresponds to filtering on the overall NB mean. 
+The DB $p$-values retained after filtering on the overall mean should be uniform under the null hypothesis, by analogy to the normal case. 
+Row sums can also be used for datasets where the effective library sizes are not very different, or where the counts are assumed to be Poisson-distributed between biological replicates. 
+
+In \edger{}, the log-transformed overall NB mean is referred to as the average abundance.
+This is computed with the \code{aveLogCPM} function, as shown below for each region.
+
+<<>>=
+abundances <- aveLogCPM(asDGEList(data))
+summary(abundances)
+@
+
+For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
+This restricts the analysis to windows with abundances above this threshold.
+While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
+Estimates of downstream statistics are also more relevant when they are based on the windows of interest. 
+That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
+
+<<>>=
+keep <- abundances > -1
+filtered.data <- data[keep,]
+summary(keep)
+@
+
+The exact choice of filter threshold may not be obvious.
+In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
+A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing true DB sites.
+Arbitrariness is unavoidable when balancing these opposing considerations.
+
+Nonetheless, several strategies for defining the threshold are described below.
+Users should start by choosing \textbf{one} of these filtering approaches for their analyses.
+Different filters can also be combined in more advanced applications, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
+However, any benefit will depend on the type of filters involved.
+The greatest effect is observed for filters that operate on different principles.
+
+\section{By proportion}
+One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
+This corresponds to the top proportion of high-abundance windows.
+The total number of windows is calculated from the genome length and the \code{spacing} interval used in \code{windowCounts}. 
+The \code{filterWindows} function returns the ratio of the rank of each window to this total, where higher-abundance windows have larger ranks.
+Users can then retain those windows with rank ratios above the unbound proportion of the genome.
+
+<<>>=
+keep <- filterWindows(data, type="proportion")$filter > 0.999
+sum(keep)
+@
+
+This approach is simple and has the practical advantage of maintaining a constant number of windows for the downstream analysis. 
+However, it may not adapt well to different datasets where the proportion of bound sites can vary.
+Using an inappropriate percentage of binding sites will result in the loss of potential DB regions or inclusion of background regions.
+
+\section{By global enrichment}
+\label{sec:global_filter}
+An alternative approach involves choosing a filter threshold based on the fold change over the level of non-specific enrichment.
+The degree of background enrichment can be estimated by counting reads into large bins across the genome.
+Binning is necessary here to increase the size of the counts when examining low-density background regions. 
+This ensures that precision is maintained when estimating the background abundance.
+
+<<>>=
+bin.size <- 2000L
+binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
+@
+
+The median of the average abundances across all bins can be computed and used as a global estimate of the background coverage.
+This global background can then be compared to the window-based abundances.
+However, some care is required as the sizes of the regions used for read counting are different between bins and windows.
+The average abundance of each bin must be scaled down to be comparable to those of the windows.
+
+With \code{type="global"}, the \code{filterWindows} function returns the increase in the abundance of each window over the global background.
+Windows can be filtered by setting some minimum threshold on this increase.
+Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
+This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
+
+<<>>=
+filter.stat <- filterWindows(data, background=binned, type="global")
+keep <- filter.stat$filter > log2(3)
+sum(keep)
+@
+
+The effect of filtering can also be visualized with a histogram. 
+This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
+Note that bins containing genuine binding sites will usually not be visible on such plots.
+This is due to the dominance of the background-containing bins throughout the genome.
+
+<<eval=FALSE,label=binhist>>=
+hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="", 
+    xlim=c(min(filter.stat$back.abundances), 0))
+global.bg <- filter.stat$abundances - filter.stat$filter
+abline(v=global.bg[1], col="red")
+abline(v=global.bg[1]+log2(3), col="blue")
+@
+
+\setkeys{Gin}{width=0.7\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<binhist>>
+@
+\end{center}
+
+Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
+For TF data, a large cut-off works well as narrow binding sites will have high read densities and are unlikely to be lost during filtering. 
+Smaller minimum fold changes are recommended for diffuse marks where the difference from background is less obvious. 
+
+\section{By local enrichment}
+
+\subsection{Mimicking single-sample peak callers}
+Local background estimators can also be constructed.
+This avoids inappropriate filtering when there are differences in background coverage across the genome. 
+Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
+The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
+This should be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
+
+<<>>=
+surrounds <- 2000
+neighbour <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
+wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
+@
+
+Counts for each window are subtracted from the counts for its neighbourhood. 
+This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
+The width of the window is also subtracted to reflect the effective size of the neighbourhood.
+Again, the abundance of the neighbourhood is scaled down for a valid comparison to that of the corresponding window.
+This work is done by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighbourhood.
+
+<<>>=
+filter.stat <- filterWindows(data, wider, type="local")
+@
+
+Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
+In this scenario, a 3-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
+This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
+
+<<>>=
+keep <- filter.stat$filter > log2(3)
+sum(keep)
+@
+
+Note that this procedure also assumes that no other enriched regions are present in each neighbourhood. 
+Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
+This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighbourhood.
+
+If this seems too complicated, an alternative is to identify locally enriched regions using peak-callers like \macs{}. 
+Filtering can then be performed to retain only windows within called peaks.  
+However, peak calling must be done independently of the DB status of each window. 
+If libraries are of similar size or biological variability is low, reads can be pooled into one library for single-sample peak calling \citep{lun2014}. 
+This is equivalent to filtering on the average count and avoids loss of the type I error control from data snooping.
+
+\subsection{Identifying local maxima}
+Another approach uses the \code{findMaxima} function to identify local maxima in the read density across the genome.
+The code below will determine if each window is a local maximum, i.e., whether it has the highest average abundance within 1 kbp on either side.
+The data can then be filtered to retain only these locally maximal windows.
+This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
+
+<<>>=
+maxed <- findMaxima(rowRanges(data), range=1000, metric=abundances)
+summary(maxed)
+@
+
+This approach is very aggressive and should only be used (sparingly) in datasets where binding is sharp, simple and isolated.
+Complex binding events involving diffuse enrichment or adjacent binding sites will not be handled well.
+For example, DB detection will fail if a low-abundance DB window is ignored in favour of a high-abundance non-DB neighbour.
+
+\subsection{With negative controls}
+Negative controls for ChIP-seq refer to input or IgG libraries where the IP step has been skipped or compromised with an irrelevant antibody, respectively. 
+This accounts for sequencing/mapping biases in ChIP-seq data. 
+IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
+These controls are mostly irrelevant when testing for DB between ChIP samples. 
+However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
+
+<<>>=
+in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
+chip <- in.demo[,1:4]
+control <- in.demo[,5]
+@
+
+The \code{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
+A larger \code{prior.count} of 5 is used to compute the average abundance.
+This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
+Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from  larger bins with more counts.
+The example below requires a 3-fold or greater increase over the control to retain the window.
+
+<<>>=
+filter.stat <- filterWindows(chip, control, type="control", prior.count=5)
+keep <- filter.stat$filter > log2(3)
+@
+
+% If you have a large bin, you get a precise estimate of the background rate, so you don't need a prior when computing the log-fold increase.
+% You'll still be susceptible when the background is completely empty; but in that case, there's probably nothing there, so the true fold change may actually be ~Inf.
+% If you have a small bin, the number of background reads fluctuates by sampling, so you need a large prior to avoid selecting for regions with randomly low background.
+% This is actually the case here; if you look for things that are kept with prior.count=2, you'll find a lot of things with low counts in the ChIP sample.
+
+The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
+The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
+If this is the case, the filtering procedure described above is inappropriate as it will select for windows with differences between ChIP and control samples. 
+This compromises the assumption of the null hypothesis during testing, resulting in loss of type I error control.
+
+% This is the best way to deal with GC biases, as you can just grab any old input off the web and use it (citation?).
+% Alternatively, you could estimate the expected background from a GC content vs. abundance curve on the ChIP data, but that's susceptible to inflation from genuine binding.
+
+\section{By prior information}
+When only a subset of genomic regions are of interest, DB detection power can be improved by removing windows lying outside of these regions. 
+Such regions could include promoters, enhancers, gene bodies or exons. 
+Alternatively, sites could be defined from a previous experiment or based on the genome sequence, e.g., TF motif matches.
+The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
+
+<<>>=
+require(TxDb.Mmusculus.UCSC.mm10.knownGene)
+broads <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)
+broads <- resize(broads, width(broads)+3000, fix="end")
+head(broads)
+@
+ 
+Windows can be filtered to only retain those which overlap with the regions of interest. 
+Discerning users may wish to distinguish between full and partial overlaps, though this should not be a significant issue for small windows.
+This could also be combined with abundance filtering to retain windows that contain putative binding sites in the regions of interest.
+
+<<>>=
+suppressWarnings(keep <- overlapsAny(rowRanges(data), broads))
+sum(keep)
+@
+
+Any information used here should be independent of the DB status under the null in the current dataset. 
+For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
+However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
+
+\section{Some additional comments about filtering}
+It should be stressed that these filtering strategies do not eliminate subjectivity.
+Some thought is still required in selecting an appropriate proportion of bound sites or minimum fold change above background for each method.
+Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold on the abundance.
+
+As a general rule, users should filter less aggressively if there is any uncertainty about the features of interest.
+In particular, the thresholds shown in this chapter for each filtering statistic are fairly mild.
+This ensures that more potential DB windows are retained for testing.
+Of course, if no such DB windows exist, then the greater number of tests will result in loss of power for the DB windows that would be retained by an aggressive filter.
+This is a necessary cost, as there is no way to know the DB status without actually testing.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 \chapter{Calculating normalization factors}
 \label{chap:norm}
 \begin{combox}
@@ -966,263 +1224,6 @@ In the worst case, the removal of the corresponding libraries may be necessary t
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Filtering prior to correction}
-\label{chap:filter}
-
-\begin{combox}
-This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
-We will also need the \code{normfacs} vector from Chapter~\ref{chap:norm}. 
-%Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
-Finally, we'll need the \code{aveLogCPM} function from the \edger{} package (that we've already loaded, unless you skipped the last chapter).
-\end{combox}
-
-\section{Independent filtering for count data}
-Many of the low abundance windows in the genome correspond to background regions in which DB is not expected. 
-Indeed, windows with low counts will not provide enough evidence against the null hypothesis to obtain sufficiently low $p$-values for DB detection. 
-Similarly, some approximations used in the statistical analysis will fail at low counts. 
-Removing such uninteresting or ineffective tests reduces the severity of the multiple testing correction, increases detection power amongst the remaining tests and reduces computational work.
-
-Filtering is valid so long as it is independent of the test statistic under the null hypothesis \citep{bourgon2010}. 
-In the negative binomial (NB) framework, this (probably) corresponds to filtering on the overall NB mean. 
-The DB $p$-values retained after filtering on the overall mean should be uniform under the null hypothesis, by analogy to the normal case. 
-Row sums can also be used for datasets where the effective library sizes are not very different, or where the counts are assumed to be Poisson-distributed between biological replicates. 
-
-In \edger{}, the log-transformed overall NB mean is referred to as the average abundance.
-This is computed with the \code{aveLogCPM} function, as shown below for each region.
-
-<<>>=
-abundances <- aveLogCPM(asDGEList(data))
-summary(abundances)
-@
-
-For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
-This restricts the analysis to windows with abundances above this threshold.
-While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
-Estimates of downstream statistics are also more relevant when they are based on the windows of interest. 
-That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
-
-<<>>=
-keep <- abundances > -1
-demo <- data[keep,]
-summary(keep)
-@
-
-The exact choice of filter threshold may not be obvious.
-In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
-A threshold that is too small will be ineffective, whereas a threshold that is too large may decrease power by removing true DB sites.
-Arbitrariness is unavoidable when balancing these opposing considerations.
-
-Nonetheless, several strategies for defining the threshold are described below.
-Users should start by choosing \textbf{one} of these filtering approaches for their analyses.
-Different filters can also be combined in more advanced applications, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
-However, any benefit will depend on the type of filters involved.
-The greatest effect is observed for filters that operate on different principles.
-
-\section{By proportion}
-One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
-This corresponds to the top proportion of high-abundance windows.
-The total number of windows is calculated from the genome length and the \code{spacing} interval used in \code{windowCounts}. 
-The \code{filterWindows} function returns the ratio of the rank of each window to this total, where higher-abundance windows have larger ranks.
-Users can then retain those windows with rank ratios above the unbound proportion of the genome.
-
-<<>>=
-keep <- filterWindows(data, type="proportion")$filter > 0.999
-sum(keep)
-@
-
-This approach is simple and has the practical advantage of maintaining a constant number of windows for the downstream analysis. 
-However, it may not adapt well to different datasets where the proportion of bound sites can vary.
-Using an inappropriate percentage of binding sites will result in the loss of potential DB regions or inclusion of background regions.
-
-\section{By global enrichment}
-\label{sec:global_filter}
-An alternative approach involves choosing a filter threshold based on the fold change over the level of non-specific enrichment.
-The degree of background enrichment can be estimated by counting reads into large bins across the genome.
-Binning is necessary here to increase the size of the counts when examining low-density background regions. 
-This ensures that precision is maintained when estimating the background abundance.
-
-<<>>=
-bin.size <- 2000L
-binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
-@
-
-The median of the average abundances across all bins can be computed and used as a global estimate of the background coverage.
-This global background can then be compared to the window-based abundances.
-However, some care is required as the sizes of the regions used for read counting are different between bins and windows.
-The average abundance of each bin must be scaled down to be comparable to those of the windows.
-
-With \code{type="global"}, the \code{filterWindows} function returns the increase in the abundance of each window over the global background.
-Windows can be filtered by setting some minimum threshold on this increase.
-Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
-This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
-
-<<>>=
-filter.stat <- filterWindows(data, background=binned, type="global")
-keep <- filter.stat$filter > log2(3)
-sum(keep)
-@
-
-The effect of filtering can also be visualized with a histogram. 
-This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
-Note that bins containing genuine binding sites will usually not be visible on such plots.
-This is due to the dominance of the background-containing bins throughout the genome.
-
-<<eval=FALSE,label=binhist>>=
-hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="", 
-    xlim=c(min(filter.stat$back.abundances), 0))
-global.bg <- filter.stat$abundances - filter.stat$filter
-abline(v=global.bg[1], col="red")
-abline(v=global.bg[1]+log2(3), col="blue")
-@
-
-\setkeys{Gin}{width=0.7\textwidth}
-\begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<binhist>>
-@
-\end{center}
-
-Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
-For TF data, a large cut-off works well as narrow binding sites will have high read densities and are unlikely to be lost during filtering. 
-Smaller minimum fold changes are recommended for diffuse marks where the difference from background is less obvious. 
-
-\section{By local enrichment}
-
-\subsection{Mimicking single-sample peak callers}
-Local background estimators can also be constructed.
-This avoids inappropriate filtering when there are differences in background coverage across the genome. 
-Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
-The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
-This should be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
-
-<<>>=
-surrounds <- 2000
-neighbour <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
-wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
-@
-
-Counts for each window are subtracted from the counts for its neighbourhood. 
-This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
-The width of the window is also subtracted to reflect the effective size of the neighbourhood.
-Again, the abundance of the neighbourhood is scaled down for a valid comparison to that of the corresponding window.
-This work is done by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighbourhood.
-
-<<>>=
-filter.stat <- filterWindows(data, wider, type="local")
-@
-
-Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
-In this scenario, a 3-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
-This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
-
-<<>>=
-keep <- filter.stat$filter > log2(3)
-sum(keep)
-@
-
-Note that this procedure also assumes that no other enriched regions are present in each neighbourhood. 
-Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
-This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighbourhood.
-
-If this seems too complicated, an alternative is to identify locally enriched regions using peak-callers like \macs{}. 
-Filtering can then be performed to retain only windows within called peaks.  
-However, peak calling must be done independently of the DB status of each window. 
-If libraries are of similar size or biological variability is low, reads can be pooled into one library for single-sample peak calling \citep{lun2014}. 
-This is equivalent to filtering on the average count and avoids loss of the type I error control from data snooping.
-
-\subsection{Identifying local maxima}
-Another approach uses the \code{findMaxima} function to identify local maxima in the read density across the genome.
-The code below will determine if each window is a local maximum, i.e., whether it has the highest average abundance within 1 kbp on either side.
-The data can then be filtered to retain only these locally maximal windows.
-This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
-
-<<>>=
-maxed <- findMaxima(rowRanges(data), range=1000, metric=abundances)
-summary(maxed)
-@
-
-This approach is very aggressive and should only be used (sparingly) in datasets where binding is sharp, simple and isolated.
-Complex binding events involving diffuse enrichment or adjacent binding sites will not be handled well.
-For example, DB detection will fail if a low-abundance DB window is ignored in favour of a high-abundance non-DB neighbour.
-
-\subsection{With negative controls}
-Negative controls for ChIP-seq refer to input or IgG libraries where the IP step has been skipped or compromised with an irrelevant antibody, respectively. 
-This accounts for sequencing/mapping biases in ChIP-seq data. 
-IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
-These controls are mostly irrelevant when testing for DB between ChIP samples. 
-However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
-
-<<>>=
-in.demo <- windowCounts(c(bam.files, "IgG.bam"), ext=frag.len)
-chip <- in.demo[,1:4]
-control <- in.demo[,5]
-@
-
-The \code{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
-A larger \code{prior.count} of 5 is used to compute the average abundance.
-This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
-Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from  larger bins with more counts.
-The example below requires a 3-fold or greater increase over the control to retain the window.
-
-<<>>=
-filter.stat <- filterWindows(chip, control, type="control", prior.count=5)
-keep <- filter.stat$filter > log2(3)
-@
-
-% If you have a large bin, you get a precise estimate of the background rate, so you don't need a prior when computing the log-fold increase.
-% You'll still be susceptible when the background is completely empty; but in that case, there's probably nothing there, so the true fold change may actually be ~Inf.
-% If you have a small bin, the number of background reads fluctuates by sampling, so you need a large prior to avoid selecting for regions with randomly low background.
-% This is actually the case here; if you look for things that are kept with prior.count=2, you'll find a lot of things with low counts in the ChIP sample.
-
-The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
-The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
-If this is the case, the filtering procedure described above is inappropriate as it will select for windows with differences between ChIP and control samples. 
-This compromises the assumption of the null hypothesis during testing, resulting in loss of type I error control.
-
-% This is the best way to deal with GC biases, as you can just grab any old input off the web and use it (citation?).
-% Alternatively, you could estimate the expected background from a GC content vs. abundance curve on the ChIP data, but that's susceptible to inflation from genuine binding.
-
-\section{By prior information}
-When only a subset of genomic regions are of interest, DB detection power can be improved by removing windows lying outside of these regions. 
-Such regions could include promoters, enhancers, gene bodies or exons. 
-Alternatively, sites could be defined from a previous experiment or based on the genome sequence, e.g., TF motif matches.
-The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
-
-<<>>=
-require(TxDb.Mmusculus.UCSC.mm10.knownGene)
-broads <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)
-broads <- resize(broads, width(broads)+3000, fix="end")
-head(broads)
-@
- 
-Windows can be filtered to only retain those which overlap with the regions of interest. 
-Discerning users may wish to distinguish between full and partial overlaps, though this should not be a significant issue for small windows.
-This could also be combined with abundance filtering to retain windows that contain putative binding sites in the regions of interest.
-
-<<>>=
-suppressWarnings(keep <- overlapsAny(rowRanges(data), broads))
-sum(keep)
-@
-
-Any information used here should be independent of the DB status under the null in the current dataset. 
-For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
-However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
-
-\section{Some additional comments about filtering}
-It should be stressed that these filtering strategies do not eliminate subjectivity.
-Some thought is still required in selecting an appropriate proportion of bound sites or minimum fold change above background for each method.
-Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold on the abundance.
-
-As a general rule, users should filter less aggressively if there is any uncertainty about the features of interest.
-In particular, the thresholds shown in this chapter for each filtering statistic are fairly mild.
-This ensures that more potential DB windows are retained for testing.
-Of course, if no such DB windows exist, then the greater number of tests will result in loss of power for the DB windows that would be retained by an aggressive filter.
-This is a necessary cost, as there is no way to know the DB status without actually testing.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \chapter{Testing for differential binding}
 \label{chap:stats}
 
@@ -1232,7 +1233,7 @@ Just let me assign the filtered list back to \code{data}, because I put it in th
 
 <<>>=
 original <- data
-data <- demo
+data <- filtered.data
 @
 
 You'll also need the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
