@@ -126,17 +126,17 @@ colnames(design) <- c("intercept", "cell.type")
 <<>>=
 require(csaw)
 data <- windowCounts(bam.files, ext=110, width=10)
-binned <- windowCounts(bam.files, bin=TRUE, width=10000)
-@
-\item Calculating normalization factors.
-<<>>=
-normfacs <- normalize(binned)
 @
 \item Filtering out uninteresting regions.
 <<>>=
 require(edgeR)
 keep <- aveLogCPM(asDGEList(data)) >= -1
 data <- data[keep,]
+@
+\item Calculating normalization factors.
+<<>>=
+binned <- windowCounts(bam.files, bin=TRUE, width=10000)
+normfacs <- normalize(binned)
 @
 \item Identifying DB windows.
 <<>>=
