@@ -920,7 +920,7 @@ Use of an aggressive filter risks the complete loss of detection for such window
 Low numbers of retained windows may also lead to unstable estimates during, e.g., normalization, variance modelling.
 
 Different filters can also be combined in more advanced applications, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
-However, any benefit will depend on the type of filters involved.
+Any benefit will depend on the type of filters involved.
 The greatest effect is observed for filters that operate on different principles.
 For example, the low-count filter can be combined with others to ensure that all retained windows surpass some minimum count.
 This is especially relevant for the local background filters, where a large enrichment value does not guarantee a large count.
