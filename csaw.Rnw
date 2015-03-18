@@ -682,9 +682,6 @@ summary(abundances)
 
 For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
 This restricts the analysis to windows with abundances above this threshold.
-While filtering can be performed at any stage of the analysis prior to the multiple testing correction, doing so at earlier steps is recommended to reduce computational work. 
-Estimates of downstream statistics are also more relevant when they are based on the windows of interest. 
-That said, one should retain enough points for information sharing in Chapter~\ref{chap:stats}.
 
 <<>>=
 keep <- abundances > -1
@@ -698,10 +695,22 @@ A threshold that is too small will be ineffective, whereas a threshold that is t
 Arbitrariness is unavoidable when balancing these opposing considerations.
 
 Nonetheless, several strategies for defining the threshold are described below.
-Users should start by choosing \textbf{one} of these filtering approaches for their analyses.
-Different filters can also be combined in more advanced applications, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
-However, any benefit will depend on the type of filters involved.
-The greatest effect is observed for filters that operate on different principles.
+Users should start by choosing \textbf{one} of these filtering approaches to implement in their analyses.
+
+\section{By count size}
+The simplest approach is to simply filter according to the count size.
+This removes windows for which the counts are simply too low to provide strong evidence for DB.
+The code below retains windows with (library size-adjusted) average counts greater than 5. 
+
+<<>>=
+keep <- abundances > aveLogCPM(5, lib.size=mean(data$totals))
+summary(keep)
+@
+
+However, a count-based filter becomes less effective as the library size increases.
+More windows will be retained with greater sequencing depth, even in uninteresting background regions.
+This increases both computational work and the severity of the multiplicity correction.
+The threshold may also be inappropriate when library sizes are very different.
 
 \section{By proportion}
 One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
@@ -894,6 +903,11 @@ Any information used here should be independent of the DB status under the null 
 For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
 However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
 
+In addition, the filter is unlike the others in that it does not operate on the abundance of the windows. 
+It is possible that the set of retained windows may be very small, e.g., if no non-empty windows overlap the pre-defined regions of interest.
+Thus, it may be prudent to apply this filter before the multiplicity correction but after DB testing.
+This ensures that there are sufficient windows for stable estimation of the downstream statistics.
+
 \section{Some final comments about filtering}
 It should be stressed that these filtering strategies do not eliminate subjectivity.
 Some thought is still required in selecting an appropriate proportion of bound sites or minimum fold change above background for each method.
@@ -901,14 +915,19 @@ Rather, these filters provide a relevant interpretation for what would otherwise
 
 As a general rule, users should filter less aggressively if there is any uncertainty about the features of interest.
 In particular, the thresholds shown in this chapter for each filtering statistic are fairly mild.
-This ensures that more potential DB windows are retained for testing.
-Of course, if no such DB windows exist, then the greater number of tests will result in loss of power for the DB windows that would be retained by an aggressive filter.
-This is a necessary cost, as there is no way to know the DB status without actually testing.
+This ensures that more potentially DB windows are retained for testing.
+Use of an aggressive filter risks the complete loss of detection for such windows, even if power is improved among those that are retained.
+Low numbers of retained windows may also lead to unstable estimates during, e.g., normalization, variance modelling.
+
+Different filters can also be combined in more advanced applications, e.g., by running \code{data[keep1 \& keep2,]} for filter vectors \code{keep1} and \code{keep2}.
+However, any benefit will depend on the type of filters involved.
+The greatest effect is observed for filters that operate on different principles.
+For example, the low-count filter can be combined with others to ensure that all retained windows surpass some minimum count.
+This is especially relevant for the local background filters, where a large enrichment value does not guarantee a large count.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 \chapter{Calculating normalization factors}
 \label{chap:norm}
