@@ -653,14 +653,12 @@ This is intended to protect the user, as any attempt to re-use the \code{ss.para
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Filtering prior to correction}
+\chapter{Filtering out uninteresting windows}
 \label{chap:filter}
 
 \begin{combox}
 This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
-We will also need the \code{normfacs} vector from Chapter~\ref{chap:norm}. 
-%Oh, and the \code{me.demo} list as well, just for a demonstration at the end of this chapter.
-Finally, we'll need the \code{aveLogCPM} function from the \edger{} package (that we've already loaded, unless you skipped the last chapter).
+We'll also need the \code{aveLogCPM} function from \edger{}, so load the package if you haven't already.
 \end{combox}
 
 \section{Independent filtering for count data}
@@ -758,8 +756,9 @@ This is due to the dominance of the background-containing bins throughout the ge
 hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="", 
     xlim=c(min(filter.stat$back.abundances), 0))
 global.bg <- filter.stat$abundances - filter.stat$filter
-abline(v=global.bg[1], col="red")
-abline(v=global.bg[1]+log2(3), col="blue")
+abline(v=global.bg[1], col="red", lwd=2)
+abline(v=global.bg[1]+log2(3), col="blue", lwd=2)
+legend("topright", lwd=2, col=c('red', 'blue'), legend=c("Background", "Threshold"))
 @
 
 \setkeys{Gin}{width=0.7\textwidth}
@@ -895,7 +894,7 @@ Any information used here should be independent of the DB status under the null 
 For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
 However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
 
-\section{Some additional comments about filtering}
+\section{Some final comments about filtering}
 It should be stressed that these filtering strategies do not eliminate subjectivity.
 Some thought is still required in selecting an appropriate proportion of bound sites or minimum fold change above background for each method.
 Rather, these filters provide a relevant interpretation for what would otherwise be an arbitrary threshold on the abundance.
