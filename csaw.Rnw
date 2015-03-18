@@ -1069,14 +1069,14 @@ ac.eff
 This method assumes that most high-abundance bins are not DB. 
 Any systematic changes must be caused by differences in IP efficiency or some other technical issue. 
 However, genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
-Also, some care is required when choosing the top percentage of bins or windows to use for normalization.
-Using too many bins (or windows) will include background regions, while using too few will result in unstable estimates.
-See Chapter~\ref{chap:filter} for more details on filtering to select enriched regions.
+Also, care is required when filtering prior to normalization.
+Retaining too many windows will include background regions, while retaining too few will result in unstable estimates.
+See Chapter~\ref{chap:filter} for more details.
 
-Note that window counts can be used directly as they should be large enough for fold change-based normalization.
-Indeed, users should perform normalization \textit{after} any necessary filtering on the windows (see Chapter~\ref{chap:filter}).
-This ensures that there is no systematic difference between libraries across these windows during DB testing.
-In practice, the estimated normalization factors are usually robust to the choice of window/bin size. 
+Note that TMM normalization is performed on window counts instead of bin counts.
+This is possible as the former should be large enough after filtering and retention of high-abundance candidates (Chapter~\ref{chap:filter}).
+Direct use of the windows also ensures that there is no systematic difference in the counts between libraries during DB testing.
+In practice, the estimated normalization factors are usually robust to the choice of window or bin size. 
 
 \subsection{Checking normalization with MA plots}
 \label{sec:eff_norm_ma}
@@ -1135,7 +1135,7 @@ One such implementation is provided in \code{normalize} by setting \code{type="l
 This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This offset matrix can then be directly used in \edger{}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
-Thus, any filtering that needs to be done (see Chapter~\ref{chap:filter}) should be carried out \textit{before} this normalization step.
+Filtering prior to normalization is strongly recommended, to avoid inaccuracies in loess fitting at low abundances.
 
 The example below operates on the filtered counts for 2000 bp windows.
 This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
@@ -1152,8 +1152,7 @@ head(ac.off)
 
 MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. 
-Filtering is strongly recommended to remove low-abundance regions where loess curve fitting is inaccurate. 
-When doing so, the filter statistic should be based on the average abundance from \code{aveLogCPM}.
+In addition, any filter statistic for the windows should be based on the average abundance from \code{aveLogCPM}.
 An average abundance threshold will act as a clean vertical cutoff in the plots below. 
 Spurious trends that might affect normalization will not be introduced at the filter boundary. 
 
