@@ -556,6 +556,23 @@ If libraries are independent, filtering on the involved subset shouldn't affect 
 % Cleanest under the null; selection of strong DB peaks might favour selection of other strong DB peaks in other groups that have lower dispersions in the mean-variance trend.
 % Though, for this to be an actual problem, it would need to break the assumption of constant dispersions across all libraries.
 
+\subsubsection*{Role of the prior count}
+
+The prior count has two roles - to stabilize both the numerator and denominator in the calculation of the log-fold change.
+This is because both of them are randomly sampled values.
+For the denominator, stabilization is necessary to avoid spuriously large fold changes when the sampled value is near zero.
+Application to the numerator is less obvious but is still required.
+Consider a region with a low but precisely estimated (if not known) mean of the read counts. 
+Most subintervals of this region are empty, but the subinterval with the fortune of obtaining a single count will get a very high log-fold change.
+A prior count protects against this stochasticity.
+
+For the global and local enrichment methods, the prior count focuses on stabilization of the numerator.
+This is because the denominator is estimated from large bins and can be expected to be precise.
+For the control method, both the numerator and denominator are estimated from small windows.
+This means that the variability of the final log-fold change will be doubled, which will affect the discriminative power of the filter.
+A larger prior count is used to prevent this.
+More practically, it mandates a minimum count, e.g., a fold change of 3 with a prior count of 5 is only possible if the count is at least 10.
+
 \subsection*{Comments about FDR control}
 
 \subsubsection*{Algorithm for splitting large clusters}
