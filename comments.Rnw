@@ -539,7 +539,7 @@ For example, a log-fold change of 2 suggests that you can get, at most, a DB fol
 In terms of rankings, the $p$-value from Poisson- or NB-based models will favour high counts.
 This means that high-abundance sites with low relative enrichments would be retained over lower abundance counterparts.
 This is opposed to the log-fold change, for which the expected value does not change with count size (prior count issues notwithstanding).
-As in \code{treat}, I think that the magnitude of the enrichment over background is more important than the significance of a non-zero enrichment (in fact, we could actually use \code{treat} to get the $p$-value).
+As in \code{treat}, the magnitude of the enrichment over background is more important than the significance of a non-zero enrichment (\code{treat} itself would be a compromise between the two).
 The $p$-value might be more sensible at low counts, but that's what the prior count is for.
 A related consideration is that the $p$-value will eventually detect all non-background regions with increasing library size.
 This seems great but, again, it does not regard the magnitude of enrichment. 
