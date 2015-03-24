@@ -536,6 +536,15 @@ However, this range is pretty wide, and I'm not sure that the extra work is wort
 Conversely, having a minimum log-fold change tells us a bit about the minimum maximum scope of DB change (assuming that background is non-DB).
 For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions which scrape past the filter.
 
+In terms of rankings, the $p$-value from Poisson- or NB-based models will favour high counts.
+This means that high-abundance sites with low relative enrichments would be retained over lower abundance counterparts.
+This is opposed to the log-fold change, for which the expected value does not change with count size (prior count issues notwithstanding).
+As in \code{treat}, I think that the magnitude of the enrichment over background is more important than the significance of a non-zero enrichment.
+The $p$-value might be more sensible at low counts, but that's what the prior count is for.
+A related consideration is that the $p$-value will eventually detect all non-background regions with increasing library size.
+This seems great but, again, it does not regard the magnitude of enrichment. 
+The log-fold change threshold is more stable to the sequencing depth.
+
 \subsubsection*{Independence of the average abundance as a filter statistic}
 
 The analogy to the normal case suggests that the average abundance is the independent filter statistic.
@@ -576,6 +585,7 @@ More practically, it mandates a minimum count, e.g., a fold change of 3 with a p
 \subsection*{Comments about FDR control}
 
 \subsubsection*{Algorithm for splitting large clusters}
+
 I suppose we could choose the number of clusters that maximises the average density. 
 It's the most logical way to do it, as we are interested in high-density regions. 
 This will also avoid chaining as clusters with a lot of empty space will be broken up. 
@@ -587,6 +597,7 @@ I think that this is more difficult to interpret compared to the existing method
 And besides, the existing method is fast enough to run a couple of times to check the parameters.
 
 \subsubsection*{Arguments for proper consolidation}
+
 The \textit{ad hoc} alternative is to just merge regions from multiple DB lists together.  
 You'll end up with overlapping results, which means that you wouldn't be controlling the FDR across the merged set. 
 In addition, merging DB lists that have been controlled at a given FDR assumes that there is at least one true positive in each list. 
@@ -611,10 +622,19 @@ sum(alt.sig[-(1:100)])/sum(alt.sig)
 @
 
 \subsubsection*{Using the highest-abundance window as a representative}
+
 This may also be necessary if you don't want to have high spatial resolution, for whatever reason.  
 For example, if you just want to find peaks that are just on/off, then you look at the DB for the window with the maximum abundance.
 You can then avoid the difficult-to-interpret regions involving complex DB events.
 This still has some advantages over straight-up peak calling, as you still maintain high resolution, i.e. you don't get contamination from miscalled peak boundaries.
+
+\subsubsection*{Annotating regions for complex DB}
+
+If you annotate a complex DB region, there's no guarantee that the DB subinterval actually overlaps the annotated feature of interest.
+The better approach would be to combine $p$-values across the feature of interest, to get a direct summary for DB at that feature.
+Trying to do so with annotation of \textit{de novo} clusters is not easy.
+You'd need to overlap the features with significant windows within each cluster.
+This would require some definition of a window-level error rate, but this makes no sense if you end up interpreting the results in terms of clusters or genes. 
 
 \end{document}
 
