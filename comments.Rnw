@@ -596,6 +596,15 @@ So, the question becomes, how big of a density penalty should be applied to a ne
 I think that this is more difficult to interpret compared to the existing method, where parameters are expressed as distances. 
 And besides, the existing method is fast enough to run a couple of times to check the parameters.
 
+\subsubsection*{Filtering on the sign of the log-fold change}
+
+If you want to work on the sign of the log-fold change, it's best to convert each two-sided $p$-value into a one-sided counterpart.
+This can be done by setting the $p$-value to $p/2$ for the correct sign, and $1-p/2$ otherwise.
+I'm not sure that filtering on signs would be sensible as it wouldn't be independent for correlated windows.
+If you want to work on the signs of multiple log-FCs, the best approach might be to do each comparison independently and compute an IUT $p$-value across all one-sided $p$-values.
+It is difficult to show that filtering on multiple signs for an ANOVA-like comparison would be independent.
+In any case, the intersection is easier to interpret as it must be significant across all comparisons.
+
 \subsubsection*{Arguments for proper consolidation}
 
 The \textit{ad hoc} alternative is to just merge regions from multiple DB lists together.  
@@ -635,6 +644,15 @@ The better approach would be to combine $p$-values across the feature of interes
 Trying to do so with annotation of \textit{de novo} clusters is not easy.
 You'd need to overlap the features with significant windows within each cluster.
 This would require some definition of a window-level error rate, but this makes no sense if you end up interpreting the results in terms of clusters or genes. 
+
+Another related problem would be when someone, in looking inside a cluster, wants an error rate for a specific window.
+The obvious approach would be to use a Bonferroni/Holm-corrected window-level $p$-value, where the correction is applied based on the number of windows in that cluster.
+This maintains strong FWER control for any arbitrary selection of hypotheses.
+The resulting value should also  be larger than the combined $p$-value of the cluster (for Bonferroni, at least).
+The real question is whether it is necessary to also correct across clusters.
+You can do so by replacing the combined $p$-value with the corrected value during the BH adjustment, for this cluster only.
+This effectively replaces ``there is DB somewhere in the cluster'' with ``there is DB at this location in the cluster''.
+We preserve a region-level interpretation, as it would be problematic to try to control the window-level FDR.
 
 \end{document}
 
