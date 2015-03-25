@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 20 March 2015}
+Last revised 25 March 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -202,7 +202,7 @@ data <- windowCounts(bam.files, ext=frag.len, width=window.width)
 The data is returned as a \code{SummarizedExperiment} object.
 The matrix of counts is stored as the first entry in the \code{assays} slot.
 Each row corresponds to a genomic window while each column corresponds to a library.
-The coordinates of each window are stored in the \code{rowData}.
+The coordinates of each window are stored in the \code{rowRanges}.
 The total number of reads in each library are stored as \code{totals} in the \code{colData}.
 
 <<>>=
@@ -1469,22 +1469,15 @@ olap <- findOverlaps(broads, rowRanges(data))
 olap
 @
 
-The \code{combineTests} function can be used to combine the $p$-values for all windows in each region. 
-This yields a single combined $p$-value (and its BH-adjusted value) for each region. 
-The average log-CPM and log-FC across all windows in each region are also computed.
+The \code{combineOverlaps} function can be used to combine the $p$-values for all windows in each region. 
+This is a wrapper around \code{combineTests} for \code{Hits} objects.
+It returns a single combined $p$-value (and its BH-adjusted value) for each region. 
+The number of windows in each region that change by more than $\sqrt{2}$ in either direction are also reported.
+Regions that do not overlap any windows have values of \code{NA} in all fields for the corresponding rows.
 
 <<>>=
-tabbroad <- combineTests(queryHits(olap), results$table[subjectHits(olap),])
-head(tabbroad)
-@
-
-The row names of the output table correspond to the cluster identifiers supplied in \code{ids}.
-These should, in turn, act as indices for the regions in \code{broads}.
-It is usually worth subsetting \code{broads} so that each entry matches a row of \code{tabcom}, prior to any downstream operations.
-This is because not all entries in \code{broads} may be overlapped by a window in \code{data}.
-
-<<>>=
-used.broads <- broads[as.integer(rownames(data))]
+tabbroad <- combineOverlaps(olap, results$table)
+head(tabbroad[!is.na(tabbroad$PValue),])
 @
 
 At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
@@ -1508,9 +1501,8 @@ merged$region
 
 A combined $p$-value is computed for each cluster with the \code{combineTests} function.
 The BH method is then applied to control the FDR across all detected clusters.
-Like before, the row names in the output table are indices for the corresponding clusters in \code{merged\$regions}. 
-However, no subsetting is required here as all clusters reported by \code{mergeWindows} should be non-empty.
-This ensures that each cluster will be represented by a row in the table.
+The number of \code{up} or \code{down} windows can be used to gauge whether binding increases or decreases across the cluster.
+Complex DB is often present if both \code{up} and \code{down} are substantially non-zero (opposing changes within the region) or if the total number of windows is much larger than either number (interval of constant binding adjacent to the DB interval).
 
 <<>>=
 tabcom <- combineTests(merged$id, results$table)
@@ -1561,16 +1553,16 @@ The sensitivity of the analysis to the choice of window size can be mitigated by
 DB results from each width can be integrated by clustering adjacent windows together (even if they are of differing sizes), and combining $p$-values within each of the resulting clusters.
 The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
 Some filtering is performed to avoid excessive chaining in this demonstration.
-Corresponding tables of DB results should also be obtained (for brevity, these will be dummied up here).
+Corresponding tables of DB results should also be obtained (for brevity, mock results are used here).
 
 <<>>=
 h3.files <-  c("h3ac.bam", "h3ac_2.bam")
 ac.small <- windowCounts(h3.files, width=150L, spacing=100L, filter=25)
 ac.large <- windowCounts(h3.files, width=1000L, spacing=500L, filter=35)
 ns <- nrow(ac.small)
-dummy.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
+mock.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
 nl <- nrow(ac.large)
-dummy.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
+mock.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
 @
 
 The \code{consolidateSizes} function can then be applied to combine these results.
@@ -1582,13 +1574,21 @@ The weight assigned to each window is inversely proportional to the number of wi
 
 <<>>=
 cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
-    result.list=list(dummy.small, dummy.large), equiweight=TRUE)
+    result.list=list(mock.small, mock.large), equiweight=TRUE)
 cons$region
 @
 
+The same function can also be used to overlap windows of varying size to pre-specified regions.
+This is done by specifying the \code{region} argument, as shown below.
+
+<<>>=
+cons.broad <- consolidateSizes(data.list=list(ac.small, ac.large),
+    result.list=list(mock.small, mock.large), region=broads, equiweight=TRUE)
+@
+
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
-This is most useful for histone marks and other analyses involving diffuse regions of enrichment.
-For such studies, the ideal bin size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
+Consolidation is most useful for histone marks and other analyses involving diffuse regions of enrichment.
+For such studies, the ideal window size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
 
 \section{Choosing a single representative window}
 
@@ -1604,14 +1604,26 @@ head(tab.best)
 @
 
 A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
-This fold change is often more useful than that reported by \code{combineTests}.
-The latter is an average across all windows in the cluster and will have little meaning for large clusters.
-Reporting the \code{best} fold change may be preferable as it focuses on the DB interval.
+This value is useful as it focuses on the DB interval within the cluster.
+Taking the average log-fold change across all windows in a cluster will understate the magnitude of the change.
+It may also be useful to report the start location of the best window.
+This allows investigators to easily identify the DB subinterval within large clusters.
 
 <<>>=
-tabcom$best.fc <- results$table$logFC[tab.best$best]
-tabcom$best.start <- start(rowRanges(data)[tab.best$best])
-head(tabcom[,c("best.fc", "best.start")])
+tabcom$best.logFC <- tab.best$logFC
+tabcom$best.start <- start(rowRanges(data))[tab.best$best]
+head(tabcom[,c("best.logFC", "best.start")])
+@
+
+The same approach can be applied to the overlaps between windows and pre-specified regions, using the \code{getBestOverlaps} wrapper function.
+This is demonstrated below for the broad gene body example.
+As with \code{combineOverlaps}, regions with no windows are assigned \code{NA} in the output table, but these are removed here to show some actual results.
+
+<<>>=
+tab.best.broad <- getBestOverlaps(olap, results$table)
+tabbroad$best.logFC <- tab.best.broad$logFC
+tabbroad$best.start <- start(rowRanges(data))[tab.best.broad$best]
+head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
 @
 
 Typically, the best window will only be used as a descriptive measure for each cluster.
@@ -1637,6 +1649,16 @@ This is relevant for consideration of complex events, e.g., adjacent TF binding 
 Loss of information also increases the sensitivity of the analysis to the clustering procedure.
 For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
 
+A less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
+This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
+If not, the DB event may be complex, e.g., involving multiple peaks or peaks that change in shape or position between conditions.
+These require more careful interpretation than simpler ``binary'' (i.e., on/off) changes.
+
+<<>>=
+tabcom$mab.logFC <- tab.ave$logFC # 'mab' stands for most abundant.
+@
+
+\subsection{Weighting windows on abundance}
 A more graduated approach uses the weighted version of Simes' method, where the window with the highest abundance is upweighted.
 In the example below, the weight assigned to the top window is increased relative to that of other windows in the same cluster.
 This means that the behaviour of the top window will have a greater influence on the final combined $p$-value.
@@ -1650,15 +1672,16 @@ tabcom.w <- combineTests(merged$id, results$table, weight=weights)
 head(tabcom.w)
 @
 
-Finally, a less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
-This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
-If not, the DB event may be complex, e.g., involving multiple peaks or peaks that change in shape or position between conditions.
-These require more careful interpretation than simpler ``binary'' (i.e., on/off) changes.
+The weighting approach can also be applied to the clusters from the broad gene body example.
+This is done by replacing the call to \code{getBestTest} with one to \code{getBestOverlaps}, as before.
+Similarly, \code{upweightSummit} can be replaced with \code{summitOverlaps}.
+These wrappers are designed to minimize book-keeping problems when one window overlaps multiple regions.
 
 <<>>=
-# 'mab' stands for most abundant.
-tabcom$mab.fc <- results$table$logFC[tab.ave$best]
-head(tabcom$mab.fc)
+broad.best <- getBestOverlaps(olap, results$table, by.pval=FALSE)
+head(broad.best[!is.na(broad.best$PValue),])
+broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
+tabbroad.w <- combineOverlaps(olap, results$table, relation.weights=broad.weights) 
 @
 
 \chapter{Post-processing steps}
