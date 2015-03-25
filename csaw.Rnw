@@ -1502,7 +1502,7 @@ merged$region
 A combined $p$-value is computed for each cluster with the \code{combineTests} function.
 The BH method is then applied to control the FDR across all detected clusters.
 The number of \code{up} or \code{down} windows can be used to gauge whether binding increases or decreases across the cluster.
-Complex DB is often present if both \code{up} and \code{down} are substantially non-zero (opposing changes within the region) or if the total number of windows is much larger than either number (interval of constant binding adjacent to the DB interval).
+A complex DB event may be present if both \code{up} and \code{down} are substantially non-zero (i.e., opposing changes within the region) or if the total number of windows is much larger than either number (e.g., interval of constant binding adjacent to the DB interval).
 
 <<>>=
 tabcom <- combineTests(merged$id, results$table)
@@ -1578,7 +1578,7 @@ cons <- consolidateSizes(data.list=list(ac.small, ac.large),
 cons$region
 @
 
-The same function can also be used to overlap windows of varying size to pre-specified regions.
+The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
 This is done by specifying the \code{region} argument, as shown below.
 
 <<>>=
@@ -1681,7 +1681,7 @@ These wrappers are designed to minimize book-keeping problems when one window ov
 broad.best <- getBestOverlaps(olap, results$table, by.pval=FALSE)
 head(broad.best[!is.na(broad.best$PValue),])
 broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
-tabbroad.w <- combineOverlaps(olap, results$table, relation.weights=broad.weights) 
+tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights) 
 @
 
 \chapter{Post-processing steps}
@@ -1842,7 +1842,7 @@ Any technical replicates were merged together using  \code{samtools merge} to fo
 Indexing was performed using \code{samtools index}.
 
 If all relevant SRA files have been obtained, a set of explicit commands can be used to produce each BAM file.
-These commands are stored in a Bash file, accessible at:
+These commands are stored in a Bash file, accessible by running:
 
 <<results=hide>>=
 system.file("doc", "sra2bam.sh", package = "csaw")
