@@ -1489,10 +1489,11 @@ In both cases, window-based methods may be more robust as each interval of the p
 
 \section{Quick and dirty clustering}
 \label{sec:cluster}
-Clustering can also be performed inside \pkgname{} with a simple single-linkage algorithm, implemented in the \code{mergeWindows} function.
-This approach is useful as it avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
-Briefly, all high-abundance windows that are less than some distance apart - say, 1 kbp - are put in the same cluster. 
-The chosen distance reflects some arbitrary minimum distance at which two binding events are considered to be separate sites.
+Clustering can also be performed with a simple single-linkage algorithm in the \code{mergeWindows} function.
+This approach avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
+Windows that are less than \code{tol} apart are considered to be adjacent and are grouped into the same cluster.
+The chosen \code{tol} represents the minimum distance at which two binding events are treated as separate sites.
+Large values (500 - 1000 bp) reduce redundancy and favour a region-based interpretation of the results, while smaller values ($< 200$ bp) allow resolution of individual binding sites.
 
 <<>>=
 merged <- mergeWindows(rowRanges(data), tol=1000L)
