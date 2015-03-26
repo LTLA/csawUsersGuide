@@ -506,7 +506,7 @@ Cross-correlation plots can also be used for fragment length estimation of narro
 However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g., H3K27 trimethylation).
 
 <<label=histone_ccf,eval=FALSE>>=
-n <- 10000
+n <- 1000
 dedup.on <- readParam(dedup=TRUE)
 h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
 h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
