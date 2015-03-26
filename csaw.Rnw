@@ -649,6 +649,11 @@ Any value for \code{forward} in the input \code{param} object will be ignored.
 In fact, the function will \textit{only} accept a \code{NULL} value for this slot.
 This is intended to protect the user, as any attempt to re-use the \code{ss.param} object in functions that are not designed for strand specificity will (correctly) raise an error.
 
+<<results=hide,echo=FALSE>>=
+rm(demo, ss.counts, windowed)
+gc()
+@
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -919,6 +924,11 @@ Any benefit will depend on the type of filters involved.
 The greatest effect is observed for filters that operate on different principles.
 For example, the low-count filter can be combined with others to ensure that all retained windows surpass some minimum count.
 This is especially relevant for the local background filters, where a large enrichment value does not guarantee a large count.
+
+<<results=hide,echo=FALSE>>=
+rm(binned, in.demo, wider, neighbour, chip, control, filter.stat)
+gc()
+@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1215,7 +1225,7 @@ binned <- windowCounts(bam.files, bin=TRUE, width=2000L)
 adj.counts <- cpm(asDGEList(binned), log=TRUE)
 for (top in c(100, 500, 1000, 5000)) {
     out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"), 
-        labels=c("es", "es", "tn", "tn"), top=top)
+        labels=c("es.1", "es.2", "tn.1", "tn.2"), top=top)
 }
 @
 
@@ -1231,6 +1241,11 @@ This indicates that the results are reproducible and that the effect sizes are l
 Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
 Any outliers should also be noted as their presence may confound the downstream analysis.
 In the worst case, the removal of the corresponding libraries may be necessary to obtain sensible results.
+
+<<results=hide,echo=FALSE>>=
+rm(binned, demo, ac.demo, ac.bin, me.demo, me.bin, ac.demo2, filtered, keep, adj.counts, adjc)
+gc()
+@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1400,6 +1415,10 @@ The \code{contrast} argument in the \code{glmQLFTest} function specifies which f
 In this case, a contrast of \code{c(0, 1)} defines the null hypothesis as \code{0*intercept + 1*cell.type = 0}, i.e., that the log-fold change between cell types is zero. 
 DB windows can then be identified by rejecting the null. 
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
+
+<<echo=FALSE,results=hide>>=
+gc()
+@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1791,6 +1810,15 @@ plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
 <<regionplot>>
 @
 \end{center}
+
+<<echo=FALSE,results=hide>>=
+rm(ac.small, ac.large)
+gc()
+@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Epilogue}
 
