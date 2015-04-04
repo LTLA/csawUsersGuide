@@ -48,6 +48,7 @@ In particular, comparisons to input are not like-for-like, as you miss IP-specif
 This shows up as reproducible differences in the TapeStation profiles (recall Alikesei's H3K27me3 data).
 It manifests most clearly as differences in coverage across repeat regions where biases are amplified, e.g., mitochondria.
 While the worst offenders can easily be filtered out, the real problem is where the biases are subtle such that they confound the actual differences.
+For example, non-specific binding would show up as a putative peak as there's nothing to cancel it out in the input.
 IgG's are better but they face a conundrum in that they are harder to generate as your IP procedure improves, i.e., becomes cleaner.
 
 Of course, you could level the accusation that DB also detects a number of false positives, due to changes in chromatin structure, fragmentation, etc. between conditions.
