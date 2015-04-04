@@ -45,9 +45,18 @@ It's also easier than looking for absolute binding, as the null hypothesis is we
 You don't need to construct a background model, as you would do in single-sample peak calling.
 You don't need to compare to a negative control, as you would do in two-sample peak calling.
 In particular, comparisons to input are not like-for-like, as you miss IP-specific biases when you skip the IP.
-This shows up as reproducible differences in the TapeStation profiles (recall Alikesei's H3K27me3 data) and manifests most clearly in coverage across repeat regions where biases are amplified, e.g., mitochondria.
+This shows up as reproducible differences in the TapeStation profiles (recall Alikesei's H3K27me3 data).
+It manifests most clearly as differences in coverage across repeat regions where biases are amplified, e.g., mitochondria.
 While the worst offenders can easily be filtered out, the real problem is where the biases are subtle such that they confound the actual differences.
 IgG's are better but they face a conundrum in that they are harder to generate as your IP procedure improves, i.e., becomes cleaner.
+
+Of course, you could level the accusation that DB also detects a number of false positives, due to changes in chromatin structure, fragmentation, etc. between conditions.
+This problem balances out the disadvantage of non-``like-for-likeness'' for a comparison to input.
+Both sets of false positives are the cost of doing business in an imperfect system.
+However, I would argue that the false positives in DB are \textit{slightly} less confounding.
+Changes in chromatin structure are still biologically interesting, even if it wasn't quite what you were looking for with respect to DB.
+In comparison, the false positives in a comparison to input would be purely technical in origin. 
+In any case, these should form a minority of the detected regions in a successful experiment.
 
 \subsection*{Comments on counting}
 
