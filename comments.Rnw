@@ -618,6 +618,20 @@ I think that this is more difficult to interpret compared to the existing method
 And besides, the existing method is fast enough to run a couple of times to check the parameters.
 
 \subsubsection*{Filtering on the sign of the log-fold change}
+There are also provisions for clustering based on the sign of the log-fold change. 
+The idea is that clusters will be broken up wherever the sign changes. 
+This will separate binding sites that are close together but are changing in opposite directions. 
+It will also make cluster definitions easier, as windows corresponding to a single event are likely to have the same fold change (as distinct from background, which should be more-or-less random).
+A vector can be supplied in \code{sign} to indicate whether each window has a positive log-fold change.
+
+<<eval=FALSE>>=
+merged.sign <- mergeWindows(rowRanges(data), tol=1000L, sign=(results$table$logFC > 0))
+@
+
+For routine analyses, sign-based filtering is not recommended as the sign of windows within each cluster is not independent of their DB status. 
+Windows in a genuine DB region will form one cluster (consistent sign) whereas those in non-DB regions will form many clusters (inconsistent sign, as the log-fold change is small).
+This results in conservativeness as more clusters will have large $p$-values.
+Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
 If you want to work on the sign of the log-fold change, it's best to convert each two-sided $p$-value into a one-sided counterpart.
 This can be done by setting the $p$-value to $p/2$ for the correct sign, and $1-p/2$ otherwise.

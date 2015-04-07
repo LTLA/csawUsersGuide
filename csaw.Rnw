@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 25 March 2015}
+Last revised 7 April 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -1551,21 +1551,6 @@ This paramater can also interpreted as the maximum distance at which two binding
 merged.max <- mergeWindows(rowRanges(data), tol=1000L, max.width=5000L)
 summary(width(merged.max$region))
 @
-
-There are also provisions for clustering based on the sign of the log-fold change. 
-The idea is that clusters will be broken up wherever the sign changes. 
-This will separate binding sites that are close together but are changing in opposite directions. 
-A vector can be supplied in \code{sign} to indicate whether each window has a positive log-fold change.
-
-<<>>=
-merged.sign <- mergeWindows(rowRanges(data), tol=1000L, sign=(results$table$logFC > 0))
-summary(width(merged.sign$region))
-@
-
-For routine analyses, sign-based filtering is not recommended as the sign of windows within each cluster is not independent of their DB status. 
-Windows in a genuine DB region will form one cluster (consistent sign) whereas those in non-DB regions will form many clusters (inconsistent sign, as the log-fold change is small).
-This results in conservativeness as more clusters will have large $p$-values.
-Furthermore, any attempt to filter away small clusters will cause liberalness if too many large $p$-values are lost.
 
 \section{Integrating results from multiple window sizes}
 \label{sec:bin_integrate}
