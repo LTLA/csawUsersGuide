@@ -689,9 +689,9 @@ For demonstration purposes, an arbitrary threshold of -1 is used here to filter 
 This restricts the analysis to windows with abundances above this threshold.
 
 <<>>=
-keep <- abundances > -1
-filtered.data <- data[keep,]
-summary(keep)
+keep.simple <- abundances > -1
+filtered.data <- data[keep.simple,]
+summary(keep.simple)
 @
 
 The exact choice of filter threshold may not be obvious.
@@ -701,6 +701,7 @@ Arbitrariness is unavoidable when balancing these opposing considerations.
 
 Nonetheless, several strategies for defining the threshold are described below.
 Users should start by choosing \textbf{one} of these filtering approaches to implement in their analyses.
+Each approach yields a logical vector that can be used in the same way as \code{keep.simple}.
 
 \section{By count size}
 The simplest approach is to simply filter according to the count size.
@@ -831,6 +832,7 @@ If libraries are of similar size or biological variability is low, reads can be 
 This is equivalent to filtering on the average count and avoids loss of the type I error control from data snooping.
 
 \subsection{Identifying local maxima}
+\label{sec:localmax}
 Another approach uses the \code{findMaxima} function to identify local maxima in the read density across the genome.
 The code below will determine if each window is a local maximum, i.e., whether it has the highest average abundance within 1 kbp on either side.
 The data can then be filtered to retain only these locally maximal windows.
@@ -1255,15 +1257,8 @@ gc()
 \label{chap:stats}
 
 \begin{combox}
-For this next section, we'll be needing the \code{data} list that was generated in Chapter~\ref{chap:count} and filtered in Chapter~\ref{chap:filter}. 
-Just let me assign the filtered list back to \code{data}, because I put it in the dummy variable \code{demo} in the previous chapter:
-
-<<>>=
-original <- data
-data <- filtered.data
-@
-
-You'll also need the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
+Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter} and the original \code{data} from Chapter~\ref{chap:count}.
+We'll also need the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
 Finally - it should be obvious, but several \edger{} functions will be needed here.
 Make sure the \edger{} package is loaded if you've been skipping chapters.
 \end{combox}
@@ -1288,7 +1283,7 @@ Here, the \code{normfacs} vector from TMM normalization of background bins is us
 If an offset matrix is necessary (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
 
 <<>>=
-y <- asDGEList(data, norm.factors=normfacs)
+y <- asDGEList(filtered.data, norm.factors=normfacs)
 @
 
 The experimental design is described by a design matrix. 
@@ -1322,7 +1317,7 @@ For the NB dispersions, a mean-dispersion trend is fitted across all windows to 
 The raw QL dispersion for each window is estimated after fitting a GLM with the trended NB dispersion. 
 Another mean-dependent trend is fitted to the raw QL estimates.  
 An empirical Bayes (EB) strategy is then used to stabilize the raw QL dispersion estimates by shrinking them towards the second trend \citep{lund2012}. 
-The ideal amount of shrinkage is determined from the heteroskedasticity of the data.
+The ideal amount of shrinkage is determined from the variability of the dispersions.
 
 <<eval=FALSE,label=shrinkx>>=
 par(mfrow=c(1,2))
@@ -1356,8 +1351,8 @@ Users can compare raw and filtered results to see whether this makes any differe
 Such filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
 <<label=rmchecker,eval=FALSE>>=
-relevant <- rowSums(assay(original)) >= 20 # some filtering; otherwise, it takes too long.
-yo <- asDGEList(original[relevant], norm.factors=normfacs)
+relevant <- rowSums(assay(data)) >= 20 # some filtering; otherwise, it takes too long.
+yo <- asDGEList(data[relevant], norm.factors=normfacs)
 yo <- estimateDisp(yo, design)
 oo <- order(yo$AveLogCPM)
 plot(yo$AveLogCPM[oo], sqrt(yo$trended.dispersion[oo]), type="l", lwd=2,
@@ -1374,9 +1369,9 @@ legend("topright", c("raw", "filtered"), col=c("black", "grey"), lwd=2)
 @
 \end{center}
 
-\subsection{Modelling heteroskedasticity}
-The heteroskedasticity of the data is modelled in \edger{} by the prior degrees of freedom (d.f.).
-A large value for the prior d.f. indicates that heteroskedasticity is low. 
+\subsection{Modelling variable dispersions between windows}
+Any variability in the dispersions across windows is modelled in \edger{} by the prior degrees of freedom (d.f.).
+A large value for the prior d.f. indicates that the variability is low. 
 This means that more EB shrinkage can be performed to reduce uncertainty and maximize power. 
 However, strong shrinkage is not appropriate if the dispersions are highly variable. 
 Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
@@ -1428,8 +1423,8 @@ gc()
 
 \begin{combox}
 All right, we're almost there. 
-This chapter needs the \code{results} object from the last chapter. 
-You'll also need the filtered \code{data} list from Chapter~\ref{chap:count} (see the comment box in the last chapter), as well as the \code{broads} object from Chapter~\ref{chap:filter}. 
+This chapter needs the \code{results} object from the last chapter.
+We also need a bunch of things from Chapter~\ref{chap:filter} - namely, the \code{filtered.data} list, the \code{broads} object and the \code{keep.simple} and \code{maxed} vectors.
 \end{combox}
 
 \section{Problems with false discovery rate control}
@@ -1484,7 +1479,7 @@ Alternatively, called peaks can be used provided that sufficient care has been t
 In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
 
 <<>>=
-olap <- findOverlaps(broads, rowRanges(data))
+olap <- findOverlaps(broads, rowRanges(filtered.data))
 olap
 @
 
@@ -1515,7 +1510,7 @@ The chosen \code{tol} represents the minimum distance at which two binding event
 Large values (500 - 1000 bp) reduce redundancy and favour a region-based interpretation of the results, while smaller values ($< 200$ bp) allow resolution of individual binding sites.
 
 <<>>=
-merged <- mergeWindows(rowRanges(data), tol=1000L)
+merged <- mergeWindows(rowRanges(filtered.data), tol=1000L)
 merged$region
 @
 
@@ -1548,7 +1543,7 @@ Any value from 2000 to 10000 bp is recommended.
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
 <<>>=
-merged.max <- mergeWindows(rowRanges(data), tol=1000L, max.width=5000L)
+merged.max <- mergeWindows(rowRanges(filtered.data), tol=1000L, max.width=5000L)
 summary(width(merged.max$region))
 @
 
@@ -1616,7 +1611,7 @@ This allows investigators to easily identify the DB subinterval within large clu
 
 <<>>=
 tabcom$best.logFC <- tab.best$logFC
-tabcom$best.start <- start(rowRanges(data))[tab.best$best]
+tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
 head(tabcom[,c("best.logFC", "best.start")])
 @
 
@@ -1627,7 +1622,7 @@ As with \code{combineOverlaps}, regions with no windows are assigned \code{NA} i
 <<>>=
 tab.best.broad <- getBestOverlaps(olap, results$table)
 tabbroad$best.logFC <- tab.best.broad$logFC
-tabbroad$best.start <- start(rowRanges(data))[tab.best.broad$best]
+tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
 head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
 @
 
@@ -1688,6 +1683,31 @@ head(broad.best[!is.na(broad.best$PValue),])
 broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
 tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights) 
 @
+
+\section{Filtering after testing but before correction}
+Most of the filters in Chapter~\ref{chap:filter} are applied before the statistical analysis.
+However, some of the approaches may be too aggressive, e.g., filtering to retain only local maxima, filtering based on pre-defined regions.
+In such cases, it may be preferable to apply one of the other, milder filters first.
+This ensures that sufficient windows are retained for stable normalization and/or EB shrinkage.
+The aggressive filters can then be applied after the statistics have been calculated.
+This is still beneficial as it removes irrelevant windows that would increase the severity of the BH correction.
+It may also reduce chaining effects during clustering.
+
+For example, say the user wants to focus on local maxima.
+Assume that the test statistics are computed from \code{filtered.data}, as generated with the mild \code{keep.simple} filter in Chapter~\ref{chap:filter}.
+These filtered windows are re-filtered, using the \code{maxed} vector from Section~\ref{sec:localmax} to identify those that are local maxima.
+The re-filtered windows and their corresponding test statistics can then be used for all FDR-controlling procedures described in this chapter.
+
+<<>>=
+maxed.new <- maxed[keep.simple]
+maxed.data <- filtered.data[maxed.new,]
+maxed.res <- results[maxed.new,]
+@
+
+Any filter vector from Chapter~\ref{chap:filter} can be used in place of \code{maxed}, so long as it was generated with the original \code{data}.
+Generating the filter vectors with \code{data} instead of \code{filtered.data} is generally recommended, as it avoids any unforseen interactions between filters.
+In particular, the local maxima filter depends on the abundance of adjacent windows.
+It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
 
 \chapter{Post-processing steps}
 
