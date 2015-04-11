@@ -153,8 +153,16 @@ However, it is unable to deal with variable sizes of enriched regions, requiring
 Using a suboptimal value might reduce power but it shouldn't change the rankings of the regions. 
 
 You could also get methods designed to create regions based on differences in density.
-But, the magnitude of the difference required for the creation of  a new region is going to be arbitrary.
+But, the magnitude of the difference required for the creation of a new region is going to be arbitrary.
 A slow decline in density from high to low won't get picked up if you're looking for big differences.
+
+% One might propose to call peaks in each condition, and then do a setdiff on the genomic intervals between conditions.
+% This would get the unique (and shared) subintervals, which you could then count over.
+% However, this has some technical problems, e.g., how large does the interval have to be for it to be considered?
+% Some threshold is required, as ambiguity in the boundaries will result in spurious ``unique'' subintervals for identical peaks.
+% Moreover, there are a number of statistical problems, not least of which is the fact that you're defining condition-specific intervals.
+% This will surely lead to an inflated false positive rate during testing.
+% You could do the same thing with libraries (being blind to the condition), but then you'll get an inflated variance if intervals are unique to one replicate.
 
 \subsubsection*{Window resolution}
 
