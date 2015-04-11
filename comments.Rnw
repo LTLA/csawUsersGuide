@@ -59,6 +59,34 @@ Changes in chromatin structure are still biologically interesting, even if it wa
 In comparison, the false positives in a comparison to input would be purely technical in origin. 
 In any case, these should form a minority of the detected regions in a successful experiment.
 
+\subsubsection{Comments on correcting for changes in chromatin state}
+
+One could theoretically use control data to correct for chromatin state when searching for DB. 
+The most obvious is to subtract the control coverage from the ChIP coverage.
+The idea is to avoid detecting spurious DB due to changes in chromatin state.
+However, this obviously requires sequencing of a negative control sample for each condition, which might be substantially more costly (or not even possible for complex designs without a one-way layout).
+It also assumes that the controls are accurate estimators of background, which mightn't be the case, e.g., for inputs.
+
+Other problems also occur when you have high ChIP and control coverage (where subtraction actually has an effect). 
+Subtraction will mess up the mean-variance relationship as the absolute size of the counts is lost.
+In particular, a small relative difference between libraries at large counts would be amplified in the subtracted counts, such that you'd get false positives (if between groups) or inflated variance (if within groups). 
+You could also end up with negative counts. 
+These need to be coerced to zeros, resulting in an excess of zeros that aren't easily handled by the NB model.
+Using the zero-inflated NB would result in a fair amount of grief.
+Simply filtering out low-abundance windows won't avoid zeros, as the other subtracted counts (e.g., for the replicate) might be large due to variability.
+
+The other approach is to do log-subtraction, where you include the controls as part of the model.
+You could then ask if log-fold change over the control is the same in the two conditions.
+This avoids the statistical problems with pure subtraction, but can result in loss of detection power.
+For example, consider a case where both ChIP and control coverage increases two-fold. 
+This would not be detected after log-correction, as the fold change cancels out.
+However, there is DB here if you assume an additive model, e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the other condition, resulting in $x$ against $2x$ binding between conditions.
+ 
+So, in short, it is difficult to rigorously adjust for changes in chromatin state.
+I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
+Protection is generally provided by filtering, as most changes in state should be depleted after the IP step (unlike, e.g., DNase-seq).
+Of course, if there are likely to be extreme changes, then control correction may be necessary. 
+
 \subsection*{Comments on counting}
 
 \subsubsection*{Fragment length}
