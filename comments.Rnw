@@ -73,7 +73,7 @@ In particular, a small relative difference between libraries at large counts wou
 You could also end up with negative counts. 
 These need to be coerced to zeros, resulting in an excess of zeros that aren't easily handled by the NB model.
 Using the zero-inflated NB would result in a fair amount of grief.
-Simply filtering out low-abundance windows won't avoid zeros, as the other subtracted counts (e.g., for the replicate) might be large due to variability.
+Simply filtering out low-abundance windows won't avoid zeros, as the other subtracted counts (e.g., for the replicate) might be large due to variability for high raw counts.
 
 The other approach is to do log-subtraction, where you include the controls as part of the model.
 You could then ask if log-fold change over the control is the same in the two conditions.
@@ -86,6 +86,7 @@ So, in short, it is difficult to rigorously adjust for changes in chromatin stat
 I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
 Protection is generally provided by filtering, as most changes in state should be depleted after the IP step (unlike, e.g., DNase-seq).
 Of course, if there are likely to be extreme changes, then control correction may be necessary. 
+Subtraction may be okay if there aren't a lot of regions with high control coverage, as the other high-abundance regions will buffer any damage to the EB statistics (though, if those regions are rare, then there mightn't be much point in correcting anyway).
 
 \subsection*{Comments on counting}
 
