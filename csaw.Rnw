@@ -1411,6 +1411,28 @@ In this case, a contrast of \code{c(0, 1)} defines the null hypothesis as \code{
 DB windows can then be identified by rejecting the null. 
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
 
+\section{What to do without replicates}
+Designing a ChIP-seq experiment without any replicates is strongly discouraged.
+Without replication, the reproducibility of any findings cannot be determined. 
+Nonetheless, it may be helpful to salvage some information from datasets that lack replicates.
+This can be done by supplying a ``reasonable'' value for the NB dispersion during GLM fitting.
+A value of 0.05 - 0.1 may be appropriate, based on past experience.
+DB windows can then be identified using the likelihood ratio test.
+
+<<>>=
+fit.norep <- glmFit(y, design, dispersion=0.05)
+results.norep <- glmLRT(fit.norep, contrast=c(0, 1))
+head(results.norep$table)
+@
+
+Obviously, this approach has a number of pitfalls. 
+The lack of replicates means that the biological variability in the data cannot be modelled.
+Thus, it becomes impossible to gauge the sensibility of the supplied NB dispersions in the analysis.
+Another problem is spurious DB due to inconsistent PCR duplication between libraries.
+Normally, inconsistent duplication results in a large QL dispersion for the affected window, such that significance is downweighted.
+However, estimation of the QL dispersion is not possible without replicates.
+This means that duplicates may need to be removed to protect against spurious differences.
+
 <<echo=FALSE,results=hide>>=
 gc()
 @
