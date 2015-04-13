@@ -81,6 +81,11 @@ This avoids the statistical problems with pure subtraction, but can result in lo
 For example, consider a case where both ChIP and control coverage increases two-fold. 
 This would not be detected after log-correction, as the fold change cancels out.
 However, there is DB here if you assume an additive model, e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the other condition, resulting in $x$ against $2x$ binding between conditions.
+
+% The ideal solution would be to switch to an identity-link GLM.
+% This would allow for subtraction-based contrasts, while preserving the mean-variance relationship.
+% However, there's the scaling effect of library size differences, which isn't easy to model with identity offsets.
+% There are also computational difficulties with enforcing positive fitted values.
  
 So, in short, it is difficult to rigorously adjust for changes in chromatin state.
 I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
