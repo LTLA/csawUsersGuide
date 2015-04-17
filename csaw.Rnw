@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 7 April 2015}
+Last revised 17 April 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -1415,9 +1415,8 @@ Specification of the contrast is explained in greater depth in the \edger{} user
 Designing a ChIP-seq experiment without any replicates is strongly discouraged.
 Without replication, the reproducibility of any findings cannot be determined. 
 Nonetheless, it may be helpful to salvage some information from datasets that lack replicates.
-This can be done by supplying a ``reasonable'' value for the NB dispersion during GLM fitting.
-A value of 0.05 - 0.1 may be appropriate, based on past experience.
-DB windows can then be identified using the likelihood ratio test.
+This is done by supplying a ``reasonable'' value for the NB dispersion during GLM fitting (e.g., 0.05 - 0.1, based on past experience).
+DB windows are then identified using the likelihood ratio test.
 
 <<>>=
 fit.norep <- glmFit(y, design, dispersion=0.05)
@@ -1431,7 +1430,7 @@ Thus, it becomes impossible to gauge the sensibility of the supplied NB dispersi
 Another problem is spurious DB due to inconsistent PCR duplication between libraries.
 Normally, inconsistent duplication results in a large QL dispersion for the affected window, such that significance is downweighted.
 However, estimation of the QL dispersion is not possible without replicates.
-This means that duplicates may need to be removed to protect against spurious differences.
+This means that duplicates may need to be removed to protect against false positives.
 
 <<echo=FALSE,results=hide>>=
 gc()
@@ -1721,15 +1720,24 @@ These filtered windows are re-filtered, using the \code{maxed} vector from Secti
 The re-filtered windows and their corresponding test statistics can then be used for all FDR-controlling procedures described in this chapter.
 
 <<>>=
-maxed.new <- maxed[keep.simple]
-maxed.data <- filtered.data[maxed.new,]
-maxed.res <- results[maxed.new,]
+keep.new <- maxed[keep.simple]
+refilt.data <- filtered.data[keep.new,]
+refilt.res <- results[keep.new,]
 @
 
 Any filter vector from Chapter~\ref{chap:filter} can be used in place of \code{maxed}, so long as it was generated with the original \code{data}.
 Generating the filter vectors with \code{data} instead of \code{filtered.data} is generally recommended, as it avoids any unforseen interactions between filters.
 In particular, the local maxima filter depends on the abundance of adjacent windows.
 It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
+
+<<echo=FALSE,results=hide>>=
+rm(ac.small, ac.large, refilt.data)
+gc()
+@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Post-processing steps}
 
@@ -1839,7 +1847,7 @@ plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
 \end{center}
 
 <<echo=FALSE,results=hide>>=
-rm(ac.small, ac.large)
+rm(anno)
 gc()
 @
 
