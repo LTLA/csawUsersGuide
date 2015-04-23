@@ -447,24 +447,25 @@ y.fast <- normalizeCyclicLoess(y, method="fast")
 tail(y.fast, 4)
 @
 
-One might think to overcome this problem by using covariates computed in a pairwise manner, as in Affymetrix-based normalization.
-This helps a little, but the core of the problem still remains.
-Note that this is not truly pairwise normalization, as the adjustment to the values is made after all pairwise normalization is performed.
-In true pairwise normalization, adjustments are made immediately after each pairwise comparison.
-
-<<>>=
-y.affy <- normalizeCyclicLoess(y, method="affy") 
-tail(y.affy, 4)
-@
-
-Using true pairwise cyclic normalization fixes the first gene, but the second and third genes still have spurious DE.
+One might think to overcome this problem by using covariates computed in a pairwise manner.
+This fixes the first gene, but the second and third genes still have spurious DE.
 This is because the success of this procedure depends on the order with which the libraries are normalized.
 In the first gene, the first two libraries are equalized first, which results in consistent behaviour for those two libraries across the remaining normalization steps.
-This is not the case for the second and third genes.
+This is not the case for the second and third genes, where DE inflates the covariate in the first pairwise normalization.
+This distorts the normalized value and affects the outcome of all remaining normalization steps.
 
 <<>>=
 y.pair <- normalizeCyclicLoess(y, method="pair") 
 tail(y.pair, 4)
+@
+
+Affymetrix-based normalization is a slight modification of the pairwise strategy, where the adjustment to the values is made after all pairwise normalization steps are performed.
+This does somewhat better, though the essence of the problem still remains.
+Note that changing the number of iterations in both cases doesn't seem to help.
+
+<<>>=
+y.affy <- normalizeCyclicLoess(y, method="affy") 
+tail(y.affy, 4)
 @
 
 Comparisons to a reference don't help consistently, as it depends on the choice of reference.
