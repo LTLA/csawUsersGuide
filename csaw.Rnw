@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 17 April 2015}
+Last revised 25 April 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -411,7 +411,7 @@ By default, only proper pairs are used whereby the two reads are on the same chr
 <<>>=
 pe.bam <- "example-pet.bam"
 pe.param <- readParam(max.frag=400, pe="both")
-demo <- windowCounts(pe.bam, param=pe.param)
+demo <- windowCounts(pe.bam, ext=250, param=pe.param)
 demo$totals
 @
 \label{data:pet}
@@ -443,16 +443,22 @@ A non-negligble proportion of these reads may be indicative of problems with pai
 c(out$diagnostics, too.large=sum(out$sizes > 400))
 @
 
+Observant readers may notice that \code{ext} was specified in the previous call to \code{windowCounts}.
+This is not strictly necessary for paired-end data, where the fragment length is explicitly calculated for each proper pair.
+However, it is recommended to set \code{ext} to the median fragment length across all pairs in each library - in this case, around 250 bp.
+This ensures consistency with some downstream functions, which assume that the \code{ext} field of the returned \code{SummarizedExperiment} object holds the average fragment length.
+Specification of \code{ext} is also necessary if fragments are to be coerced to the same length, as described in Section~\ref{sec:coercelen}.
+
 In datasets where many read pairs are invalid, the reads in those pairs can be rescued by setting \code{rescue.ext} to a positive integer.
 For each invalid intra-chromosomal read pair, the read with the higher mapping quality score will be directionally extended by \code{rescue.ext} to impute the fragment. 
 The other read in the pair is ignored.
 For inter-chromosomal read pairs, both reads are extended in this manner. 
 Counting will then be performed with these fragments in addition to those from the valid pairs. 
-An appropriate value of \code{rescue.ext} can be chosen based on the mode of the fragment size distribution, above.
+An appropriate value of \code{rescue.ext} can be chosen based on the median of the fragment size distribution, above.
 
 <<>>=
-rescue.param <- reform(pe.param, rescue.ext=200)
-demo <- windowCounts(pe.bam, param=rescue.param)
+rescue.param <- reform(pe.param, rescue.ext=250)
+demo <- windowCounts(pe.bam, ext=250, param=rescue.param)
 demo$totals
 @
 
@@ -528,6 +534,8 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 \end{center}
 
 \subsection{Variable fragment lengths between libraries}
+\label{sec:coercelen}
+
 The \code{windowCounts} function also supports the use of library-specific fragment lengths.
 For example, libraries with larger fragment lengths will have wider peaks.
 The single-end reads in those peaks will then require more extension, in order to impute a fragment interval that covers the binding site.
