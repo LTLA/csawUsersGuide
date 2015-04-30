@@ -1139,6 +1139,10 @@ If so, composition biases should be removed to preserve the assumed DB.
 Otherwise, the differences must represent efficiency biases and should be removed.
 Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are generally expected to be consistent in most conditions.
 
+For the main NF-YA example, there is no expectation of constant binding between cell types.
+Thus, normalization factors will be computed to remove composition biases.
+This ensures that any genuine systematic changes in binding will still be picked up.
+
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
 One possible explanation is that changes in IP efficiency will have little effect at low-abundance background regions and more effect at high-abundance binding sites. 
