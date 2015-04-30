@@ -913,9 +913,9 @@ Any information used here should be independent of the DB status under the null 
 For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
 However, using DB calls from the same dataset to filter regions would violate the null assumption and compromise type I error control.
 
-In addition, the filter is unlike the others in that it does not operate on the abundance of the windows. 
+In addition, this filter is unlike the others in that it does not operate on the abundance of the windows. 
 It is possible that the set of retained windows may be very small, e.g., if no non-empty windows overlap the pre-defined regions of interest.
-Thus, it may be prudent to apply this filter before the multiplicity correction but after DB testing.
+Thus, it may be better to apply this filter before the multiplicity correction but after DB testing.
 This ensures that there are sufficient windows for stable estimation of the downstream statistics.
 
 \section{Some final comments about filtering}
