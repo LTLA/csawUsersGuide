@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 30 April 2015}
+Last revised 3 May 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -1789,6 +1789,30 @@ This can then be used for interactive manipulation, e.g., to identify all genes 
 anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
 anno.ranges
 @
+
+\section{Checking bimodality for TF studies}
+For TF experiments, a simple measure of strand bimodality can be reported as a diagnostic.
+Given a set of regions, the \code{checkBimodality} function will return the maximum bimodality score across all base positions in each region.
+The bimodality score at each base position is defined as the minimum of the ratio of the number of forward- to reverse-stranded reads to the left of that position, and the ratio of the reverse- to forward-stranded reads to the right.
+A high score is only possible if both ratios are large, i.e., strand bimodality is present.
+
+<<>>=
+expanded <- suppressWarnings(resize(merged$region, fix="center", 
+    width=width(merged$region)+50))
+sbm.score <- checkBimodality(bam.files, expanded, width=frag.len)
+head(sbm.score)
+@
+
+In the above code, all regions are expanded by \code{spacing}, i.e., 50 bp.
+This ensures that the optimal bimodality score can be computed for the centre of the binding site, even if that position is not captured by a window.
+The \code{width} argument specifies the span with which to count reads for the score calculation.
+This should be set to the average fragment length.
+If multiple \code{bam.files} are provided, they will be effectively pooled during counting.
+
+For typical TF binding sites, bimodality scores can be considered to be ``high'' if they are larger than 4.
+This allows users to distinguish between genuine binding sites and high-abundance artifacts such as repeats or read stacks.
+However, caution is still required as some high scores may be driven by the stochastic distribution of reads.
+Obviously, the concept of strand bimodality is less relevant for diffuse targets like histone marks.
 
 \section{Saving the results to file}
 It is a simple matter to save the results for later perusal. 
