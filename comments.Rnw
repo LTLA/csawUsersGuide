@@ -115,17 +115,33 @@ However, every difference is interesting, even if it doesn't necessarily occur i
 For example, you mightn't get pronounced bimodality if one half of the peak is sitting somewhere that's unmappable or difficult to sequence. 
 
 Defining bimodality is also difficult. 
-Arbitrary thresholds for bimodality don't necessarily have a good physical interpretation.  
+Arbitrary thresholds for bimodality don't necessarily have a good physical interpretation. 
+Of course, abundance-based filtering also requires an arbitary threshold, but I'd argue that the two cases are different.
+Filtering on abundance is critical so we have to put up with it, whereas we can do without filtering on bimodality.
 This is complicated by the fact that you have to combine background and enriched samples to avoid data snooping; this can dilute bimodality for smaller peaks.
-A problem specific to MACS is that single-sample mode won't pick up two peaks within ~10 kbp; each peak will be increase the observed background for the other.
+A problem specific to MACS is that single-sample mode won't pick up two peaks within $\sim$10 kbp; each peak will be increase the observed background for the other.
 
 Read extension means that bimodal structures will have higher counts than regions with the same number of reads but random read directions. 
 This brings looking for bimodality under the framework of row sum filtering. 
 It is also smoother; if you're not bimodal but there is a difference, you still get picked up.
+This allows us to keep an open mind, and to find things that we weren't expecting to see.
 Unimodal events are only problematic if they are high-abundance, which shouldn't occur if you've removed repeats.
 
 Finally, you can do whatever bimodal filtering you want implicitly, by running your desired peak caller and then picking only those windows that overlap called peaks. 
 This will give you the MTC advantage without requiring too much extra code on my part.
+Alternatively, you can use the \code{checkBimodality} function.
+However, a couple of notes:
+\begin{itemize}
+\item In addition to the reasons mentioned above, I wouldn't recommend filtering on the bimodality scores here, because I don't think it's an independent statistic. 
+For purposes of convenience, I pooled the reads before counting them, such that we use Poisson means to compute the ratios.
+Selection for large scores might result in selection for high abundances (due to the prior count) and selection for DB sites when one library is much larger than the other.
+There's also the issue that the counts are computed on a per-base basis, rather than using window-level counts; I don't know whether this'll compromise independence.
+\item Currently, \code{checkBimodality} is recommended for use as a diagnostic.
+The idea is determine whether a DB region is likely to be a genuine TF binding site.
+However, one counter-argument is that you could get a large region containing a bimodal site that is distinct from the DB subinterval.
+In such cases, the best approach would be to reduce the clustering tolerance so that such sites are separated out.
+Otherwise, we'd have to filter directly on bimodality at the window level, which I don't want to do.
+\end{itemize}
 
 \subsubsection*{Window correlations}
 
