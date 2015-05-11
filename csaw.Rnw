@@ -1236,15 +1236,16 @@ For example, differences in the GC content distribution can be driven by technic
 On a semi-related note, the binned counts can be used to examine the similarity of replicates through multi-dimensional scaling (MDS) plots. 
 The distance between each pair of libraries is computed as the square root of the mean squared log-fold change across the top set of bins with the highest absolute log-fold changes.
 A small top set visualizes the most extreme differences whereas a large set visualizes overall differences.
+Checking a range of \code{top} values may be useful when the scope of DB is unknown.
 Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
 
 <<label=mds,eval=false>>=
 par(mfrow=c(2,2), mar=c(5,4,2,2))
-binned <- windowCounts(bam.files, bin=TRUE, width=2000L, param=param)
+binned <- windowCounts(c(bam.files, "input.bam"), bin=TRUE, width=2000L, param=param)
 adj.counts <- cpm(asDGEList(binned), log=TRUE)
 for (top in c(100, 500, 1000, 5000)) {
-    out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"), 
-        labels=c("es.1", "es.2", "tn.1", "tn.2"), top=top)
+    out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red", "grey30"), 
+        labels=c("es.1", "es.2", "tn.1", "tn.2", "input"), top=top)
 }
 @
 
@@ -1255,8 +1256,9 @@ for (top in c(100, 500, 1000, 5000)) {
 @
 \end{center}
 
-Replicates from different groups should form separate clusters in the plot.
+Replicates from different groups should form separate clusters in the MDS plot.
 This indicates that the results are reproducible and that the effect sizes are large.
+Such clustering is observed in the example above, along with separation from the input sample (note that the input is not essential for plotting, and is only included for demonstration purposes).
 Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
 Any outliers should also be noted as their presence may confound the downstream analysis.
 In the worst case, the removal of the corresponding libraries may be necessary to obtain sensible results.
