@@ -125,7 +125,8 @@ colnames(design) <- c("intercept", "cell.type")
 \item Loading in data from BAM files.
 <<>>=
 require(csaw)
-data <- windowCounts(bam.files, ext=110, width=10)
+param <- readParam(minq=50)
+data <- windowCounts(bam.files, ext=110, width=10, param=param)
 @
 \item Filtering out uninteresting regions.
 <<>>=
@@ -135,7 +136,7 @@ data <- data[keep,]
 @
 \item Calculating normalization factors.
 <<>>=
-binned <- windowCounts(bam.files, bin=TRUE, width=10000)
+binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
 normfacs <- normalize(binned)
 @
 \item Identifying DB windows.
@@ -195,8 +196,9 @@ A count is then obtained for each window in each library.
 
 <<>>=
 frag.len <- 110
-window.width <- 10
-data <- windowCounts(bam.files, ext=frag.len, width=window.width)
+win.width <- 10
+param <- readParam(minq=50)
+data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
 @
 
 The data is returned as a \code{SummarizedExperiment} object.
@@ -265,30 +267,28 @@ The idea is to define the \code{readParam} object once in the pipeline.
 It can then be reused for all relevant functions, to ensure that read loading is consistent throughout the analysis.
 
 <<>>=
-default.param <- readParam()
-default.param
+param
 @
 
-Reads that have been marked as PCR duplicates in the SAM flag can be ignored by setting \code{dedup=TRUE}. 
-This can reduce the variability caused by inconsistent duplication between replicates. 
-However, it also caps the number of reads at each position. 
-This can lead to loss of DB detection power in high abundance regions. 
-Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size. 
-Thus, duplicate removal is not recommended for routine DB analyses. 
-Of course, removal may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
-
-Reads can also be filtered out based on the minimum mapping score with the \code{minq} argument. 
+In the example above, reads are filtered out based on the minimum mapping score with the \code{minq} argument. 
 Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
 Removal of these reads is highly recommended as it will ensure that only the reliable alignments are supplied to \pkgname{}.
 The exact value of the threshold depends on the range of scores provided by the aligner. 
 The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 50 might be appropriate.
 
-An example of read counting with more stringent parameters is shown below.
-Comparison to the values in \code{data\$totals} indicates that fewer reads are used in each library.
+Reads marked as PCR duplicates in the SAM flag can be ignored by setting \code{dedup=TRUE}. 
+This can reduce the variability caused by inconsistent amplification between replicates, and avoid spurious duplicate-driven DB between groups. 
+However, it also caps the number of reads at each position. 
+This can lead to loss of DB detection power in high abundance regions. 
+Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size. 
+Thus, duplicate removal is not recommended for routine DB analyses. 
+Of course, it may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
+An example of counting with duplicate removal is shown below.
+Comparison to \code{data\$totals} indicates that fewer reads are used from each library.
 
 <<>>=
-strict.param <- readParam(minq=50, dedup=TRUE)
-demo <- windowCounts(bam.files, ext=frag.len, width=window.width, param=strict.param)
+dedup.param <- readParam(minq=50, dedup=TRUE)
+demo <- windowCounts(bam.files, ext=frag.len, width=win.width, param=dedup.param)
 demo$totals
 @
 
@@ -297,6 +297,10 @@ Read extraction and counting can be restricted to particular chromosomes by spec
 This avoids the need to count reads on unassigned contigs or uninteresting chromosomes, e.g., the mitochondrial genome for ChIP-seq studies targeting nuclear factors. 
 Alternatively, it allows \code{windowCounts} to work on huge datasets or in limited memory by analyzing only one chromosome at a time.
 
+<<>>=
+restrict.param <- readParam(restrict=c("chr1", "chr10", "chrX"))
+@
+
 Reads lying in certain regions can also be removed by specifying the coordinates of those regions in \code{discard}. 
 This is intended to remove reads that are wholly aligned within known repeat regions but were not removed by the \code{minq} filter. 
 Repeats are problematic as changes in repeat copy number or accessibility between conditions can lead to spurious DB. 
@@ -304,9 +308,7 @@ Removal of reads within repeat regions can avoid detection of these irrelevant d
 
 <<>>=
 repeats <- GRanges("chr1", IRanges(3000001, 3002128))
-new.param <- readParam(discard=repeats, restrict=c("chr1", "chr10", "chrX"))
-demo <- windowCounts(bam.files, ext=frag.len, width=window.width, param=new.param)
-head(rowRanges(demo))
+discard.param <- readParam(discard=repeats)
 @
 
 Coordinates of annotated repeats can be obtained from several different sources.
@@ -328,7 +330,7 @@ The example below copies \code{param} and replaces \code{minq} and \code{discard
 This is safer than directly modifying the slots, as appropriate type/value checking of each class member is performed.
 
 <<>>=
-another.param <- reform(default.param, minq=20, discard=repeats)
+another.param <- reform(param, minq=20, discard=repeats)
 another.param
 @
 
@@ -354,10 +356,9 @@ paramlist <- reformList(paramlist, pe="none")
 checkList(paramlist)
 @
 
-For simplicity, most of the calls to \code{windowCounts} in this guide will use the default settings for \code{param}, i.e., \code{readParam()}.
-However, users are encouraged to construct their own \code{readParam} objects (or lists thereof) and apply them consistently throughout their analyses.
-A good check for synchronisation is to ensure that the values of \code{...\$totals} are identical between calls. 
-This means that the same reads are extracted from the BAM file in each call. 
+Users are encouraged to construct their own \code{readParam} objects (or lists thereof) and apply them consistently throughout their analyses.
+A good measure of synchronisation between \code{windowCounts} calls is to check that the values of \code{...\$totals} are identical between calls. 
+This means that the same reads are probably extracted from the BAM files in each call. 
 
 \subsection{Increasing speed and memory efficiency}
 \label{sec:efficiency}
@@ -369,7 +370,7 @@ Of course, spatial resolution is lost with larger spacings.
 Adjacent positions are not counted and thus cannot be distinguished. 
 
 <<>>=
-demo <- windowCounts(bam.files, spacing=100, ext=frag.len, width=window.width)
+demo <- windowCounts(bam.files, spacing=100, ext=frag.len, width=win.width, param=param)
 head(rowRanges(demo))
 @
 
@@ -387,18 +388,19 @@ The default value of the filter threshold is 10, though it can be raised to redu
 More sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
 <<>>=
-demo <- windowCounts(bam.files, ext=frag.len, width=window.width, filter=30)
+demo <- windowCounts(bam.files, ext=frag.len, width=win.width, filter=30, param=param)
 head(assay(demo))
 @
 
 Setting \code{bin=TRUE} will cause \code{windowCounts} to count reads into contiguous bins across the genome.
-Specifically, \code{spacing} is set to \code{width} and only the $5'$ end of each read is used for counting. 
-No filtering is performed such that a count value will be returned for each genomic bin. 
-Users should set \code{width} to a reasonably large value, e.g., above 1000 bp.
-Otherwise, reads will be counted and reported for every single base in the genome by default.
+Specifically, \code{spacing} is set to \code{width} such that each window forms a bin.
+Only the $5'$ end of each read is used for counting into bins, without any directional extension.
+No filtering is performed on the count sum, such that counts will be returned for each genomic bin. 
+As a result, users should set \code{width} to a reasonably large value.
+This avoids problems with memory constraints when counts are returned for a large number of small bins.
 
 <<>>=
-demo <- windowCounts(bam.files, width=1000, bin=TRUE)
+demo <- windowCounts(bam.files, width=1000, bin=TRUE, param=param)
 head(rowRanges(demo))
 @
 
@@ -488,7 +490,7 @@ For this dataset, an estimate of $\sim$110 bp is obtained from the plot below.
 
 <<label=ccf,eval=FALSE>>=
 max.delay <- 500
-dedup.on <- readParam(dedup=TRUE, minq=50)
+dedup.on <- reform(param, dedup=TRUE)
 x <- correlateReads(bam.files, max.delay, param=dedup.on)
 plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
 @
@@ -513,7 +515,6 @@ However, they are less effective for regions of diffuse enrichment where bimodal
 
 <<label=histone_ccf,eval=FALSE>>=
 n <- 1000
-dedup.on <- readParam(dedup=TRUE)
 h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
 h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
 h3k4me2 <- correlateReads("h3k4me2.bam", n, param=dedup.on)
@@ -545,17 +546,17 @@ The extension lengths are also stored in the \code{SummarizedExperiment} output 
 
 <<>>=
 multi.frag.lens <- c(100, 150, 200, 250)
-demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30)
+demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30, param=param)
 demo$ext
 @
 
 Caution is required to avoid detecting irrelevant DB from differences in peak widths.
-Some protection is provided by scaling extended reads to the same length in all libraries.
+Some protection is provided in \code{windowCounts}, by scaling extended reads to the same length in all libraries.
 Consider a bimodal peak across several libraries.
 Scaling ensures that the subpeak on the forward strand is centered at the same location in each library.
 The same applies for the subpeak on the reverse strand.
 This removes most of the differences in width between libraries.
-The final fragment length is taken from the \code{final.ext} attribute of \code{multi.frag.lens}.
+The final fragment length is taken from the \code{final.ext} attribute of the \code{ext} argument.
 This can be set with \code{makeExtVector}, and is defined as the mean of the fragment lengths by default.
 If \code{final.ext} is not present or is \code{NA}, no rescaling is performed.
 
@@ -634,7 +635,7 @@ This can be performed with the \code{regionCounts} function, which is largely a 
 my.regions <- GRanges(c("chr11", "chr12", "chr15"),
     IRanges(c(75461351, 95943801, 21656501), 
     c(75461610, 95944810, 21657610)))
-reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=strict.param)
+reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
 head(assay(reg.counts))
 @ 
 
@@ -647,8 +648,8 @@ The strand of the output regions indicates the strand on which reads were counte
 Up to two rows can be generated for each window or region, depending on filtering.
 
 <<>>=
-ss.param <- reform(default.param, forward=NULL)
-ss.counts <- strandedCounts(bam.files, ext=frag.len, width=window.width, param=ss.param)
+ss.param <- reform(param, forward=NULL)
+ss.counts <- strandedCounts(bam.files, ext=frag.len, width=win.width, param=ss.param)
 strand(rowRanges(ss.counts))
 @
 
@@ -670,7 +671,7 @@ gc()
 \label{chap:filter}
 
 \begin{combox}
-This chapter will require \code{frag.len} and \code{data} defined in Chapter~\ref{chap:count}.
+This chapter will require the \code{frag.len}, \code{param} and \code{data} from the last chapter, as well as the \code{bam.files} vector we defined at the start.
 We'll also need the \code{aveLogCPM} function from \edger{}, so load the package if you haven't already.
 \end{combox}
 
@@ -751,7 +752,7 @@ This ensures that precision is maintained when estimating the background abundan
 
 <<>>=
 bin.size <- 2000L
-binned <- windowCounts(bam.files, bin=TRUE, width=bin.size)
+binned <- windowCounts(bam.files, bin=TRUE, width=bin.size, param=param)
 @
 
 The median of the average abundances across all bins can be computed and used as a global estimate of the background coverage.
@@ -807,7 +808,7 @@ This should be synchronized with \code{windowCounts} by using the same \code{par
 <<>>=
 surrounds <- 2000
 neighbour <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
-wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len)
+wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len, param=param)
 @
 
 Counts for each window are subtracted from the counts for its neighbourhood. 
@@ -863,7 +864,7 @@ These controls are mostly irrelevant when testing for DB between ChIP samples.
 However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
 
 <<>>=
-in.demo <- windowCounts(c(bam.files, "input.bam"), ext=frag.len)
+in.demo <- windowCounts(c(bam.files, "input.bam"), ext=frag.len, param=param)
 chip <- in.demo[,1:4]
 control <- in.demo[,5]
 @
@@ -877,6 +878,7 @@ The example below requires a 3-fold or greater increase over the control to reta
 <<>>=
 filter.stat <- filterWindows(chip, control, type="control", prior.count=5)
 keep <- filter.stat$filter > log2(3)
+sum(keep)
 @
 
 The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
@@ -950,6 +952,7 @@ gc()
 This next chapter will need the \code{bam.files} vector again. 
 You'll notice that that a number of other BAM files are used in this chapter. 
 However, these are just present for demonstration purposes and aren't necessary for the main NFYA example.
+We'll also need the \code{param} object that we defined in Chapter~\ref{chap:count}.
 \end{combox}
 
 \section{Overview}
@@ -974,7 +977,7 @@ This uses the trimmed mean of M-values (TMM) method \citep{oshlack2010} to corre
 The assumption here is that most bins represent non-DB background regions so any consistent difference across bins must be spurious.
 
 <<>>=
-binned <- windowCounts(bam.files, bin=TRUE, width=10000)
+binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
 normfacs <- normalize(binned)
 normfacs
 @
@@ -1010,9 +1013,9 @@ Testing multiple bin sizes is recommended to ensure that the estimates are robus
 A value of 10000 bp is suitable for most datasets.
 
 <<>>=
-demo <- windowCounts(bam.files, bin=TRUE, width=5000)
+demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
 normalize(demo)
-demo <- windowCounts(bam.files, bin=TRUE, width=15000)
+demo <- windowCounts(bam.files, bin=TRUE, width=15000, param=param)
 normalize(demo)
 @
 
@@ -1067,14 +1070,14 @@ The TMM method can then be applied to eliminate systematic differences across th
 
 <<>>=
 me.files <- c("h3k4me3_mat.bam", "h3k4me3_pro.bam")
-me.demo <- windowCounts(me.files, width=150)
-me.bin <- windowCounts(me.files, bin=TRUE, width=10000) 
+me.demo <- windowCounts(me.files, width=150, param=param)
+me.bin <- windowCounts(me.files, bin=TRUE, width=10000, param=param) 
 keep <- filterWindows(me.demo, me.bin, type="global")$filter > log2(3)
 me.eff <- normalize(me.demo[keep,])
 me.eff
 ac.files <- c("h3ac.bam", "h3ac_2.bam")
-ac.demo <- windowCounts(ac.files, width=150)
-ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000)
+ac.demo <- windowCounts(ac.files, width=150, param=param)
+ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
 keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
 ac.eff <- normalize(ac.demo[keep,])
 ac.eff
@@ -1161,7 +1164,7 @@ This window size is chosen purely for aesthetics in this demonstration, as the t
 Obviously, users should pick a more appropriate value for their analysis.
 
 <<>>=
-ac.demo2 <- windowCounts(c("h3ac.bam", "h3ac_2.bam"), width=2000L)
+ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
 filtered <- filterWindows(ac.demo2, ac.bin, type="global")
 keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
@@ -1175,8 +1178,7 @@ In addition, any filter statistic for the windows should be based on the average
 An average abundance threshold will act as a clean vertical cutoff in the plots below. 
 Spurious trends that might affect normalization will not be introduced at the filter boundary. 
 
-<<eval=FALSE,keep.source=true,label=trendplot>>=
-par(mfrow=c(1,2))
+<<eval=FALSE,keep.source=true,label=trendplot1>>=
 abval <- filtered$abundances[keep]
 o <- order(abval)
 adjc <- cpm(asDGEList(ac.demo2), log=TRUE)
@@ -1185,8 +1187,9 @@ fit <- loessFit(x=abval, y=mval)
 smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
    main="Raw", ylim=c(-2,2), xlim=c(0, 7))
 lines(abval[o], fit$fitted[o], col="red")
-#
-## Repeating after normalization.
+@
+<<eval=FALSE,keep.source=true,label=trendplot1>>=
+# Repeating after normalization.
 re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
 mval <- re.adjc[,1]-re.adjc[,2]
 fit <- loessFit(x=abval, y=mval)
@@ -1198,7 +1201,9 @@ lines(abval[o], fit$fitted[o], col="red")
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
 <<fig=TRUE,echo=FALSE,width=10,height=5>>=
-<<trendplot>>
+par(mfrow=c(1,2))
+<<trendplot1>>
+<<trendplot2>>
 @
 \end{center}
 
@@ -1235,7 +1240,7 @@ Again, counting with large bins is recommended as fold changes will be undefined
 
 <<label=mds,eval=false>>=
 par(mfrow=c(2,2), mar=c(5,4,2,2))
-binned <- windowCounts(bam.files, bin=TRUE, width=2000L)
+binned <- windowCounts(bam.files, bin=TRUE, width=2000L, param=param)
 adj.counts <- cpm(asDGEList(binned), log=TRUE)
 for (top in c(100, 500, 1000, 5000)) {
     out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"), 
@@ -1458,6 +1463,7 @@ gc()
 All right, we're almost there. 
 This chapter needs the \code{results} object from the last chapter.
 We also need a bunch of things from Chapter~\ref{chap:filter} - namely, the \code{filtered.data} list, the \code{broads} object and the \code{keep.simple} and \code{maxed} vectors.
+Finally, we'll need \code{ac.files} and \code{param} from Chapters~\ref{chap:norm} and \ref{chap:count}, respectively, for a little demonstration.
 \end{combox}
 
 \section{Problems with false discovery rate control}
@@ -1589,9 +1595,8 @@ Some filtering is performed to avoid excessive chaining in this demonstration.
 Corresponding tables of DB results should also be obtained (for brevity, mock results are used here).
 
 <<>>=
-h3.files <-  c("h3ac.bam", "h3ac_2.bam")
-ac.small <- windowCounts(h3.files, width=150L, spacing=100L, filter=25)
-ac.large <- windowCounts(h3.files, width=1000L, spacing=500L, filter=35)
+ac.small <- windowCounts(ac.files, width=150L, spacing=100L, filter=25, param=param)
+ac.large <- windowCounts(ac.files, width=1000L, spacing=500L, filter=35, param=param)
 ns <- nrow(ac.small)
 mock.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
 nl <- nrow(ac.large)
@@ -1859,7 +1864,7 @@ This ensures that the same reads used in the analysis will be pulled out during 
 
 <<>>=
 cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
-extractReads(cur.region, bam.files[1], param=readParam())
+extractReads(cur.region, bam.files[1], param=param)
 @
 
 Here, coverage is visualized as the number of reads covering each base pair in the interval of interest.
@@ -1873,7 +1878,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 require(Gviz)
 collected <- list()
 for (i in 1:length(bam.files)) { 
-    reads <- extractReads(cur.region, bam.files[i])
+    reads <- extractReads(cur.region, bam.files[i], param=param)
     pcov <- as(coverage(reads[strand(reads)=="+"])/data$totals[i]*1e6, "GRanges")
     ncov <- as(coverage(reads[strand(reads)=="-"])/data$totals[i]*1e6, "GRanges")
     ptrack <- DataTrack(pcov, type="histogram", lwd=0, fill=rgb(0,0,1,.4), ylim=c(0,1.1), 
