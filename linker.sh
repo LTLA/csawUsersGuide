@@ -7,6 +7,8 @@ ln -s $nfydir/SRR074417.bam tn_1.bam
 ln -s $nfydir/SRR074417.bam.bai tn_1.bam.bai
 ln -s $nfydir/SRR074418.bam tn_2.bam
 ln -s $nfydir/SRR074418.bam.bai tn_2.bam.bai
+ln -s $nfydir/SRR074401.bam input.bam
+ln -s $nfydir/SRR074401.bam.bai input.bam.bai
 
 petfile=/home/alun/AaronDocs/ChIP/pal-2013/bam/SRR642390.bam
 ln -s $petfile example-pet.bam
