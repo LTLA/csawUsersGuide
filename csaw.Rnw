@@ -201,11 +201,10 @@ param <- readParam(minq=50)
 data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
 @
 
-The data is returned as a \code{SummarizedExperiment} object.
-The matrix of counts is stored as the first entry in the \code{assays} slot.
+The function returns a \code{SummarizedExperiment} object where the matrix of counts is stored as the first entry in the \code{assays} slot.
 Each row corresponds to a genomic window while each column corresponds to a library.
 The coordinates of each window are stored in the \code{rowRanges}.
-The total number of reads in each library are stored as \code{totals} in the \code{colData}.
+The total number of reads in each library is stored as \code{totals} in the \code{colData}.
 
 <<>>=
 head(assay(data))
@@ -257,8 +256,7 @@ This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the s
 For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
 Analyses with multiple widths can be combined to examine DB across several resolutions (see Section~\ref{sec:bin_integrate}).
 
-For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size.
-See Section~\ref{sec:efficiency} for more details.
+For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size -- see Section~\ref{sec:efficiency} for more details.
 
 \subsection{Filtering out low-quality reads}
 Read extraction from the BAM files is controlled with the \code{param} argument in \code{windowCounts}.
@@ -307,7 +305,7 @@ Repeats are problematic as changes in repeat copy number or accessibility betwee
 Removal of reads within repeat regions can avoid detection of these irrelevant differences. 
 
 <<>>=
-repeats <- GRanges("chr1", IRanges(3000001, 3002128))
+repeats <- GRanges("chr1", IRanges(3000001, 3041000)) # telomere
 discard.param <- readParam(discard=repeats)
 @
 
@@ -358,7 +356,7 @@ checkList(paramlist)
 
 Users are encouraged to construct their own \code{readParam} objects (or lists thereof) and apply them consistently throughout their analyses.
 A good measure of synchronisation between \code{windowCounts} calls is to check that the values of \code{...\$totals} are identical between calls. 
-This means that the same reads are probably extracted from the BAM files in each call. 
+This suggests that the same reads are being extracted from the BAM files in each call. 
 
 \subsection{Increasing speed and memory efficiency}
 \label{sec:efficiency}
@@ -419,9 +417,9 @@ demo$totals
 \label{data:pet}
 
 A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes using the \code{getPESizes} function. 
-In this example, a user might use a value of around 500 bp as it covers most of the fragment size distribution. 
+In this example, a user might use a value of around 400 bp as it exceeds the vast majority of the fragment size distribution. 
 The plot can also be used to examine the quality of the PE sequencing procedure. 
-The location of the peak should be consistent with the fragmentation and size selection steps in library preparation. 
+The location of the mode should be consistent with the fragmentation and size selection steps in library preparation. 
 
 <<label=frag,eval=FALSE>>=
 out <- getPESizes(pe.bam)
@@ -644,7 +642,7 @@ Techniques like CLIP-seq, MeDIP-seq or CAGE provide strand-specific sequence inf
 The \pkgname{} package can analyze these datasets through strand-specific counting.
 This can be done manually setting the \code{forward} slot in the \code{readParam} object to \code{TRUE} or \code{FALSE}, to count only forward- or reverse-strand reads respectively.
 Alternatively, the \code{strandedCounts} wrapper function can be used to obtain strand-specific counts for each window or region.
-The strand of the output regions indicates the strand on which reads were counted for that row.
+The strand of each output range indicates the strand on which reads were counted for that row.
 Up to two rows can be generated for each window or region, depending on filtering.
 
 <<>>=
@@ -656,7 +654,7 @@ strand(rowRanges(ss.counts))
 Note that \code{strandedCounts} operates internally by calling \code{windowCounts} (or \code{regionCounts}) twice with different settings for \code{param\$forward}. 
 Any value for \code{forward} in the input \code{param} object will be ignored.
 In fact, the function will \textit{only} accept a \code{NULL} value for this slot.
-This is intended to protect the user, as any attempt to re-use the \code{ss.param} object in functions that are not designed for strand specificity will (correctly) raise an error.
+This is intended to protect the user, as any attempt to re-use the \code{ss.param} object in functions that are not designed for strand specificity will (appropriately) raise an error.
 
 <<results=hide,echo=FALSE>>=
 rm(demo, ss.counts, windowed)
@@ -891,14 +889,14 @@ filter.stat <- filterWindows(chip, control, type="control", prior.count=5,
 
 The binned counts are also supplied as a list to the \code{norm.fac} argument, where the first and second elements contain the counts for the ChIP and control samples, respectively.
 The log-fold enrichment of the ChIP sample over the control is then computed for each window, after normalizing for composition bias with the binned counts.
-The example below requires a 3-fold or greater increase over the control to retain the window.
+The example below requires a 3-fold or greater increase in abundance over the control to retain each window.
 
 <<>>=
 keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
 
-The \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
+As an aside, the \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
 The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
 If this is the case, the filtering procedure described above is inappropriate as it will select for windows with differences between ChIP and control samples. 
 This compromises the assumption of the null hypothesis during testing, resulting in loss of type I error control.
@@ -1027,7 +1025,7 @@ If the bins are too large, background and enriched regions will be included in t
 This makes it difficult to trim away bins corresponding to enriched regions.
 On the other hand, the counts will be too low if the bins are too small.
 Testing multiple bin sizes is recommended to ensure that the estimates are robust to any changes. 
-A value of 10000 bp is suitable for most datasets.
+A value of 10 kbp is suitable for most datasets.
 
 <<>>=
 demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
@@ -1044,7 +1042,7 @@ The effectiveness of normalization can be examined using a MA plot.
 A single main cloud of points should be present, consisting primarily of background regions.
 Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
 Composition biases manifest as a vertical shift in the position of this cloud. 
-Ideally, the log-ratios of the corresponding normalization factors should correspond to the centre of the cloud. 
+Ideally, the log-ratios of the corresponding normalization factors should pass through the centre of the cloud. 
 This indicates that undersampling has been identified and corrected.
 
 % Genuine binding sites are mixed in with the background in this example, as
@@ -1079,8 +1077,8 @@ for (i in 1:(length(bam.files)-1)) {
 \subsection{Using the TMM method on high-abundance regions}
 Efficiency biases are commonly observed in ChIP-seq data. 
 This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
-These technical differences are of no biological interest and must be removed. 
-This can be achieved by assuming that high-abundance windows or bins contain binding sites. 
+These technical differences are not biologically interesting and must be removed. 
+This can be achieved by assuming that high-abundance windows contain binding sites. 
 In the examples below, reads are counted into 150 bp windows for histone mark data.
 High-abundance windows are chosen using a global filtering approach described in Section~\ref{sec:global_filter}. 
 The TMM method can then be applied to eliminate systematic differences across those windows.
@@ -1101,8 +1099,8 @@ ac.eff
 @
 \label{data:norm}
 
-This method assumes that most high-abundance bins are not DB. 
-Any systematic changes must be caused by differences in IP efficiency or some other technical issue. 
+This method also assumes that most binding sites in the genome are not DB.
+Thus, any systematic differences in coverage among the high-abundance windows must be caused by differences in IP efficiency between libraries or some other technical issue.
 However, genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
 Also, care is required when filtering prior to normalization.
 Retaining too many windows will include background regions, while retaining too few will result in unstable estimates.
@@ -1153,15 +1151,18 @@ for (main in c("H3K4me3", "H3ac")) {
 @
 \end{center}
 
-These two normalization strategies are mutually exclusive, as only one set of factors will ultimately be used.
+\subsection{Choosing between normalization strategies}
+The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of factors will ultimately be used.
 The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
-If so, composition biases should be removed to preserve the assumed DB.
-Otherwise, the differences must represent efficiency biases and should be removed.
-Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are generally expected to be consistent in most conditions.
+If so, composition bias should be removed to preserve the assumed DB.
+Otherwise, the differences must represent efficiency bias and should be removed.
+Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are expected to be consistent in most conditions.
 
 For the main NF-YA example, there is no expectation of constant binding between cell types.
 Thus, normalization factors will be computed to remove composition biases.
 This ensures that any genuine systematic changes in binding will still be picked up.
+In general, normalization for composition bias is a good starting point for any analysis.
+This can be considered as the ``default'' unless there is evidence for a confounding efficiency bias.
 
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
@@ -1315,8 +1316,8 @@ This author's desire to increase his h-index may also be a factor \citep{chen201
 
 \subsection{Setting up the data}
 A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
-Here, the \code{normfacs} vector from TMM normalization of background bins is used. 
-If an offset matrix is necessary (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
+Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
+If an offset matrix was generated (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
 
 <<>>=
 y <- asDGEList(filtered.data, norm.factors=normfacs)
@@ -1324,7 +1325,7 @@ y <- asDGEList(filtered.data, norm.factors=normfacs)
 
 The experimental design is described by a design matrix. 
 In this case, the only relevant factor is the cell type of each sample. 
-A generalized linear model (GLM) will be fitted to the counts for each window using the specified design matrix \citep{mccarthy2012}. 
+A generalized linear model (GLM) will be fitted to the counts for each window using the specified design \citep{mccarthy2012}. 
 This provides a general framework for the analysis of complex experiments with multiple factors. 
 Readers are referred to the user's guide in \edger{} for more details on parametrization.
 
@@ -1432,7 +1433,7 @@ This results in a lower estimated prior d.f. and reduced DB detection power.
 
 \section{Testing for DB windows}
 The effect of specific factors can be tested to identify windows with significant differential binding. 
-In the QL framework, $p$-values are computed using the F-test \citep{lund2012}. 
+In the QL framework, $p$-values are computed using the QL F-test \citep{lund2012}. 
 This is more appropriate than using the likelihood ratio test as the F-test accounts for uncertainty in the dispersion estimates. 
 Associated statistics such as log-fold changes and log-counts per million are also computed for each window.
 
@@ -1633,7 +1634,6 @@ The weight assigned to each window is inversely proportional to the number of wi
 cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
     result.list=list(mock.small, mock.large), equiweight=TRUE)
 cons$region
-head(cons$table)
 @
 
 The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
@@ -1753,7 +1753,7 @@ It may also reduce chaining effects during clustering.
 
 For example, say the user wants to focus on local maxima.
 Assume that the test statistics are computed from \code{filtered.data}, as generated with the mild \code{keep.simple} filter in Chapter~\ref{chap:filter}.
-These filtered windows are re-filtered, using the \code{maxed} vector from Section~\ref{sec:localmax} to identify those that are local maxima.
+These filtered windows are re-filtered using the \code{maxed} vector from Section~\ref{sec:localmax}, to identify those that are local maxima.
 The re-filtered windows and their corresponding test statistics can then be used for all FDR-controlling procedures described in this chapter.
 
 <<>>=
@@ -1803,7 +1803,7 @@ head(anno$right)
 Character vectors of compact string representations are provided to summarize the features overlapped by each supplied region. 
 Each pattern contains \code{GENE|EXONS|STRAND} to describe the strand and overlapped exons of that gene. 
 Promoters are labelled as exon \code{0} whereas introns are labelled as \code{I}. 
-For \code{left} and \code{right}, an additional \code{DISTANCE} field is included.
+For \code{left} and \code{right}, an additional \code{[DISTANCE]} field is included.
 This indicates the gap between the annotated feature and the supplied region.
 
 While the string representation saves space in the output, it is not easy to work with.
