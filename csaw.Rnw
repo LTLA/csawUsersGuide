@@ -1176,7 +1176,7 @@ A matrix is produced that contains an offset term for each bin/window in each li
 This offset matrix can then be directly used in \edger{}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
 Filtering prior to normalization is strongly recommended, to avoid inaccuracies in loess fitting at low abundances.
 
-The example below operates on the filtered counts for 2000 bp windows.
+The example below operates on the filtered counts for 2 kbp windows.
 This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
 Obviously, users should pick a more appropriate value for their analysis.
 
@@ -1633,6 +1633,7 @@ The weight assigned to each window is inversely proportional to the number of wi
 cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
     result.list=list(mock.small, mock.large), equiweight=TRUE)
 cons$region
+head(cons$table)
 @
 
 The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
@@ -1661,8 +1662,8 @@ head(tab.best)
 @
 
 A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
-This value is useful as it focuses on the DB interval within the cluster.
-Taking the average log-fold change across all windows in a cluster will understate the magnitude of the change.
+This value is useful as it focuses on the most DB interval within the cluster.
+In contrast, taking the average log-fold change across all windows in a cluster will understate the magnitude of DB.
 It may also be useful to report the start location of the best window.
 This allows investigators to easily identify the DB subinterval within large clusters.
 
