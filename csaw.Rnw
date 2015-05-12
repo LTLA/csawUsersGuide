@@ -869,14 +869,31 @@ chip <- in.demo[,1:4]
 control <- in.demo[,5]
 @
 
+Some additional work is required to account for composition biases (see Section~\ref{sec:compo_norm}).
+These are likely to be present when comparing ChIP to negative control samples.
+A simple strategy for normalization involves counting reads into large bins, as shown below.
+
+<<>>=
+in.binned <- windowCounts(c(bam.files, "input.bam"), bin=TRUE, width=10000, param=param)
+chip.binned <- in.binned[,1:4]
+control.binned <- in.binned[,5]
+@
+
 The \code{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
 A larger \code{prior.count} of 5 is used to compute the average abundance.
 This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
-Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from  larger bins with more counts.
+Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from larger bins with more counts.
+
+<<>>=
+filter.stat <- filterWindows(chip, control, type="control", prior.count=5,
+    norm.fac=list(chip.binned, control.binned))
+@
+
+The binned counts are also supplied as a list to the \code{norm.fac} argument, where the first and second elements contain the counts for the ChIP and control samples, respectively.
+The log-fold enrichment of the ChIP sample over the control is then computed for each window, after normalizing for composition bias with the binned counts.
 The example below requires a 3-fold or greater increase over the control to retain the window.
 
 <<>>=
-filter.stat <- filterWindows(chip, control, type="control", prior.count=5)
 keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
@@ -1188,7 +1205,7 @@ smoothScatter(abval, mval, ylab="M", xlab="Average logCPM",
    main="Raw", ylim=c(-2,2), xlim=c(0, 7))
 lines(abval[o], fit$fitted[o], col="red")
 @
-<<eval=FALSE,keep.source=true,label=trendplot1>>=
+<<eval=FALSE,keep.source=true,label=trendplot2>>=
 # Repeating after normalization.
 re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
 mval <- re.adjc[,1]-re.adjc[,2]
