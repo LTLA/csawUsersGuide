@@ -1716,27 +1716,29 @@ head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
 @
 
 Typically, the best window will only be used as a descriptive measure for each cluster.
-However, more statistical rigour is necessary if they are treated as the features of interest over which the error rate is to be controlled.
+However, more statistical rigour is required if these windows are treated as the features of interest over which the error rate is to be controlled.
 A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
 This is necessary to account for the implicit multiple testing across all windows in each cluster.
 
 \subsection{Based on average abundance}
 Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
 This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
-As the average abundance is independent of the $p$-value, no correction for multiple testing within each cluster is necessary.
-For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
-This will usually provide more power as it avoids the conservativeness of Simes' method.
+As the average abundance is (roughly) independent of the $p$-value, there is no need to correct for multiple testing within each cluster.
 
 <<>>=
 tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
 head(tab.ave)
 @
 
+For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
+This will usually provide more power as it avoids the conservativeness of Simes' method.
+The use of the highest-abundance window will also favour detection of simple DB events, where DB occurs at the most strongly bound loci in each cluster.
+This may be preferable for some studies, in order to avoid complex DB that is difficult to interpret.
+
 The obvious drawback is that information is lost when the analysis is restricted to a single window.
-Detection will fail if the DB event does not occur at the most abundant window.
-This is relevant for consideration of complex events, e.g., adjacent TF binding sites.
+Detection will fail for complex DB events, e.g., clusters of TF binding sites, spreading of diffuse marks.
 Loss of information also increases the sensitivity of the analysis to the clustering procedure.
-For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site.
+For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site, as the window covering the latter will represent the cluster.
 
 A less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
 This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
