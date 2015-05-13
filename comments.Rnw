@@ -741,6 +741,15 @@ In this manner, you avoid detecting changes in shoulders or subpeaks of the main
 This still has some advantages over straight-up peak calling, as you still maintain high resolution, i.e., you don't get contamination from miscalled peak boundaries.
 I guess it turns into something similar to a summit-based analysis of peaks.
 
+On a more philosophical note, why should we bother with complex events?
+Simple DB will probably give a better correlation with transcriptional activity, as large-scale changes in marking should have some effect.
+I'd argue that it's unwise to focus on this correlation when interpreting ChIP-seq data -- if you wanted a direct measure of transcription, then you might as well do RNA-seq.
+It's worth tolerating some complex DB changes that are irrelevant, in order to find those that affect your genes (or more generally, regions) of interest.
+You'd have to do so anyway with simple DB, as transcription is dependent on many things other than binding of a particular target protein.
+In more mechanistic terms, changes outside of the highest-abundance window may expose or sequester binding motifs for other proteins, which would have important effects.
+Complex DB may also result from simpler DB where the increase in enrichment results in an apparent spread of the mark.
+The subtle change at the center of the site is missed, but the larger relative changes at the edges can still be detected.
+
 \subsubsection*{Annotating regions for complex DB}
 
 If you annotate a complex DB region, there's no guarantee that the DB subinterval actually overlaps the annotated feature of interest.
