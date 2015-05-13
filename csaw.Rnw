@@ -403,6 +403,9 @@ head(rowRanges(demo))
 @
 
 \section{Experiments involving paired-end data}
+\label{data:pet}
+
+\subsection{Counting with proper pairs}
 ChIP experiments with paired-end sequencing can be accomodated by setting \code{pe="both"} in the \code{param} object supplied to \code{windowCounts}. 
 Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined between the $5'$ positions of the paired reads.
 The number of fragments overlapping each window is then counted as described. 
@@ -414,9 +417,8 @@ pe.param <- readParam(max.frag=400, pe="both")
 demo <- windowCounts(pe.bam, ext=250, param=pe.param)
 demo$totals
 @
-\label{data:pet}
 
-A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes using the \code{getPESizes} function. 
+A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes from the \code{getPESizes} function. 
 In this example, a user might use a value of around 400 bp as it exceeds the vast majority of the fragment size distribution. 
 The plot can also be used to examine the quality of the PE sequencing procedure. 
 The location of the mode should be consistent with the fragmentation and size selection steps in library preparation. 
@@ -443,12 +445,17 @@ A non-negligble proportion of these reads may be indicative of problems with pai
 c(out$diagnostics, too.large=sum(out$sizes > 400))
 @
 
-Observant readers may notice that \code{ext} was specified in the previous call to \code{windowCounts}.
+Note that all of the paired-end methods in \pkgname{} depend on the synchronisation of mate information for each alignment in the BAM file. 
+This is usually enforced in the alignments that are reported directly from the aligner. 
+Any file manipulations that might break the synchronisation should be corrected (e.g., with \href{http://broadinstitute.github.io/picard}{\textbf{Picard}}) prior to read counting.
+
+Observant readers may notice that \code{ext} was specified in the above call to \code{windowCounts}.
 This is not strictly necessary for paired-end data, where the fragment length is explicitly calculated for each proper pair.
 However, it is recommended to set \code{ext} to the median fragment length across all pairs in each library - in this case, around 250 bp.
-This ensures consistency with some downstream functions, which assume that the \code{ext} field of the returned \code{SummarizedExperiment} object holds the average fragment length.
+This ensures consistency with some downstream functions, which assume that the \code{ext} field of the returned \code{SummarizedExperiment} holds the average fragment length.
 Specification of \code{ext} is also necessary if fragments are to be coerced to the same length, as described in Section~\ref{sec:coercelen}.
 
+\subsection{Handling low-quality paired-end data}
 In datasets where many read pairs are invalid, the reads in those pairs can be rescued by setting \code{rescue.ext} to a positive integer.
 For each invalid intra-chromosomal read pair, the read with the higher mapping quality score will be directionally extended by \code{rescue.ext} to impute the fragment. 
 The other read in the pair is ignored.
@@ -462,9 +469,9 @@ demo <- windowCounts(pe.bam, ext=250, param=rescue.param)
 demo$totals
 @
 
-Paired-end data can also be treated as single-end data by specifiying \code{pe="first"} or \code{pe="second"} in the \code{readParam} constructor. 
-This will only use the first or second read of each read pair, regardless of the validity of the pair or the relative quality of the read alignments.
-This setting may be useful for comparing paired-end analyses with single-end analyses, or in truly disastrous situations where paired-end sequencing has failed.
+Paired-end data can also be treated as single-end by specifiying \code{pe="first"} or \code{"second"} in the \code{readParam} constructor. 
+This will only use the first or second read of each read pair, regardless of the validity of the pair or the relative quality of the alignments.
+This setting may be useful for contrasting paired- and single-end analyses, or in disastrous situations where paired-end sequencing has failed, e.g., due to ligation between DNA fragments.
 
 <<>>=
 first.param <- readParam(pe="first")
@@ -472,8 +479,30 @@ demo <- windowCounts(pe.bam, param=first.param)
 demo$totals
 @
 
-Note that all of the paired-end methods in \pkgname{} depend on the synchronisation of mate information for each alignment in the BAM file. 
-Any file manipulations that might break this synchronisation should be corrected prior to read counting.
+\subsection{Speeding up extraction for paired-end reads}
+Paired-end processing in \pkgname{} tends to be slow, as read names must be loaded and matched to identify proper pairs.
+This can be accelerated by performing the matching step once, and storing the identified pairs in a separate BAM file.
+Downstream applications can then directly use pairs in the new file without name matching.
+This pre-processing is performed by the \code{dumpPE} function, to produce a sorted/indexed BAM file with the specified \code{prefix}.
+
+<<>>=
+new.bam <- dumpPE("example-pet.bam", prefix="new-pet", param=pe.param)
+@
+
+All read extraction functions can set \code{fast.pe=TRUE} in \code{readParam} to extract reads quickly from the new BAM file.
+This will identify each fragment based on the mapping position of the first read in each pair and the associated insert size.
+However, almost all of the other parameters in \code{readParam} will be ignored, e.g., \code{dedup}, \code{minq}, \code{discard}, \code{rescue.ext}.
+Any that are required for the analysis should be applied during \code{dumpPE}.
+
+<<>>=
+fast.param <- reform(pe.param, fast.pe=TRUE)
+demo <- windowCounts(new.bam, ext=250, param=fast.param)
+@
+
+It is also possible to run \code{fast.pe=TRUE} on BAM files without first processing them with \code{dumpPE}.
+This should yield similar results as \code{fast.pe=FALSE} if none of the quality control parameters have been set.
+
+% Slight differences because of insert size calculations when reads are soft-clipped.
 
 \section{Estimating the average fragment length}
 \label{sec:ccf}
@@ -659,6 +688,8 @@ This is intended to protect the user, as any attempt to re-use the \code{ss.para
 <<results=hide,echo=FALSE>>=
 rm(demo, ss.counts, windowed)
 gc()
+unlink(new.bam)
+unlink("new-pet.bam.bai")
 @
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
