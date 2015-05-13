@@ -279,11 +279,14 @@ As you add more variability, the waters become muddled and obvious differences d
 
 \subsubsection*{Mapping quality and read stacks}
 
-Read stacks can be effectively eliminated by setting a non-negligble threshold on the mapping quality.
-I suspect it's because they're formed by repeat regions, and so MAPQ is low due to non-uniqueness.
+Read stacks are observed as large pile-ups of (slightly offset) alignments within a small genomic interval.
+These can be effectively eliminated by setting a non-negligble threshold on the mapping quality.
+I suspect they're formed by repeat regions, and so MAPQ scores are generally low due to non-uniqueness.
 Alternatively, they might be contaminants that are just trying to find a (poorly aligned) home on the genome build.
-Use of \code{discard} to ignore blacklisted regions is less effective as these regions tend not to overlap unannotated repeats.
+Use of \code{discard} to ignore these regions is less effective as they regions tend not to overlap unannotated repeats.
 At the very least, you'd have to use RepeatMasker annotations, which are too aggressive for my taste.
+In the worst case, direct duplicate removal may be required.
+It'd be nice to have a softer removal algorithm that accounts for the neighbouring coverage to determine if reads are genuine duplicates or not.
 
 \subsection*{Comments on normalization}
 
@@ -733,10 +736,10 @@ sum(alt.sig[-(1:100)])/sum(alt.sig)
 
 \subsubsection*{Using the highest-abundance window as a representative}
 
-This may also be necessary if you don't want to have high spatial resolution, for whatever reason.  
-For example, if you just want to find peaks that are just on/off, then you look at the DB for the window with the maximum abundance.
-You can then avoid the difficult-to-interpret regions involving complex DB events.
-This still has some advantages over straight-up peak calling, as you still maintain high resolution, i.e. you don't get contamination from miscalled peak boundaries.
+This avoids complex DB events by looking for regions that are changing at the site of maximum binding.
+In this manner, you avoid detecting changes in shoulders or subpeaks of the main binding event.
+This still has some advantages over straight-up peak calling, as you still maintain high resolution, i.e., you don't get contamination from miscalled peak boundaries.
+I guess it turns into something similar to a summit-based analysis of peaks.
 
 \subsubsection*{Annotating regions for complex DB}
 
