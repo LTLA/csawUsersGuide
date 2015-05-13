@@ -1733,7 +1733,7 @@ head(tab.ave)
 For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
 This will usually provide more power as it avoids the conservativeness of Simes' method.
 The use of the highest-abundance window will also favour detection of simple DB events, where DB occurs at the most strongly bound loci in each cluster.
-This may be preferable for some studies, in order to avoid complex DB that is difficult to interpret.
+This may be preferable for some studies, given that complex DB events are often difficult to interpret.
 
 The obvious drawback is that information is lost when the analysis is restricted to a single window.
 Detection will fail for complex DB events, e.g., clusters of TF binding sites, spreading of diffuse marks.
