@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 3 May 2015}
+Last revised 14 May 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
