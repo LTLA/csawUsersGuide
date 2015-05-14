@@ -171,10 +171,11 @@ A comprehensive listing of the datasets used in this guide is provided in Sectio
 \chapter{Converting reads to counts}
 \label{chap:count}
 \begin{combox}
-Hello, reader. 
-A little box like this will be present at the start of each chapter. 
-It's intended to tell you which objects from previous chapters are needed to get the code in the current chapter to work.  
-At this point, all we need are the \code{bam.files} that we defined in the introduction above. 
+Hello, reader.
+A little box like this will be present at the start of each chapter.
+The idea is to list the objects from previous chapters that are needed to run the code in the current chapter.
+Hopefully, it'll provide a nice segue between chapters for tired eyes.
+At this point, all we need are the \code{bam.files} that we defined in the introduction above.
 \end{combox}
 
 \section{Types of input data}
@@ -701,7 +702,7 @@ unlink("new-pet.bam.bai")
 
 \begin{combox}
 This chapter will require the \code{frag.len}, \code{param} and \code{data} from the last chapter, as well as the \code{bam.files} vector we defined at the start.
-We'll also need the \code{aveLogCPM} function from \edger{}, so load the package if you haven't already.
+We'll also need the \code{aveLogCPM} function from \edger{}, so load the package if you haven't done so already.
 \end{combox}
 
 \section{Independent filtering for count data}
@@ -995,10 +996,10 @@ gc()
 \chapter{Calculating normalization factors}
 \label{chap:norm}
 \begin{combox}
-This next chapter will need the \code{bam.files} vector again. 
-You'll notice that that a number of other BAM files are used in this chapter. 
-However, these are just present for demonstration purposes and aren't necessary for the main NFYA example.
+This chapter will need the \code{bam.files} vector again (from the introduction). 
 We'll also need the \code{param} object that we defined in Chapter~\ref{chap:count}.
+You'll notice that that a number of other BAM files are used in this chapter. 
+However, these are only present for demonstration purposes and aren't necessary for the main NF-YA example.
 \end{combox}
 
 \section{Overview}
@@ -1325,10 +1326,9 @@ gc()
 \label{chap:stats}
 
 \begin{combox}
-Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter} and the original \code{data} from Chapter~\ref{chap:count}.
-We'll also need the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
-Finally - it should be obvious, but several \edger{} functions will be needed here.
-Make sure the \edger{} package is loaded if you've been skipping chapters.
+Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter} along with the original \code{data} from Chapter~\ref{chap:count}.
+We'll also use the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
+Finally, we'll be executing a number of \edger{} functions, so make sure the \edger{} package is loaded if you've been skipping chapters.
 \end{combox}
 
 \section{Introduction to \edger{}}
