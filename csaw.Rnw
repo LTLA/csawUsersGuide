@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 14 May 2015}
+Last revised 16 May 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -985,7 +985,8 @@ For example, the low-count filter can be combined with others to ensure that all
 This is especially relevant for the local background filters, where a large enrichment value does not guarantee a large count.
 
 <<results=hide,echo=FALSE>>=
-rm(binned, in.demo, wider, neighbour, chip, control, filter.stat)
+rm(binned, in.demo, wider, neighbour, chip, control, filter.stat,
+	in.binned, chip.binned, control.binned)
 gc()
 @
 
