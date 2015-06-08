@@ -652,7 +652,8 @@ Independence also requires that the null design has an all-ones column for those
 The behaviour of the other libraries shouldn't matter, as they will only contribute to EB shrinkage.
 If libraries are independent, filtering on the involved subset shouldn't affect the information extracted from the other subset.
 
-% Cleanest under the null; selection of strong DB peaks might favour selection of other strong DB peaks in other groups that have lower dispersions in the mean-variance trend.
+% Cleanest under the null, due to correlations in the underlying means between groups under the alternative.
+% Selection of strong DB peaks might favour selection of other strong DB peaks in other groups that have lower dispersions in the mean-variance trend.
 % Though, for this to be an actual problem, it would need to break the assumption of constant dispersions across all libraries.
 
 \subsubsection*{Role of the prior count}
