@@ -243,7 +243,7 @@ All reads associated with that binding site (+- ext) will not be counted at eith
 This is mitigated by putting an upper bound of ext/N on the spacing, such that the maximum distance of the site to any window is ext/(2N).
 I think that N=2 is a good compromise between resolution and computational efficiency.
 If you set the spacing too low, the penalty from Simes will be such that you'll end up using the p-value from a suboptimal window anwyay.
-You could avoid this with findMaxima(), in which case you can use any spacing you like (as you'll throw out > 99% of the windows at the end).
+You could avoid this with findMaxima(), in which case you can use any spacing you like (as you'll throw out > 99\% of the windows at the end).
 
 In general, don't obsess about the window not getting all reads associated with a binding site.
 You'll lose some even if the window was right on top of the site, due to some fragments having greater-than-average fragment lengths.
@@ -285,8 +285,12 @@ I suspect they're formed by repeat regions, and so MAPQ scores are generally low
 Alternatively, they might be contaminants that are just trying to find a (poorly aligned) home on the genome build.
 Use of \code{discard} to ignore these regions is less effective as they regions tend not to overlap unannotated repeats.
 At the very least, you'd have to use RepeatMasker annotations, which are too aggressive for my taste.
-In the worst case, direct duplicate removal may be required.
+
+In the worst case, direct duplicate removal may be required to get rid of stacks.
 It'd be nice to have a softer removal algorithm that accounts for the neighbouring coverage to determine if reads are genuine duplicates or not.
+However, I think this pre-processing is beyond the scope of csaw's responsibilities.
+Alignment and read quality control is done before entry into csaw, so I'd like to avoid mission creep.
+Besides, pure duplicate stacks (i.e., not driven by repeats) are only really problematic in cases where you don't have biological replicates.
 
 \subsection*{Comments on normalization}
 
