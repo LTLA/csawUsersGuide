@@ -677,6 +677,16 @@ This means that the variability of the final log-fold change will be doubled, wh
 A larger prior count is used to prevent this.
 More practically, it mandates a minimum count, e.g., a fold change of 3 with a prior count of 5 is only possible if the count is at least 10.
 
+\subsection*{Comments about the statistical testing}
+
+\subsubsection*{Batch effects and the prior d.f.}
+The prior d.f. will be large if there is a systematic batch effect, e.g., due to efficiency biases.
+This is because the variability of the dispersions will be low when all of them are consistently large to reflect the constant difference between replicates.
+In contrast, the prior d.f. will be small if there is a stochastic batch effect, e.g., due to hidden factors of variation.
+This is because the dispersions will now absorb the batch effect, which will differ randomly between windows.
+As a result, the variability in the dispersions will be large.
+Small prior d.f. can result in almost as much damage as large dispersions, so watch out.
+
 \subsection*{Comments about FDR control}
 
 \subsubsection*{Algorithm for splitting large clusters}
