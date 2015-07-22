@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 16 May 2015}
+Last revised 22 July 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -1283,39 +1283,8 @@ Of course, this also assumes that the targeted differences have no biological re
 Detection power may be lost if this is not true. 
 For example, differences in the GC content distribution can be driven by technical bias as well as biology, e.g., when protein binding is associated with a specific GC composition.
 
-\section{Examining replicate similarity with MDS plots}
-On a semi-related note, the binned counts can be used to examine the similarity of replicates through multi-dimensional scaling (MDS) plots. 
-The distance between each pair of libraries is computed as the square root of the mean squared log-fold change across the top set of bins with the highest absolute log-fold changes.
-A small top set visualizes the most extreme differences whereas a large set visualizes overall differences.
-Checking a range of \code{top} values may be useful when the scope of DB is unknown.
-Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
-
-<<label=mds,eval=false>>=
-par(mfrow=c(2,2), mar=c(5,4,2,2))
-binned <- windowCounts(c(bam.files, "input.bam"), bin=TRUE, width=2000L, param=param)
-adj.counts <- cpm(asDGEList(binned), log=TRUE)
-for (top in c(100, 500, 1000, 5000)) {
-    out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red", "grey30"), 
-        labels=c("es.1", "es.2", "tn.1", "tn.2", "input"), top=top)
-}
-@
-
-\setkeys{Gin}{width=0.8\textwidth}
-\begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<mds>>
-@
-\end{center}
-
-Replicates from different groups should form separate clusters in the MDS plot.
-This indicates that the results are reproducible and that the effect sizes are large.
-Such clustering is observed in the example above, along with separation from the input sample (note that the input is not essential for plotting, and is only included for demonstration purposes).
-Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
-Any outliers should also be noted as their presence may confound the downstream analysis.
-In the worst case, the removal of the corresponding libraries may be necessary to obtain sensible results.
-
 <<results=hide,echo=FALSE>>=
-rm(binned, demo, ac.demo, ac.bin, me.demo, me.bin, ac.demo2, filtered, keep, adj.counts, adjc)
+rm(demo, ac.demo, ac.bin, me.demo, me.bin, ac.demo2, filtered, keep, adjc)
 gc()
 @
 
@@ -1501,7 +1470,37 @@ Normally, inconsistent duplication results in a large QL dispersion for the affe
 However, estimation of the QL dispersion is not possible without replicates.
 This means that duplicates may need to be removed to protect against false positives.
 
+\section{Examining replicate similarity with MDS plots}
+As a quality control measure, the window counts can be used to examine the similarity of replicates through multi-dimensional scaling (MDS) plots. 
+The distance between each pair of libraries is computed as the square root of the mean squared log-fold change across the top set of bins with the highest absolute log-fold changes.
+A small top set visualizes the most extreme differences whereas a large set visualizes overall differences.
+Checking a range of \code{top} values may be useful when the scope of DB is unknown.
+Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
+
+<<label=mds,eval=false>>=
+par(mfrow=c(2,2), mar=c(5,4,2,2))
+adj.counts <- cpm(y, log=TRUE)
+for (top in c(100, 500, 1000, 5000)) {
+    out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"),
+        labels=c("es.1", "es.2", "tn.1", "tn.2"), top=top)
+}
+@
+
+\setkeys{Gin}{width=0.8\textwidth}
+\begin{center}
+<<fig=TRUE,echo=FALSE>>=
+<<mds>>
+@
+\end{center}
+
+Replicates from different groups should form separate clusters in the MDS plot, as observed above.
+This indicates that the results are reproducible and that the effect sizes are large.
+Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
+Any outliers should also be noted as their presence may confound the downstream analysis.
+In the worst case, outlier samples may need to be removed to obtain sensible results.
+
 <<echo=FALSE,results=hide>>=
+rm(adj.counts)
 gc()
 @
 
