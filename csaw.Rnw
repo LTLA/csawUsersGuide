@@ -153,7 +153,7 @@ tabcom <- combineTests(merged$id, results$table)
 @
 \end{enumerate}
 
-In this guide, the behaviour of each step will be demonstrated with some publicly available data.
+In this guide, the behavior of each step will be demonstrated with some publicly available data.
 The dataset below focuses on changes in the binding profile of the NFYA protein between embryonic stem cells and terminal neurons \citep{tiwari2012}. 
 This will be used as a case study for most of the code examples throughout the guide.
 
@@ -853,7 +853,7 @@ filter.stat <- filterWindows(data, wider, type="local")
 
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
 In this scenario, a 3-fold increase in enrichment over the neighborhood abundance is required for retention of each window.
-This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
+This roughly mimics the behavior of single-sample peak-calling programs such as \macs{} \citep{zhang2008}.
 
 <<>>=
 keep <- filter.stat$filter > log2(3)
@@ -884,7 +884,7 @@ summary(maxed)
 
 This approach is very aggressive and should only be used (sparingly) in datasets where binding is sharp, simple and isolated.
 Complex binding events involving diffuse enrichment or adjacent binding sites will not be handled well.
-For example, DB detection will fail if a low-abundance DB window is ignored in favour of a high-abundance non-DB neighbor.
+For example, DB detection will fail if a low-abundance DB window is ignored in favor of a high-abundance non-DB neighbor.
 
 \subsection{With negative controls}
 Negative controls for ChIP-seq refer to input or IgG libraries where the IP step has been skipped or compromised with an irrelevant antibody, respectively. 
@@ -1149,7 +1149,7 @@ In practice, the estimated normalization factors are usually robust to the choic
 
 The effect of normalization can be visualized with MA plots. 
 Plots are constructed using counts for 10 kbp bins, rather than with those from the windows.
-This is useful as the behaviour of the entire genome can be examined, rather than just that of the high-abundance windows.
+This is useful as the behavior of the entire genome can be examined, rather than just that of the high-abundance windows.
 It also allows calculation of and comparison to the factors for composition bias.
 
 <<>>=
@@ -1597,7 +1597,7 @@ Clustering can also be performed with a simple single-linkage algorithm in the \
 This approach avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
 Windows that are less than \code{tol} apart are considered to be adjacent and are grouped into the same cluster.
 The chosen \code{tol} represents the minimum distance at which two binding events are treated as separate sites.
-Large values (500 - 1000 bp) reduce redundancy and favour a region-based interpretation of the results, while smaller values ($< 200$ bp) allow resolution of individual binding sites.
+Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpretation of the results, while smaller values ($< 200$ bp) allow resolution of individual binding sites.
 
 <<>>=
 merged <- mergeWindows(rowRanges(filtered.data), tol=1000L)
@@ -1732,7 +1732,7 @@ head(tab.ave)
 
 For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
 This will usually provide more power as it avoids the conservativeness of Simes' method.
-The use of the highest-abundance window will also favour detection of simple DB events, where DB occurs at the most strongly bound loci in each cluster.
+The use of the highest-abundance window will also favor detection of simple DB events, where DB occurs at the most strongly bound loci in each cluster.
 This may be preferable for some studies, given that complex DB events are often difficult to interpret.
 
 The obvious drawback is that information is lost when the analysis is restricted to a single window.
@@ -1752,7 +1752,7 @@ tabcom$mab.logFC <- tab.ave$logFC # 'mab' stands for most abundant.
 \subsection{Weighting windows on abundance}
 A more graduated approach uses the weighted version of Simes' method, where the window with the highest abundance is upweighted.
 In the example below, the weight assigned to the top window is increased relative to that of other windows in the same cluster.
-This means that the behaviour of the top window will have a greater influence on the final combined $p$-value.
+This means that the behavior of the top window will have a greater influence on the final combined $p$-value.
 That said, the other windows in the cluster still have unity weights.
 Any DB events in those windows will still be considered when the $p$-values are combined.
 
