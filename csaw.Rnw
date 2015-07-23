@@ -831,28 +831,28 @@ Smaller minimum fold changes are recommended for diffuse marks where the differe
 \subsection{Mimicking single-sample peak callers}
 Local background estimators can also be constructed.
 This avoids inappropriate filtering when there are differences in background coverage across the genome. 
-Here, the 2 kbp region surrounding each window will be used as the ``neighbourhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
+Here, the 2 kbp region surrounding each window will be used as the ``neighborhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
 The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
 This should be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
 
 <<>>=
 surrounds <- 2000
-neighbour <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
-wider <- regionCounts(bam.files, regions=neighbour, ext=frag.len, param=param)
+neighbor <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
+wider <- regionCounts(bam.files, regions=neighbor, ext=frag.len, param=param)
 @
 
-Counts for each window are subtracted from the counts for its neighbourhood. 
-This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background. 
-The width of the window is also subtracted to reflect the effective size of the neighbourhood.
-Again, the abundance of the neighbourhood is scaled down for a valid comparison to that of the corresponding window.
-This work is done by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighbourhood.
+Counts for each window are subtracted from the counts for its neighborhood.
+This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.
+The width of the window is also subtracted from that of its neighborhood, to reflect the effective size of the latter after subtraction of counts.
+Using these differences in widths, the abundance of the neighborhood is scaled down for a valid comparison to that of the corresponding window.
+This entire procedure can be performed automatically by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighborhood.
 
 <<>>=
 filter.stat <- filterWindows(data, wider, type="local")
 @
 
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
-In this scenario, a 3-fold increase in enrichment over the neighbourhood abundance is required for retention of each window.
+In this scenario, a 3-fold increase in enrichment over the neighborhood abundance is required for retention of each window.
 This roughly mimics the behaviour of single-sample peak-calling programs such as \macs{} \citep{zhang2008}. 
 
 <<>>=
@@ -860,9 +860,9 @@ keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
 
-Note that this procedure also assumes that no other enriched regions are present in each neighbourhood. 
+Note that this procedure also assumes that no other enriched regions are present in each neighborhood.
 Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
-This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighbourhood.
+This may be problematic for diffuse histone marks or TFBS clusters where enrichment may be observed in both the window and its neighborhood.
 
 If this seems too complicated, an alternative is to identify locally enriched regions using peak-callers like \macs{}. 
 Filtering can then be performed to retain only windows within called peaks.  
@@ -884,7 +884,7 @@ summary(maxed)
 
 This approach is very aggressive and should only be used (sparingly) in datasets where binding is sharp, simple and isolated.
 Complex binding events involving diffuse enrichment or adjacent binding sites will not be handled well.
-For example, DB detection will fail if a low-abundance DB window is ignored in favour of a high-abundance non-DB neighbour.
+For example, DB detection will fail if a low-abundance DB window is ignored in favour of a high-abundance non-DB neighbor.
 
 \subsection{With negative controls}
 Negative controls for ChIP-seq refer to input or IgG libraries where the IP step has been skipped or compromised with an irrelevant antibody, respectively. 
@@ -985,7 +985,7 @@ For example, the low-count filter can be combined with others to ensure that all
 This is especially relevant for the local background filters, where a large enrichment value does not guarantee a large count.
 
 <<results=hide,echo=FALSE>>=
-rm(binned, in.demo, wider, neighbour, chip, control, filter.stat,
+rm(binned, in.demo, wider, neighbor, chip, control, filter.stat,
 	in.binned, chip.binned, control.binned)
 gc()
 @
@@ -1628,7 +1628,7 @@ summary(width(merged$region))
 
 Alternatively, chaining can be limited by setting \code{max.width} to restrict the size of the merged intervals. 
 Clusters substantially larger than \code{max.width} are split into several smaller subclusters of roughly equal size.
-The chosen value should be small enough so as to separate DB regions from unchanged neighbours, yet large enough to avoid misinterpretation of the FDR.
+The chosen value should be small enough so as to separate DB regions from unchanged neighbors, yet large enough to avoid misinterpretation of the FDR.
 Any value from 2000 to 10000 bp is recommended. 
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
