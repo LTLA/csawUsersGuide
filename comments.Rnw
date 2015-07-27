@@ -81,6 +81,8 @@ This avoids the statistical problems with pure subtraction, but can result in lo
 For example, consider a case where both ChIP and control coverage increases two-fold. 
 This would not be detected after log-correction, as the fold change cancels out.
 However, there is DB here if you assume an additive model, e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the other condition, resulting in $x$ against $2x$ binding between conditions.
+This seems to be most problematic when DB coincides with changes in chromatin accessibility.
+This is biologically sensible but will not be detected if the latter cancels out the former.
 
 % The ideal solution would be to switch to an identity-link GLM.
 % This would allow for subtraction-based contrasts, while preserving the mean-variance relationship.
