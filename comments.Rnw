@@ -659,7 +659,7 @@ Filtering on either statistic alone could acquire one upper and lower triangle, 
 However, filtering on both statistics yields only one triangle and a non-uniform distribution.
 A proof of validity requires consideration of the correlation structure -- 
 	it seems to work out under normality, where filtering on a difference in abundances will remove the same proportion from each hyperplane of the multivariate normal.
-See \texttt{e8efd8f85ae62428c765716bad97a87ed514572d} of my thesis.
+See commit \texttt{e8efd8f85ae62428c765716bad97a87ed514572d} of \texttt{master/filtering/filtration.tex} in my thesis.
 
 \subsubsection*{Selective filtering based on the contrast}
 
