@@ -571,6 +571,7 @@ Choosing the filter which gets you the greatest number of DE regions isn't the b
 At any given filter value, the expected FDR is controlled by the BH method rather than the actual FDR. 
 Trying to maximize the number of significant tests will result in loss of FDR control as it's not an unbiased expectation anymore. 
 It's worst with strong correlations between the nulls.
+The regularization stuff presented by Wolfgang at Bioconductor 2015 seems to help here.
 
 <<echo=FALSE>>=
 set.seed(1478343)
@@ -644,7 +645,23 @@ The log-fold change threshold is more stable to the sequencing depth, especially
 \subsubsection*{Independence of the average abundance as a filter statistic}
 
 The analogy to the normal case suggests that the average abundance is the independent filter statistic.
+This seems to hold up for different library sizes, unbalanced designs and correlations.
 Note that this assumes that the null design matrix can be parametrized with an intercept column.
+
+With respect to clustering; it should be valid to cluster retained windows, as the clustering depends on coordinates and not the statistics of each window.
+Or, you can think about it by conditioning on cluster formation where each constituent window must pass the filter threshold.
+Independence ensures that the $p$-values of all windows are still uniformly distributed within each cluster, so it should be okay.
+
+The problem is a bit more difficult for the local methods, where we're working with a difference in correlated abundances between each window and its neighbourhood.
+Independence between the $p$-value and each abundance is not enough.
+Cut up the uniform distribution into four slices; two upper triangles, and two lower triangles. 
+Filtering on either statistic alone could acquire one upper and lower triangle, such that the $p$-value distribution is still uniform.
+However, filtering on both statistics yields only one triangle and a non-uniform distribution.
+A proof of validity requires consideration of the correlation structure -- 
+	it seems to work out under normality, where filtering on a difference in abundances will remove the same proportion from each hyperplane of the multivariate normal.
+See \texttt{e8efd8f85ae62428c765716bad97a87ed514572d} of my thesis.
+
+\subsubsection*{Selective filtering based on the contrast}
 
 One common complaint with the average abundance is that performance will deteriorate as the number of groups increases.
 For example, if a peak was only present in one group, the average abundance of that peak would drop as the number of groups increases.
