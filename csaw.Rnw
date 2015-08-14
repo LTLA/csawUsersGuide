@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 22 July 2015}
+Last revised 15 August 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -513,8 +513,6 @@ Cross-correlation plots can be generated directly from BAM files using the \code
 This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment \citep{kharchenko2008}. 
 Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
 This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
-The location of the peak can then be used as an estimate of the fragment length for read extension in \code{windowCounts}. 
-For this dataset, an estimate of $\sim$110 bp is obtained from the plot below.
 
 <<label=ccf,eval=FALSE>>=
 max.delay <- 500
@@ -530,6 +528,14 @@ plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
 <<ccf>>
 @
 \end{center}
+
+The location of the peak can be used as an estimate of the fragment length for read extension in \code{windowCounts}. 
+An estimate of $\sim$110 bp is obtained from the plot above.
+This can be done more precisely with the \code{maximizeCcf} function, which returns a similar value.
+
+<<>>=
+maximizeCcf(x)
+@
 
 A sharp spike may also observed in the plot at a distance corresponding to the read length. 
 This is thought to be an artifact, caused by the preference of aligners towards uniquely mapped reads. 
