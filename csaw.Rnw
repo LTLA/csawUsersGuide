@@ -1291,7 +1291,7 @@ In this calculation, the total number of reads for the endogenous genome is used
 This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
 Otherwise, if the total number of spike-in reads was used as the library size, the estimated factors would always be equal to unity.
 
-<<echo=FALSE, results="hide">>=
+<<echo=FALSE, results=hide>>=
 spike.data <- data
 @
 
