@@ -1395,21 +1395,26 @@ Another mean-dependent trend is fitted to the raw QL estimates.
 An empirical Bayes (EB) strategy is then used to stabilize the raw QL dispersion estimates by shrinking them towards the second trend \citep{lund2012}. 
 The ideal amount of shrinkage is determined from the variability of the dispersions.
 
-<<eval=FALSE,label=shrinkx>>=
-par(mfrow=c(1,2))
+<<>>=
 y <- estimateDisp(y, design)
-o <- order(y$AveLogCPM)
-plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
-  ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"), 
-  ylab=("Biological coefficient of variation"))
+summary(y$trended.dispersion)
 fit <- glmQLFit(y, design, robust=TRUE)
-plotQLDisp(fit)
+summary(fit$var.post)
 @
 
 The effect of EB stabilisation can be visualized by examining the biological coefficient of variation (for the NB dispersion) and the quarter-root deviance (for the QL dispersion). 
 These plots can also be used to decide whether the fitted trend is appropriate. 
 Sudden irregulaties may be indicative of an underlying structure in the data which cannot be modelled with the mean-dispersion trend. 
 Discrete patterns in the raw dispersions are indicative of low counts and suggest that more aggressive filtering is required.
+
+<<eval=FALSE,label=shrinkx>>=
+par(mfrow=c(1,2))
+o <- order(y$AveLogCPM)
+plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
+  ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
+  ylab=("Biological coefficient of variation"))
+plotQLDisp(fit)
+@
 
 \setkeys{Gin}{width=0.99\textwidth}
 \begin{center}
@@ -1418,13 +1423,13 @@ Discrete patterns in the raw dispersions are indicative of low counts and sugges
 @
 \end{center}
 
-A strong trend may also be observed where the dispersion drops sharply with increasing average abundance.
+A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
 This is due to the disproportionate impact of artifacts such as mapping errors and PCR duplicates at low counts. 
 It is difficult to accurately fit an empirical curve to these strong trends.  
 As a consequence, the dispersions at high abundances may be overestimated. 
 Filtering of low-abundance regions (as described in Chapter~\ref{chap:filter}) provides some protection by removing the strongest part of the trend.
-Users can compare raw and filtered results to see whether this makes any difference.
-Such filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
+Users can compare raw and filtered results to see whether it makes any difference.
+Filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
 <<label=rmchecker,eval=FALSE>>=
 relevant <- rowSums(assay(data)) >= 20 # some filtering; otherwise, it takes too long.
@@ -1556,6 +1561,8 @@ Finally, we'll need \code{ac.files} and \code{param} from Chapters~\ref{chap:nor
 \end{combox}
 
 \section{Problems with false discovery rate control}
+
+\subsection{Overview}
 The false discovery rate (FDR) is usually the most appropriate measure of error for high-throughput experiments. 
 Control of the FDR can be provided by applying the Benjamini-Hochberg (BH) method \citep{benjamini1995} to a set of $p$-values. 
 This is less conservative than the alternatives (e.g., Bonferroni) yet still provides some measure of error control. 
@@ -1563,7 +1570,7 @@ The most obvious approach is to apply the BH method to the set of $p$-values acr
 This will control the FDR across the set of putative DB windows.
 
 However, the FDR across all detected windows is not necessarily the most relevant error rate. 
-Interpretation of ChIP-seq experiments is more concerned with regions of the genome in which (differential) protein binding is found, rather than the individual windows. 
+Interpretation of ChIP-seq experiments is more concerned with regions of the genome in which (differential) protein binding is found, rather than the individual windows.
 In other words, the FDR across all detected DB regions is usually desired. 
 This is not equivalent to that across all DB windows as each region will often consist of multiple overlapping windows.
 Control of one will not guarantee control of the other \citep{lun2014}.
@@ -1582,7 +1589,7 @@ However, a region-based interpretation results in an actual FDR of 50\%.
 % E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
 % be under 0.05 as well. So, if the BH method works, so does Simes' method.
 
-\section{Restoring FDR control with clustered windows}
+\subsection{Restoring FDR control with clustered windows}
 Misinterpretation of the FDR can be avoided by obtaining a single $p$-value for each region.
 In particular, several strategies can be used to cluster adjacent windows into regions.
 A combined $p$-value can then be computed for each cluster, based on the $p$-values of the constituent windows \citep{simes1986}.
@@ -1600,7 +1607,9 @@ The combining procedure is known as Simes' method and is implemented in the \cod
 Similarly, selection of a representative window can be performed using the \code{getBestTest} function.
 Examples of their usage are shown below, along with demonstrations of the different clustering strategies.
 
-\section{Clustering with external information}
+\section{Clustering windows into regions}
+
+\subsection{Clustering with external information}
 Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
 The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
 Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \citep{lun2014}.
@@ -1629,7 +1638,7 @@ Counting reads across the promoter will give equal counts for each condition so 
 Similarly, imprecise boundaries for called peaks can lead to loss of DB detection power due to ``contamination'' by reads from background regions. 
 In both cases, window-based methods may be more robust as each interval of the promoter/peak region is examined separately \citep{lun2014}.
 
-\section{Quick and dirty clustering}
+\subsection{Quick and dirty clustering}
 \label{sec:cluster}
 Clustering can also be performed with a simple single-linkage algorithm in the \code{mergeWindows} function.
 This approach avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
@@ -1674,6 +1683,36 @@ This paramater can also interpreted as the maximum distance at which two binding
 merged.max <- mergeWindows(rowRanges(filtered.data), tol=1000L, max.width=5000L)
 summary(width(merged.max$region))
 @
+
+\subsection{Summarizing the direction of DB per cluster}
+The number of significant clusters can be counted at a FDR threshold of 5\%.
+This is performed for clusters that contain windows changing in one direction only, and for those with changes in both directions.
+The former includes simpler DB events involving consistent changes throughout a region, while the latter corresponds to complex DB.
+In this manner, the overall direction of significant DB can be summarized for the entire experiment.
+
+<<>>=
+is.sig <- tabcom$FDR <= 0.05
+has.up <- tabcom$logFC.up > 0
+has.down <- tabcom$logFC.down > 0
+data.frame(DB.up=sum(is.sig & has.up & !has.down),
+    DB.down=sum(is.sig & has.up & !has.down),
+    DB.both=sum(is.sig & has.up & has.down))
+@
+
+The same approach can be applied for the promoter-based clusters.
+This requires some protection against the \code{NA} values for the promoters that contain no windows.
+
+<<>>=
+is.sig <- tabbroad$FDR <= 0.05 & !is.na(tabbroad$FDR)
+has.up <- tabbroad$logFC.up > 0
+has.down <- tabbroad$logFC.down > 0
+data.frame(DB.up=sum(is.sig & has.up & !has.down),
+    DB.down=sum(is.sig & has.up & !has.down),
+    DB.both=sum(is.sig & has.up & has.down))
+@
+
+An alternative approach to defining the direction of DB for each cluster is to use the log-fold change of a single representative window (see below).
+This is simpler and allows quantification of the magnitude of the change, but will not capture complex DB between conditions.
 
 \section{Integrating results from multiple window sizes}
 \label{sec:bin_integrate}
