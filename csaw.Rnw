@@ -1694,9 +1694,8 @@ In this manner, the overall direction of significant DB can be summarized for th
 is.sig <- tabcom$FDR <= 0.05
 has.up <- tabcom$logFC.up > 0
 has.down <- tabcom$logFC.down > 0
-data.frame(DB.up=sum(is.sig & has.up & !has.down),
-    DB.down=sum(is.sig & has.up & !has.down),
-    DB.both=sum(is.sig & has.up & has.down))
+data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
+    DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
 @
 
 The same approach can be applied for the promoter-based clusters.
@@ -1706,13 +1705,12 @@ This requires some protection against the \code{NA} values for the promoters tha
 is.sig <- tabbroad$FDR <= 0.05 & !is.na(tabbroad$FDR)
 has.up <- tabbroad$logFC.up > 0
 has.down <- tabbroad$logFC.down > 0
-data.frame(DB.up=sum(is.sig & has.up & !has.down),
-    DB.down=sum(is.sig & has.up & !has.down),
-    DB.both=sum(is.sig & has.up & has.down))
+data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
+    DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
 @
 
 An alternative approach to defining the direction of DB for each cluster is to use the log-fold change of a single representative window (see below).
-This is simpler and allows quantification of the magnitude of the change, but will not capture complex DB between conditions.
+This is simpler and allows quantification of the magnitude of DB, but is not sufficient to describe complex events.
 
 \section{Integrating results from multiple window sizes}
 \label{sec:bin_integrate}
