@@ -542,6 +542,13 @@ Given a choice, I'd prefer to remove any trended bias directly, as I \textit{kno
 Besides, the GC content vs. M-value plots are pretty tame; there's not much of a trend as the bulk of points occur in a limited range of GC contents.
 \end{itemize}
 
+\subsubsection*{Why spike-ins work}
+
+The key part of the spike-in procedure is that whatever spike-in you're using, it needs to contain the same target as your sample of interest.
+Moreover, the antibody must be able to recognise the target in both species (see Discussion of Bonhoure \textit{et al.}, 2014).
+This ensures that any differences in IP efficiency are reflected in the coverage of the spike-ins.
+Otherwise, it wouldn't provide any advantage over normalizing across background regions.
+
 \subsection*{Comments on filtering}
 
 \subsubsection*{Circular dependencies between normalization and filtering}
