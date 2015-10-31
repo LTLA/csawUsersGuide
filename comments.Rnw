@@ -548,6 +548,7 @@ The key part of the spike-in procedure is that whatever spike-in you're using, i
 Moreover, the antibody must be able to recognise the target in both species (see Discussion of Bonhoure \textit{et al.}, 2014).
 This ensures that any differences in IP efficiency are reflected in the coverage of the spike-ins.
 Otherwise, it wouldn't provide any advantage over normalizing across background regions.
+This is fine for histone marks that tend to be uibiquitous across species, but it gets tougher if you're looking at specific proteins, e.g., transcription factors with species-specific epitopes.
 
 \subsection*{Comments on filtering}
 
