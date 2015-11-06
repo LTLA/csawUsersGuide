@@ -294,6 +294,14 @@ However, I think this pre-processing is beyond the scope of csaw's responsibilit
 Alignment and read quality control is done before entry into csaw, so I'd like to avoid mission creep.
 Besides, pure duplicate stacks (i.e., not driven by repeats) are only really problematic in cases where you don't have biological replicates.
 
+\subsubsection*{Dealing with huge data sets}
+
+Read depth isn't much of an issue, because everything gets counted into the same windows.
+You might have more windows that don't get filtered, but that's capped at the total number of windows, and filtering afterwards will get rid of the background majority.
+The bigger problem occurs when you have many samples (e.g., more than 100) such that the count matrix becomes uncomfortably large.
+In such cases, it may be best to analyze each chromosome separately.
+You'll lose some information for dispersion estimation because you don't get EB shrinkage across the genome, but when you have a lot of samples that's not a major problem.
+
 \subsection*{Comments on normalization}
 
 \subsubsection*{TMM on the binned counts}
