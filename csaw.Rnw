@@ -652,8 +652,6 @@ This is intended to protect the user, as any attempt to re-use the \code{ss.para
 <<results=hide,echo=FALSE>>=
 rm(demo, ss.counts, windowed)
 gc()
-unlink(new.bam)
-unlink("new-pet.bam.bai")
 @
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
