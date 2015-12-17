@@ -449,12 +449,6 @@ Note that all of the paired-end methods in \pkgname{} depend on the synchronisat
 This is usually enforced in the alignments that are reported directly from the aligner. 
 Any file manipulations that might break the synchronisation should be corrected (e.g., with \href{http://broadinstitute.github.io/picard}{\textbf{Picard}}) prior to read counting.
 
-Observant readers may notice that \code{ext} was specified in the above call to \code{windowCounts}.
-This is not strictly necessary for paired-end data, where the fragment length is explicitly calculated for each proper pair.
-However, it is recommended to set \code{ext} to the median fragment length across all pairs in each library - in this case, around 250 bp.
-This ensures consistency with some downstream functions, which assume that the \code{ext} field of the returned \code{RangedSummarizedExperiment} holds the average fragment length.
-Specification of \code{ext} is also necessary if fragments are to be coerced to the same length, as described in Section~\ref{sec:coercelen}.
-
 Paired-end data can also be treated as single-end by specifiying \code{pe="first"} or \code{"second"} in the \code{readParam} constructor. 
 This will only use the first or second read of each read pair, regardless of the validity of the pair or the relative quality of the alignments.
 This setting may be useful for contrasting paired- and single-end analyses, or in disastrous situations where paired-end sequencing has failed, e.g., due to ligation between DNA fragments.
@@ -554,6 +548,7 @@ As a result, most of the differences in peak width between libraries can be remo
 The desired final fragment length can be specified by setting \code{ext} to a list (or any subsettable object) of length two.
 The first element of this list represents the library-specific fragment sizes, while the second element represents the final fragment size.
 If the second element is set to \code{NA}, no rescaling is performed and the library-specific fragment sizes are used directly.
+This also works for paired-end data, though the first element will be ignored as directional extension is not performed.
 The example below rescales all fragments to the mean of the library-specific sizes.
 
 <<>>=
