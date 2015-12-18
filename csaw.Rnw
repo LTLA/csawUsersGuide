@@ -50,7 +50,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 29 August 2015}
+Last revised 19 December 2015}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -407,9 +407,9 @@ head(rowRanges(demo))
 \label{data:pet}
 
 ChIP experiments with paired-end sequencing can be accomodated by setting \code{pe="both"} in the \code{param} object supplied to \code{windowCounts}. 
-Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined between the $5'$ positions of the paired reads.
+Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined as that between the $5'$ positions of the paired reads.
 The number of fragments overlapping each window is then counted as described. 
-By default, only proper pairs are used whereby the two reads are on the same chromosome, face inward and are no more than \code{max.frag} apart.
+By default, only proper pairs are used in which the two paired reads are on the same chromosome, face inward and are no more than \code{max.frag} apart.
 
 <<>>=
 pe.bam <- "example-pet.bam"
@@ -544,11 +544,10 @@ Consider a bimodal peak across several libraries.
 Scaling ensures that the subpeak on the forward strand is centered at the same location in each library.
 The same applies for the subpeak on the reverse strand.
 As a result, most of the differences in peak width between libraries can be removed.
-
 The desired final fragment length can be specified by setting \code{ext} to a list (or any subsettable object) of length two.
 The first element of this list represents the library-specific fragment sizes, while the second element represents the final fragment size.
 If the second element is set to \code{NA}, no rescaling is performed and the library-specific fragment sizes are used directly.
-This also works for paired-end data, though the first element will be ignored as directional extension is not performed.
+This also works for analyses with paired-end data, though the first element of \code{ext} will be ignored as directional extension is not performed.
 The example below rescales all fragments to the mean of the library-specific sizes.
 
 <<>>=
