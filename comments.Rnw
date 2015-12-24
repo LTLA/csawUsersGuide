@@ -143,6 +143,8 @@ The idea is determine whether a DB region is likely to be a genuine TF binding s
 However, one counter-argument is that you could get a large region containing a bimodal site that is distinct from the DB subinterval.
 In such cases, the best approach would be to reduce the clustering tolerance so that such sites are separated out.
 Otherwise, we'd have to filter directly on bimodality at the window level, which I don't want to do.
+\item Watch out for large peaks, because even in TF data, the subpeaks tend to spread such that you end up with little bimodality.
+The same applies for situations with many adjacent binding events, such that you end up with a histone-like broad peak.
 \end{itemize}
 
 \subsubsection*{Window correlations}
