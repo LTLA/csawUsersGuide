@@ -720,9 +720,9 @@ More practically, it mandates a minimum count, e.g., a fold change of 3 with a p
 The prior d.f. will be large if there is a systematic batch effect, e.g., due to efficiency biases.
 This is because the variability of the dispersions will be low when all of them are consistently large to reflect the constant difference between replicates.
 In contrast, the prior d.f. will be small if there is a stochastic batch effect, e.g., due to hidden factors of variation.
-This is because the dispersions will now absorb the batch effect, which will differ randomly between windows.
+This is because the dispersions will be absorbing a batch effect that is differing randomly between windows.
 As a result, the variability in the dispersions will be increased.
-There mightn't ba large increase in the dispersions themselves due to a stochastic batch effect, as not all features will be heavily affected by the batch to cause a substantial increase in the fitted trend or the common estimate.
+There mightn't be a large increase in the dispersions themselves due to a stochastic batch effect, as not all features will be heavily affected by the batch to cause a substantial increase in the fitted trend or the common estimate.
 However, small prior d.f. can result in almost as much damage as large dispersions, so watch out.
 
 \subsection*{Comments about FDR control}
