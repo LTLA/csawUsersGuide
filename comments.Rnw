@@ -59,7 +59,7 @@ Changes in chromatin structure are still biologically interesting, even if it wa
 In comparison, the false positives in a comparison to input would be purely technical in origin. 
 In any case, these should form a minority of the detected regions in a successful experiment.
 
-\subsubsection{Comments on correcting for changes in chromatin state}
+\subsubsection*{Comments on correcting for changes in chromatin state}
 
 One could theoretically use control data to correct for chromatin state when searching for DB. 
 The most obvious is to subtract the control coverage from the ChIP coverage.
@@ -94,6 +94,17 @@ I'd say that several hundred false positives is an acceptable cost for keeping t
 Protection is generally provided by filtering, as most changes in state should be depleted after the IP step (unlike, e.g., DNase-seq).
 Of course, if there are likely to be extreme changes, then control correction may be necessary. 
 Subtraction may be okay if there aren't a lot of regions with high control coverage, as the other high-abundance regions will buffer any damage to the variance and EB statistics (though, if those regions are rare, then there mightn't be much point in correcting anyway; you might also get more false positives if variance inflation is prevented).
+
+\subsubsection*{Justifying the \textit{de novo} focus}
+With a new data set, it's generally a good strategy to do a \textit{de novo} analysis.
+If most of the peaks occur around the TSS or genes, then you can switch to an approach using pre-defined regions. 
+Otherwise, you'd be throwing out a lot of information. 
+I'm guessing over 90\% of reads would be lost if you stuck to TSS-based regions.
+While you might say that we are only interested in genic binding anyway, that's a narrow-minded view.
+You should first see what the data has to say before diving into assumptions like that, especially for uncharacterized proteins.
+There's also the issue of the difficulty in defining the location and width of the TSS and promoter.
+Improper definitions may result in loss of power if the binding site is missed or includes too much background.
+Besides, what's the harm? Worst is, you spend an hour or so looking at non-interesting regions. At best, you might be able to find something new and exciting.
 
 \subsection*{Comments on counting}
 
@@ -160,7 +171,7 @@ This is similar to the outcome of thinning in Markov chain Monte Carlo procedure
 
 \subsubsection*{Windows vs. peak calling}
 
-Peak-calling fundamentally involves the clustering of windows to get a peak interval for counting.
+Peak calling fundamentally involves the clustering of windows to get a peak interval for counting.
 Clustering can adjust to variable size widths, whereas the use of a large bin does not (and can encounter edge effects). 
 However, this depends heavily on the decisions made by the aggregation routine, as there's often insufficient data to direct unambiguous cluster boundaries at any single site.
 Results might not be robust to tuning of parameters or even new datasets (cluster groupings can change which will change the manner in which counts are collected). 
