@@ -692,8 +692,13 @@ Thus, any biases introduced during filtering will have a large effect on the DB 
 With respect to clustering; it should be valid to cluster retained windows, as the clustering depends on coordinates and not the statistics of each window.
 Or, you can think about it as conditioning on cluster formation where each constituent window must pass the filter threshold.
 Independence ensures that the $p$-values of all windows are still uniformly distributed within each cluster, so it should be okay.
-The problem is a bit more difficult for the local methods, where we're working with a difference in correlated abundances between each window and its neighbourhood.
-Independence between the $p$-value and each abundance is not enough.
+This doesn't work for clusters formed from the sign of the log-fold changes, though.
+Even though the sign is independent of the $p$-value for each window, it's not so for correlated windows.
+Regions with (spurious) DB are more likely to have windows with similar signs that form a single cluster, whereas regions with no DB will have random signs.
+
+The situation is also more difficult for the local filtering methods.
+Here, the filter statistic is defined as the difference in correlated abundances between each window and its neighbourhood.
+Independence between the $p$-value and each abundance is not enough, as the example with the signs suggests.
 Fortunately, analogies with the normal case suggest that any statistic computed from the overall means of correlated windows is independent of the $p$-values for those windows.
 
 % Cut up the uniform distribution into two halves length-wise, and each of those halfs into two triangular slices.
