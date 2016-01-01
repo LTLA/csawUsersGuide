@@ -192,7 +192,7 @@ Which is okay in other cases as you get a boost in power from larger counts (tho
 All in all, clustering will give higher counts and better performance for clusters where the DB status is homogenous throughout the cluster. 
 (That said, clustering will not guarantee that the DB status is homogenous i
     -- you could still suboptimally detect clusters involving shifting, so it's not correct to say that you're using clustering to focus on homogenous changes. 
-    The only way to guarantee homogeneity would be to do IUTs on all windows throughout the regions).
+    The only way to guarantee homogeneity would be to do IUTs on all windows throughout the regions.)
 For more complex events, clustering will probably be suboptimal.
 Widths are generally a simpler alternative. 
 However, it is unable to deal with variable sizes of enriched regions, requiring testing of multiple bin sizes.
@@ -685,9 +685,12 @@ The log-fold change threshold is more stable to the sequencing depth, especially
 The analogy to the normal case suggests that the average abundance is the independent filter statistic.
 This seems to hold up for different library sizes, unbalanced designs and correlations.
 Note that this assumes that the null design matrix can be parametrized with an intercept column.
+This is important as most windows are low-abundance, which means that the density at the filter boundary is high relative to the number of retained windows.
+Thus, any biases introduced during filtering will have a large effect on the DB analysis.
+(Incidentally, this is another justification for the stringent peak-calling threshold in the simulations of 2014 NAR paper.)
 
 With respect to clustering; it should be valid to cluster retained windows, as the clustering depends on coordinates and not the statistics of each window.
-Or, you can think about it by conditioning on cluster formation where each constituent window must pass the filter threshold.
+Or, you can think about it as conditioning on cluster formation where each constituent window must pass the filter threshold.
 Independence ensures that the $p$-values of all windows are still uniformly distributed within each cluster, so it should be okay.
 
 The problem is a bit more difficult for the local methods, where we're working with a difference in correlated abundances between each window and its neighbourhood.
