@@ -179,11 +179,20 @@ Similarly, inappropriate inclusion of background regions can be problematic for 
 
 Clustering must also be done independently of DB, such that changes to spatial resolution also may not be appropriate, e.g., for complex DB events.
 This includes DB shifting or shrinkage, or even noisy background where the surrounding non-NB regions contaminate the DB enriched signal.  
+Such events are potentially interesting, with some examples below:
+\begin{itemize}
+\item Spreading of a repressive mark may prevent binding of regulatory factors, whereas spreading of an activating mark may allow access of specific TFs to their binding sites. 
+\item A more esoteric example involves RNPII studies, if you want to distinguish between elongating and poised events. 
+\item Peak shifting may be indicative of changes in nucleosome phasing and the consequences thereof, e.g., if binding sites are immobilized within nucleosomes.
+\end{itemize}
 The only way to find these buggers is to look for DE'ness at every place. 
 In other words, we're interested in differential binding rather than absolute enrichment, and peak counts will give us the former rather than the latter.
 Which is okay in other cases as you get a boost in power from larger counts (though you can twiddle the width to deal with that - and then you get into parameter dogfights).
 
 All in all, clustering will give higher counts and better performance for clusters where the DB status is homogenous throughout the cluster. 
+(That said, clustering will not guarantee that the DB status is homogenous i
+    -- you could still suboptimally detect clusters involving shifting, so it's not correct to say that you're using clustering to focus on homogenous changes. 
+    The only way to guarantee homogeneity would be to do IUTs on all windows throughout the regions).
 For more complex events, clustering will probably be suboptimal.
 Widths are generally a simpler alternative. 
 However, it is unable to deal with variable sizes of enriched regions, requiring testing of multiple bin sizes.
