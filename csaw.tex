@@ -14,7 +14,7 @@
 
 % Sweave options
 \usepackage{Sweave}
-\SweaveOpts{keep.source=TRUE,prefix.string=plots-ug/ug,png=TRUE,pdf=FALSE}
+
 
 \DefineVerbatimEnvironment{Sinput}{Verbatim}{fontshape=sl,fontsize=\footnotesize}
 \DefineVerbatimEnvironment{Soutput}{Verbatim}{fontsize=\footnotesize}
@@ -82,11 +82,6 @@ Last revised 21 December 2015}
 \maketitle
 \tableofcontents
 
-<<results=hide,echo=FALSE>>=
-picdir <- "plots-ug"
-if (file.exists(picdir)) { unlink(picdir, recursive=TRUE) }
-dir.create(picdir)
-@
 
 \newpage
 \pagenumbering{arabic}
@@ -137,51 +132,60 @@ A typical ChIP-seq analysis in \pkgname{} would look something like that describ
 This assumes that a vector of file paths to sorted and indexed BAM files is provided in \code{bam.files} and a design matrix in supplied in \code{design}.
 The code is split across several steps:
 
-<<results=hide,echo=FALSE,label=bamdef>>=
-bam.files <- c("es_1.bam", "es_2.bam", "tn_1.bam", "tn_2.bam")
-design <- model.matrix(~factor(c('es', 'es', 'tn', 'tn')))
-colnames(design) <- c("intercept", "cell.type")
-@
 
 \begin{enumerate}
 \item Loading in data from BAM files.
-<<>>=
-require(csaw)
-param <- readParam(minq=50)
-data <- windowCounts(bam.files, ext=110, width=10, param=param)
-@
+\begin{Schunk}
+\begin{Sinput}
+> require(csaw)
+> param <- readParam(minq=50)
+> data <- windowCounts(bam.files, ext=110, width=10, param=param)
+\end{Sinput}
+\end{Schunk}
 \item Filtering out uninteresting regions.
-<<>>=
-require(edgeR)
-keep <- aveLogCPM(asDGEList(data)) >= -1
-data <- data[keep,]
-@
+\begin{Schunk}
+\begin{Sinput}
+> require(edgeR)
+> keep <- aveLogCPM(asDGEList(data)) >= -1
+> data <- data[keep,]
+\end{Sinput}
+\end{Schunk}
 \item Calculating normalization factors.
-<<>>=
-binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-normfacs <- normOffsets(binned)
-@
+\begin{Schunk}
+\begin{Sinput}
+> binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+> normfacs <- normOffsets(binned)
+\end{Sinput}
+\end{Schunk}
 \item Identifying DB windows.
-<<>>=
-y <- asDGEList(data, norm.factors=normfacs)
-y <- estimateDisp(y, design)
-fit <- glmQLFit(y, design, robust=TRUE)
-results <- glmQLFTest(fit)
-@
+\begin{Schunk}
+\begin{Sinput}
+> y <- asDGEList(data, norm.factors=normfacs)
+> y <- estimateDisp(y, design)
+> fit <- glmQLFit(y, design, robust=TRUE)
+> results <- glmQLFTest(fit)
+\end{Sinput}
+\end{Schunk}
 \item Correcting for multiple testing.
-<<>>=
-merged <- mergeWindows(rowRanges(data), tol=1000L)
-tabcom <- combineTests(merged$id, results$table)
-@
+\begin{Schunk}
+\begin{Sinput}
+> merged <- mergeWindows(rowRanges(data), tol=1000L)
+> tabcom <- combineTests(merged$id, results$table)
+\end{Sinput}
+\end{Schunk}
 \end{enumerate}
 
 In this guide, the behavior of each step will be demonstrated with some publicly available data.
 The dataset below focuses on changes in the binding profile of the NFYA protein between embryonic stem cells and terminal neurons \citep{tiwari2012}. 
 This will be used as a case study for most of the code examples throughout the guide.
 
-<<>>=
-<<bamdef>>
-@
+\begin{Schunk}
+\begin{Sinput}
+> bam.files <- c("es_1.bam", "es_2.bam", "tn_1.bam", "tn_2.bam")
+> design <- model.matrix(~factor(c('es', 'es', 'tn', 'tn')))
+> colnames(design) <- c("intercept", "cell.type")
+\end{Sinput}
+\end{Schunk}
 \label{data:main}
 
 A comprehensive listing of the datasets used in this guide is provided in Section~\ref{sec:dataset}, along with instructions on how to obtain and process them for entry into the \pkgname{} pipeline.
@@ -217,23 +221,56 @@ The number of fragments overlapping a genomic window is counted.
 This is repeated after sliding the window along the genome to a new position. 
 A count is then obtained for each window in each library. 
 
-<<>>=
-frag.len <- 110
-win.width <- 10
-param <- readParam(minq=50)
-data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
-@
+\begin{Schunk}
+\begin{Sinput}
+> frag.len <- 110
+> win.width <- 10
+> param <- readParam(minq=50)
+> data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
+\end{Sinput}
+\end{Schunk}
 
 The function returns a \code{RangedSummarizedExperiment} object where the matrix of counts is stored as the first entry in the \code{assays} slot.
 Each row corresponds to a genomic window while each column corresponds to a library.
 The coordinates of each window are stored in the \code{rowRanges}.
 The total number of reads in each library is stored as \code{totals} in the \code{colData}.
 
-<<>>=
-head(assay(data))
-head(rowRanges(data))
-data$totals
-@
+\begin{Schunk}
+\begin{Sinput}
+> head(assay(data))
+\end{Sinput}
+\begin{Soutput}
+     [,1] [,2] [,3] [,4]
+[1,]    3    3    1    3
+[2,]    5    6    1    3
+[3,]    7    5    0    0
+[4,]    4    7    0    0
+[5,]    3    7    0    0
+[6,]    1    2    2    6
+\end{Soutput}
+\begin{Sinput}
+> head(rowRanges(data))
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 6 ranges and 0 metadata columns:
+      seqnames             ranges strand
+         <Rle>          <IRanges>  <Rle>
+  [1]     chr1 [3003701, 3003710]      *
+  [2]     chr1 [3003751, 3003760]      *
+  [3]     chr1 [3003801, 3003810]      *
+  [4]     chr1 [3004001, 3004010]      *
+  [5]     chr1 [3004051, 3004060]      *
+  [6]     chr1 [3007551, 3007560]      *
+  -------
+  seqinfo: 66 sequences from an unspecified genome
+\end{Soutput}
+\begin{Sinput}
+> data$totals
+\end{Sinput}
+\begin{Soutput}
+[1] 17196528 20040530 23118590 22075821
+\end{Soutput}
+\end{Schunk}
 
 For single-end data, suitable values for the average fragment length in \code{ext} can be estimated from the primary peak in a cross-correlation plot (see Section~\ref{sec:ccf}). 
 Alternatively, the length can be estimated from diagnostics during ChIP or library preparation, e.g., post-fragmentation gel electrophoresis images. 
@@ -287,9 +324,19 @@ This takes a \code{readParam} object which specifies a number of extraction para
 The idea is to define the \code{readParam} object once in the pipeline.
 It can then be reused for all relevant functions, to ensure that read loading is consistent throughout the analysis.
 
-<<>>=
-param
-@
+\begin{Schunk}
+\begin{Sinput}
+> param
+\end{Sinput}
+\begin{Soutput}
+    Extracting reads in single-end mode
+    Duplicate removal is turned off 
+    Minimum allowed mapping score is 50 
+    Reads are extracted from both strands
+    No restrictions are placed on read extraction
+    No regions are specified to discard reads
+\end{Soutput}
+\end{Schunk}
 
 In the example above, reads are filtered out based on the minimum mapping score with the \code{minq} argument. 
 Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
@@ -307,30 +354,39 @@ Of course, it may be unavoidable in some cases, e.g., involving libraries genera
 An example of counting with duplicate removal is shown below.
 Comparison to \code{data\$totals} indicates that fewer reads are used from each library.
 
-<<>>=
-dedup.param <- readParam(minq=50, dedup=TRUE)
-demo <- windowCounts(bam.files, ext=frag.len, width=win.width, param=dedup.param)
-demo$totals
-@
+\begin{Schunk}
+\begin{Sinput}
+> dedup.param <- readParam(minq=50, dedup=TRUE)
+> demo <- windowCounts(bam.files, ext=frag.len, width=win.width, param=dedup.param)
+> demo$totals
+\end{Sinput}
+\begin{Soutput}
+[1] 13925800 13826445 16342981 18905912
+\end{Soutput}
+\end{Schunk}
 
 \subsection{Avoiding problematic genomic regions}
 Read extraction and counting can be restricted to particular chromosomes by specifying the names of the chromosomes of interest in \code{restrict}. 
 This avoids the need to count reads on unassigned contigs or uninteresting chromosomes, e.g., the mitochondrial genome for ChIP-seq studies targeting nuclear factors. 
 Alternatively, it allows \code{windowCounts} to work on huge datasets or in limited memory by analyzing only one chromosome at a time.
 
-<<>>=
-restrict.param <- readParam(restrict=c("chr1", "chr10", "chrX"))
-@
+\begin{Schunk}
+\begin{Sinput}
+> restrict.param <- readParam(restrict=c("chr1", "chr10", "chrX"))
+\end{Sinput}
+\end{Schunk}
 
 Reads lying in certain regions can also be removed by specifying the coordinates of those regions in \code{discard}. 
 This is intended to remove reads that are wholly aligned within known repeat regions but were not removed by the \code{minq} filter. 
 Repeats are problematic as changes in repeat copy number or accessibility between conditions can lead to spurious DB. 
 Removal of reads within repeat regions can avoid detection of these irrelevant differences. 
 
-<<>>=
-repeats <- GRanges("chr1", IRanges(3000001, 3041000)) # telomere
-discard.param <- readParam(discard=repeats)
-@
+\begin{Schunk}
+\begin{Sinput}
+> repeats <- GRanges("chr1", IRanges(3000001, 3041000)) # telomere
+> discard.param <- readParam(discard=repeats)
+\end{Sinput}
+\end{Schunk}
 
 Coordinates of annotated repeats can be obtained from several different sources.
 A curated blacklist of problematic regions is available from the ENCODE project \citep{dunham2012}, and can be obtained by following this \href{https://sites.google.com/site/anshulkundaje/projects/blacklists}{\textbf{link}}.
@@ -350,10 +406,20 @@ Users can modify an existing \code{readParam} object using the \code{reform} met
 The example below copies \code{param} and replaces \code{minq} and \code{discard} with new values.
 This is safer than directly modifying the slots, as appropriate type/value checking of each class member is performed.
 
-<<>>=
-another.param <- reform(param, minq=20, discard=repeats)
-another.param
-@
+\begin{Schunk}
+\begin{Sinput}
+> another.param <- reform(param, minq=20, discard=repeats)
+> another.param
+\end{Sinput}
+\begin{Soutput}
+    Extracting reads in single-end mode
+    Duplicate removal is turned off 
+    Minimum allowed mapping score is 20 
+    Reads are extracted from both strands
+    No restrictions are placed on read extraction
+    Reads in 1 region will be discarded
+\end{Soutput}
+\end{Schunk}
 
 The \code{windowCounts} function will also accept a list of \code{readParam} objects. 
 Different read extraction parameters can then be specified for each library.
@@ -362,20 +428,30 @@ Nonetheless, it may be unavoidable, e.g., if the dataset is composed of a mixtur
 A hypothetical example is shown below with one single- and one paired-end library.
 To mimic single-end data in the second library, only the first read of the pair is used.
 
-<<>>=
-paramlist <- list(readParam(), readParam(pe="first"))
-checkList(paramlist)
-@
+\begin{Schunk}
+\begin{Sinput}
+> paramlist <- list(readParam(), readParam(pe="first"))
+> checkList(paramlist)
+\end{Sinput}
+\begin{Soutput}
+[1] "pe"
+\end{Soutput}
+\end{Schunk}
 
 For convenience, the \code{checkList} function is provided to identify those parameters that are different across the list.
 This can be useful to ensure that only the intended parameters are varied across libraries.
 Lists can also be manipulated with the \code{reformList} function, which sets parameters to their specified values in all elements of the list.
 In the code below, coercion of \code{pe} to a common value removes any differences between \code{readParam} objects.
 
-<<>>=
-paramlist <- reformList(paramlist, pe="none")
-checkList(paramlist)
-@
+\begin{Schunk}
+\begin{Sinput}
+> paramlist <- reformList(paramlist, pe="none")
+> checkList(paramlist)
+\end{Sinput}
+\begin{Soutput}
+character(0)
+\end{Soutput}
+\end{Schunk}
 
 Users are encouraged to construct their own \code{readParam} objects (or lists thereof) and apply them consistently throughout their analyses.
 A good measure of synchronisation between \code{windowCounts} calls is to check that the values of \code{...\$totals} are identical between calls. 
@@ -390,10 +466,25 @@ This may be useful when machine memory is limited.
 Of course, spatial resolution is lost with larger spacings.
 Adjacent positions are not counted and thus cannot be distinguished. 
 
-<<>>=
-demo <- windowCounts(bam.files, spacing=100, ext=frag.len, width=win.width, param=param)
-head(rowRanges(demo))
-@
+\begin{Schunk}
+\begin{Sinput}
+> demo <- windowCounts(bam.files, spacing=100, ext=frag.len, width=win.width, param=param)
+> head(rowRanges(demo))
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 6 ranges and 0 metadata columns:
+      seqnames             ranges strand
+         <Rle>          <IRanges>  <Rle>
+  [1]     chr1 [3003701, 3003710]      *
+  [2]     chr1 [3003801, 3003810]      *
+  [3]     chr1 [3004001, 3004010]      *
+  [4]     chr1 [3008301, 3008310]      *
+  [5]     chr1 [3008401, 3008410]      *
+  [6]     chr1 [3009201, 3009210]      *
+  -------
+  seqinfo: 66 sequences from an unspecified genome
+\end{Soutput}
+\end{Schunk}
 
 For analyses with large windows, it is worth increasing the \code{spacing} to a fraction of the specified \code{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
@@ -408,10 +499,21 @@ Specifically, any window is removed if the sum of counts across all libraries is
 The default value of the filter threshold is 10, though it can be raised to reduce memory usage for large libraries.
 More sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
-<<>>=
-demo <- windowCounts(bam.files, ext=frag.len, width=win.width, filter=30, param=param)
-head(assay(demo))
-@
+\begin{Schunk}
+\begin{Sinput}
+> demo <- windowCounts(bam.files, ext=frag.len, width=win.width, filter=30, param=param)
+> head(assay(demo))
+\end{Sinput}
+\begin{Soutput}
+     [,1] [,2] [,3] [,4]
+[1,]    5   14    2    9
+[2,]    5    2   19    6
+[3,]    4    6   17    4
+[4,]    6    8   16    5
+[5,]    3   11   16    5
+[6,]    5   11   13    2
+\end{Soutput}
+\end{Schunk}
 
 Setting \code{bin=TRUE} will cause \code{windowCounts} to count reads into contiguous bins across the genome.
 Specifically, \code{spacing} is set to \code{width} such that each window forms a bin.
@@ -420,10 +522,25 @@ No filtering is performed on the count sum, such that counts will be returned fo
 As a result, users should set \code{width} to a reasonably large value.
 This avoids problems with memory constraints when counts are returned for a large number of small bins.
 
-<<>>=
-demo <- windowCounts(bam.files, width=1000, bin=TRUE, param=param)
-head(rowRanges(demo))
-@
+\begin{Schunk}
+\begin{Sinput}
+> demo <- windowCounts(bam.files, width=1000, bin=TRUE, param=param)
+> head(rowRanges(demo))
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 6 ranges and 0 metadata columns:
+      seqnames             ranges strand
+         <Rle>          <IRanges>  <Rle>
+  [1]     chr1 [3000001, 3001000]      *
+  [2]     chr1 [3001001, 3002000]      *
+  [3]     chr1 [3002001, 3003000]      *
+  [4]     chr1 [3003001, 3004000]      *
+  [5]     chr1 [3004001, 3005000]      *
+  [6]     chr1 [3005001, 3006000]      *
+  -------
+  seqinfo: 66 sequences from an unspecified genome
+\end{Soutput}
+\end{Schunk}
 
 \section{Experiments involving paired-end data}
 \label{data:pet}
@@ -433,39 +550,52 @@ Read extension is not required as the genomic interval spanned by the originatin
 The number of fragments overlapping each window is then counted as described. 
 By default, only proper pairs are used in which the two paired reads are on the same chromosome, face inward and are no more than \code{max.frag} apart.
 
-<<>>=
-pe.bam <- "example-pet.bam"
-pe.param <- readParam(max.frag=400, pe="both")
-demo <- windowCounts(pe.bam, ext=250, param=pe.param)
-demo$totals
-@
+\begin{Schunk}
+\begin{Sinput}
+> pe.bam <- "example-pet.bam"
+> pe.param <- readParam(max.frag=400, pe="both")
+> demo <- windowCounts(pe.bam, ext=250, param=pe.param)
+> demo$totals
+\end{Sinput}
+\begin{Soutput}
+[1] 11723240
+\end{Soutput}
+\end{Schunk}
 
 A suitable value for \code{max.frag} can be chosen by examining the distribution of fragment sizes from the \code{getPESizes} function. 
 In this example, a user might use a value of around 400 bp as it exceeds the vast majority of the fragment size distribution. 
 The plot can also be used to examine the quality of the PE sequencing procedure. 
 The location of the mode should be consistent with the fragmentation and size selection steps in library preparation. 
 
-<<label=frag,eval=FALSE>>=
-out <- getPESizes(pe.bam)
-frag.sizes <- out$sizes[out$sizes<=800]
-hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
-abline(v=400, col="red")
-@
+\begin{Schunk}
+\begin{Sinput}
+> out <- getPESizes(pe.bam)
+> frag.sizes <- out$sizes[out$sizes<=800]
+> hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
+> abline(v=400, col="red")
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<frag>>
-@
+\includegraphics{plots-ug/ug-023}
 \end{center}
 
 The number of fragments exceeding the maximum size can be recorded for quality control. 
 The \code{getPESizes} function also returns the number of single reads, pairs with one unmapped read, improperly orientated pairs and inter-chromosomal pairs.
 A non-negligble proportion of these reads may be indicative of problems with paired-end alignment or sequencing. 
 
-<<>>=
-c(out$diagnostics, too.large=sum(out$sizes > 400))
-@
+\begin{Schunk}
+\begin{Sinput}
+> c(out$diagnostics, too.large=sum(out$sizes > 400))
+\end{Sinput}
+\begin{Soutput}
+  total.reads  mapped.reads        single mate.unmapped    unoriented 
+     33498954      27420853             0       2000261         95382 
+    inter.chr     too.large 
+       761432        130242 
+\end{Soutput}
+\end{Schunk}
 
 Note that all of the paired-end methods in \pkgname{} depend on the synchronisation of mate information for each alignment in the BAM file. 
 This is usually enforced in the alignments that are reported directly from the aligner. 
@@ -475,11 +605,16 @@ Paired-end data can also be treated as single-end by specifiying \code{pe="first
 This will only use the first or second read of each read pair, regardless of the validity of the pair or the relative quality of the alignments.
 This setting may be useful for contrasting paired- and single-end analyses, or in disastrous situations where paired-end sequencing has failed, e.g., due to ligation between DNA fragments.
 
-<<>>=
-first.param <- readParam(pe="first")
-demo <- windowCounts(pe.bam, param=first.param)
-demo$totals
-@
+\begin{Schunk}
+\begin{Sinput}
+> first.param <- readParam(pe="first")
+> demo <- windowCounts(pe.bam, param=first.param)
+> demo$totals
+\end{Sinput}
+\begin{Soutput}
+[1] 13715351
+\end{Soutput}
+\end{Schunk}
 
 \section{Estimating the average fragment length}
 \label{sec:ccf}
@@ -490,28 +625,33 @@ This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq
 Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
 This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
 
-<<label=ccf,eval=FALSE>>=
-max.delay <- 500
-dedup.on <- reform(param, dedup=TRUE)
-x <- correlateReads(bam.files, max.delay, param=dedup.on)
-plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
-@
+\begin{Schunk}
+\begin{Sinput}
+> max.delay <- 500
+> dedup.on <- reform(param, dedup=TRUE)
+> x <- correlateReads(bam.files, max.delay, param=dedup.on)
+> plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
 \centering
-<<fig=TRUE,echo=FALSE>>=
-<<ccf>>
-@
+\includegraphics{plots-ug/ug-027}
 \end{center}
 
 The location of the peak can be used as an estimate of the fragment length for read extension in \code{windowCounts}. 
 An estimate of $\sim$110 bp is obtained from the plot above.
 This can be done more precisely with the \code{maximizeCcf} function, which returns a similar value.
 
-<<>>=
-maximizeCcf(x)
-@
+\begin{Schunk}
+\begin{Sinput}
+> maximizeCcf(x)
+\end{Sinput}
+\begin{Soutput}
+[1] 110
+\end{Soutput}
+\end{Schunk}
 
 A sharp spike may also observed in the plot at a distance corresponding to the read length. 
 This is thought to be an artifact, caused by the preference of aligners towards uniquely mapped reads. 
@@ -523,25 +663,25 @@ Poor IP efficiency will result in a smaller or absent peak as bimodality is less
 Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation.
 However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g., H3K27 trimethylation).
 
-<<label=histone_ccf,eval=FALSE>>=
-n <- 1000
-h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
-h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
-h3k4me2 <- correlateReads("h3k4me2.bam", n, param=dedup.on)
-plot(0:n, h3ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
-    xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
-lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
-lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
-legend("topright", col=c("blue", "red", "forestgreen"),
-    c("H3Ac", "H3K27me3", "H3K4me2"), pch=16)
-@
+\begin{Schunk}
+\begin{Sinput}
+> n <- 1000
+> h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
+> h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
+> h3k4me2 <- correlateReads("h3k4me2.bam", n, param=dedup.on)
+> plot(0:n, h3ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
++     xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
+> lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
+> lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
+> legend("topright", col=c("blue", "red", "forestgreen"),
++     c("H3Ac", "H3K27me3", "H3K4me2"), pch=16)
+\end{Sinput}
+\end{Schunk}
 \label{data:ccf}
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<histone_ccf>>
-@
+\includegraphics{plots-ug/ug-030}
 \end{center}
 
 \subsection{Variable fragment lengths between libraries}
@@ -554,11 +694,16 @@ This is done by supplying a vector to the \code{ext} argument.
 Each entry specifies the average fragment length to be used for the corresponding library.
 The extension lengths are also stored in the \code{RangedSummarizedExperiment} output for future reference. 
 
-<<>>=
-multi.frag.lens <- c(100, 150, 200, 250)
-demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30, param=param)
-demo$ext
-@
+\begin{Schunk}
+\begin{Sinput}
+> multi.frag.lens <- c(100, 150, 200, 250)
+> demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30, param=param)
+> demo$ext
+\end{Sinput}
+\begin{Soutput}
+[1] 100 150 200 250
+\end{Soutput}
+\end{Schunk}
 
 Caution is required to avoid detecting irrelevant DB from differences in peak widths.
 \code{windowCounts} can provide some protection by scaling extended reads to the same length in all libraries.
@@ -572,10 +717,12 @@ If the second element is set to \code{NA}, no rescaling is performed and the lib
 This also works for analyses with paired-end data, though the first element of \code{ext} will be ignored as directional extension is not performed.
 The example below rescales all fragments to the mean of the library-specific sizes.
 
-<<>>=
-demo <- windowCounts(bam.files, filter=30, param=param,
-    ext=DataFrame(multi.frag.lens, mean(multi.frag.lens))) 
-@
+\begin{Schunk}
+\begin{Sinput}
+> demo <- windowCounts(bam.files, filter=30, param=param,
++     ext=DataFrame(multi.frag.lens, mean(multi.frag.lens))) 
+\end{Sinput}
+\end{Schunk}
 
 In general, use of different extension lengths is unnecessary in well-controlled datasets.
 Difference in lengths between libraries are usually smaller than 50 bp.
@@ -590,31 +737,31 @@ For each selected window, \code{profileSites} records the coverage across the fl
 This is divided by the count for the window itself to obtain a relative coverage, based on the specification of \code{weight}.
 The values are then averaged across all windows to obtain an aggregated coverage profile for each library.
 
-<<label=profiling,eval=FALSE>>=
-all.bam <- c("h3ac.bam", "h3k4me2.bam", "es_1.bam")
-collected <- list()
-for (curbam in all.bam) {
-    windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
-    rwsms <- rowSums(assay(windowed))
-    maxed <- findMaxima(rowRanges(windowed), range=1000, metric=rwsms)
-    collected[[curbam]] <- profileSites(curbam, rowRanges(windowed)[maxed], 
-        param=dedup.on, weight=1/rwsms[maxed])
-}
-xranged <- as.integer(names(collected[[1]]))
-plot(xranged, collected[[1]], type="l", col="blue", xlim=c(-1000, 1000), lwd=2, 
-    xlab="Distance (bp)", ylab="Relative coverage per base")
-lines(xranged, collected[[2]], col="forestgreen", lwd=2)
-lines(xranged, collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
-legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
-    c("H3Ac", "H3K4me2", "NF-YA"), pch=16)
-abline(v=c(-150,200), col="dodgerblue", lty=2)
-@
+\begin{Schunk}
+\begin{Sinput}
+> all.bam <- c("h3ac.bam", "h3k4me2.bam", "es_1.bam")
+> collected <- list()
+> for (curbam in all.bam) {
++     windowed <- windowCounts(curbam, spacing=50, width=50, param=dedup.on, filter=20)
++     rwsms <- rowSums(assay(windowed))
++     maxed <- findMaxima(rowRanges(windowed), range=1000, metric=rwsms)
++     collected[[curbam]] <- profileSites(curbam, rowRanges(windowed)[maxed], 
++         param=dedup.on, weight=1/rwsms[maxed])
++ }
+> xranged <- as.integer(names(collected[[1]]))
+> plot(xranged, collected[[1]], type="l", col="blue", xlim=c(-1000, 1000), lwd=2, 
++     xlab="Distance (bp)", ylab="Relative coverage per base")
+> lines(xranged, collected[[2]], col="forestgreen", lwd=2)
+> lines(xranged, collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
+> legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
++     c("H3Ac", "H3K4me2", "NF-YA"), pch=16)
+> abline(v=c(-150,200), col="dodgerblue", lty=2)
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<profiling>>
-@
+\includegraphics{plots-ug/ug-034}
 \end{center}
 
 In the example above, enrichment for the two histone marks is mostly contained within a 350 bp region around the maxima (dashed lines).
@@ -643,13 +790,21 @@ The \pkgname{} package focuses on counting reads into windows.
 However, it may be occasionally desirable to use the same conventions (e.g., duplicate removal, quality score filtering) when counting reads into pre-specified regions. 
 This can be performed with the \code{regionCounts} function, which is largely a wrapper for \code{countOverlaps} from the \granges{} package.
 
-<<>>=
-my.regions <- GRanges(c("chr11", "chr12", "chr15"),
-    IRanges(c(75461351, 95943801, 21656501), 
-    c(75461610, 95944810, 21657610)))
-reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
-head(assay(reg.counts))
-@ 
+\begin{Schunk}
+\begin{Sinput}
+> my.regions <- GRanges(c("chr11", "chr12", "chr15"),
++     IRanges(c(75461351, 95943801, 21656501), 
++     c(75461610, 95944810, 21657610)))
+> reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
+> head(assay(reg.counts))
+\end{Sinput}
+\begin{Soutput}
+     [,1] [,2] [,3] [,4]
+[1,]   37   57  103  102
+[2,]    0    0    1    0
+[3,]   15   17   16    7
+\end{Soutput}
+\end{Schunk}
 
 \subsection{Strand-specific counting}
 Techniques like CLIP-seq, MeDIP-seq or CAGE provide strand-specific sequence information.
@@ -659,21 +814,25 @@ Alternatively, the \code{strandedCounts} wrapper function can be used to obtain 
 The strand of each output range indicates the strand on which reads were counted for that row.
 Up to two rows can be generated for each window or region, depending on filtering.
 
-<<>>=
-ss.param <- reform(param, forward=NULL)
-ss.counts <- strandedCounts(bam.files, ext=frag.len, width=win.width, param=ss.param)
-strand(rowRanges(ss.counts))
-@
+\begin{Schunk}
+\begin{Sinput}
+> ss.param <- reform(param, forward=NULL)
+> ss.counts <- strandedCounts(bam.files, ext=frag.len, width=win.width, param=ss.param)
+> strand(rowRanges(ss.counts))
+\end{Sinput}
+\begin{Soutput}
+factor-Rle of length 656381 with 70 runs
+  Lengths: 48361 46926 15963 15666 27617 ...   657  1289  1217    49    75
+  Values :     +     -     +     -     + ...     -     +     -     +     -
+Levels(3): + - *
+\end{Soutput}
+\end{Schunk}
 
 Note that \code{strandedCounts} operates internally by calling \code{windowCounts} (or \code{regionCounts}) twice with different settings for \code{param\$forward}. 
 Any value for \code{forward} in the input \code{param} object will be ignored.
 In fact, the function will \textit{only} accept a \code{NULL} value for this slot.
 This is intended to protect the user, as any attempt to re-use the \code{ss.param} object in functions that are not designed for strand specificity will (appropriately) raise an error.
 
-<<results=hide,echo=FALSE>>=
-rm(demo, ss.counts, windowed)
-gc()
-@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -701,19 +860,31 @@ Row sums can also be used for datasets where the effective library sizes are not
 In \edger{}, the log-transformed overall NB mean is referred to as the average abundance.
 This is computed with the \code{aveLogCPM} function, as shown below for each region.
 
-<<>>=
-abundances <- aveLogCPM(asDGEList(data))
-summary(abundances)
-@
+\begin{Schunk}
+\begin{Sinput}
+> abundances <- aveLogCPM(asDGEList(data))
+> summary(abundances)
+\end{Sinput}
+\begin{Soutput}
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ -2.211  -2.189  -2.110  -2.041  -1.971   9.811 
+\end{Soutput}
+\end{Schunk}
 
 For demonstration purposes, an arbitrary threshold of -1 is used here to filter the window abundances. 
 This restricts the analysis to windows with abundances above this threshold.
 
-<<>>=
-keep.simple <- abundances > -1
-filtered.data <- data[keep.simple,]
-summary(keep.simple)
-@
+\begin{Schunk}
+\begin{Sinput}
+> keep.simple <- abundances > -1
+> filtered.data <- data[keep.simple,]
+> summary(keep.simple)
+\end{Sinput}
+\begin{Soutput}
+   Mode   FALSE    TRUE    NA's 
+logical 3674738   15072       0 
+\end{Soutput}
+\end{Schunk}
 
 The exact choice of filter threshold may not be obvious.
 In particular, there is often no clear distinction in abundances between genuine binding and background events, e.g., due to the presence of many weak but genuine binding sites.
@@ -729,10 +900,16 @@ The simplest approach is to simply filter according to the count size.
 This removes windows for which the counts are simply too low to provide strong evidence for DB.
 The code below retains windows with (library size-adjusted) average counts greater than 5. 
 
-<<>>=
-keep <- abundances > aveLogCPM(5, lib.size=mean(data$totals))
-summary(keep)
-@
+\begin{Schunk}
+\begin{Sinput}
+> keep <- abundances > aveLogCPM(5, lib.size=mean(data$totals))
+> summary(keep)
+\end{Sinput}
+\begin{Soutput}
+   Mode   FALSE    TRUE    NA's 
+logical 3621824   67986       0 
+\end{Soutput}
+\end{Schunk}
 
 However, a count-based filter becomes less effective as the library size increases.
 More windows will be retained with greater sequencing depth, even in uninteresting background regions.
@@ -746,10 +923,15 @@ The total number of windows is calculated from the genome length and the \code{s
 The \code{filterWindows} function returns the ratio of the rank of each window to this total, where higher-abundance windows have larger ranks.
 Users can then retain those windows with rank ratios above the unbound proportion of the genome.
 
-<<>>=
-keep <- filterWindows(data, type="proportion")$filter > 0.999
-sum(keep)
-@
+\begin{Schunk}
+\begin{Sinput}
+> keep <- filterWindows(data, type="proportion")$filter > 0.999
+> sum(keep)
+\end{Sinput}
+\begin{Soutput}
+[1] 54620
+\end{Soutput}
+\end{Schunk}
 
 This approach is simple and has the practical advantage of maintaining a constant number of windows for the downstream analysis. 
 However, it may not adapt well to different datasets where the proportion of bound sites can vary.
@@ -762,10 +944,12 @@ The degree of background enrichment can be estimated by counting reads into larg
 Binning is necessary here to increase the size of the counts when examining low-density background regions. 
 This ensures that precision is maintained when estimating the background abundance.
 
-<<>>=
-bin.size <- 2000L
-binned <- windowCounts(bam.files, bin=TRUE, width=bin.size, param=param)
-@
+\begin{Schunk}
+\begin{Sinput}
+> bin.size <- 2000L
+> binned <- windowCounts(bam.files, bin=TRUE, width=bin.size, param=param)
+\end{Sinput}
+\end{Schunk}
 
 The median of the average abundances across all bins can be computed and used as a global estimate of the background coverage.
 This global background can then be compared to the window-based abundances.
@@ -777,31 +961,36 @@ Windows can be filtered by setting some minimum threshold on this increase.
 Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
-<<>>=
-filter.stat <- filterWindows(data, background=binned, type="global")
-keep <- filter.stat$filter > log2(3)
-sum(keep)
-@
+\begin{Schunk}
+\begin{Sinput}
+> filter.stat <- filterWindows(data, background=binned, type="global")
+> keep <- filter.stat$filter > log2(3)
+> sum(keep)
+\end{Sinput}
+\begin{Soutput}
+[1] 20588
+\end{Soutput}
+\end{Schunk}
 
 The effect of filtering can also be visualized with a histogram. 
 This allows users to confirm that the bulk of (assumed) background bins are discarded upon filtering. 
 Note that bins containing genuine binding sites will usually not be visible on such plots.
 This is due to the dominance of the background-containing bins throughout the genome.
 
-<<eval=FALSE,label=binhist>>=
-hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="", 
-    xlim=c(min(filter.stat$back.abundances), 0))
-global.bg <- filter.stat$abundances - filter.stat$filter
-abline(v=global.bg[1], col="red", lwd=2)
-abline(v=global.bg[1]+log2(3), col="blue", lwd=2)
-legend("topright", lwd=2, col=c('red', 'blue'), legend=c("Background", "Threshold"))
-@
+\begin{Schunk}
+\begin{Sinput}
+> hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, main="", 
++     xlim=c(min(filter.stat$back.abundances), 0))
+> global.bg <- filter.stat$abundances - filter.stat$filter
+> abline(v=global.bg[1], col="red", lwd=2)
+> abline(v=global.bg[1]+log2(3), col="blue", lwd=2)
+> legend("topright", lwd=2, col=c('red', 'blue'), legend=c("Background", "Threshold"))
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<binhist>>
-@
+\includegraphics{plots-ug/ug-045}
 \end{center}
 
 Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
@@ -817,11 +1006,13 @@ Here, the 2 kbp region surrounding each window will be used as the ``neighborhoo
 The counts for this region can be obtained with the aptly-named \code{regionCounts} function.
 This should be synchronized with \code{windowCounts} by using the same \code{param}, if any non-default settings were used.
 
-<<>>=
-surrounds <- 2000
-neighbor <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
-wider <- regionCounts(bam.files, regions=neighbor, ext=frag.len, param=param)
-@
+\begin{Schunk}
+\begin{Sinput}
+> surrounds <- 2000
+> neighbor <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
+> wider <- regionCounts(bam.files, regions=neighbor, ext=frag.len, param=param)
+\end{Sinput}
+\end{Schunk}
 
 Counts for each window are subtracted from the counts for its neighborhood.
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.
@@ -829,18 +1020,25 @@ The width of the window is also subtracted from that of its neighborhood, to ref
 Using these differences in widths, the abundance of the neighborhood is scaled down for a valid comparison to that of the corresponding window.
 This entire procedure can be performed automatically by setting \code{type="local"} for \code{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighborhood.
 
-<<>>=
-filter.stat <- filterWindows(data, wider, type="local")
-@
+\begin{Schunk}
+\begin{Sinput}
+> filter.stat <- filterWindows(data, wider, type="local")
+\end{Sinput}
+\end{Schunk}
 
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
 In this scenario, a 3-fold increase in enrichment over the neighborhood abundance is required for retention of each window.
 This roughly mimics the behavior of single-sample peak-calling programs such as \macs{} \citep{zhang2008}.
 
-<<>>=
-keep <- filter.stat$filter > log2(3)
-sum(keep)
-@
+\begin{Schunk}
+\begin{Sinput}
+> keep <- filter.stat$filter > log2(3)
+> sum(keep)
+\end{Sinput}
+\begin{Soutput}
+[1] 9539
+\end{Soutput}
+\end{Schunk}
 
 Note that this procedure also assumes that no other enriched regions are present in each neighborhood.
 Otherwise, the local background will be overestimated and windows may be incorrectly filtered out. 
@@ -859,10 +1057,16 @@ The code below will determine if each window is a local maximum, i.e., whether i
 The data can then be filtered to retain only these locally maximal windows.
 This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
 
-<<>>=
-maxed <- findMaxima(rowRanges(data), range=1000, metric=abundances)
-summary(maxed)
-@
+\begin{Schunk}
+\begin{Sinput}
+> maxed <- findMaxima(rowRanges(data), range=1000, metric=abundances)
+> summary(maxed)
+\end{Sinput}
+\begin{Soutput}
+   Mode   FALSE    TRUE    NA's 
+logical 2823683  866127       0 
+\end{Soutput}
+\end{Schunk}
 
 This approach is very aggressive and should only be used (sparingly) in datasets where binding is sharp, simple and isolated.
 Complex binding events involving diffuse enrichment or adjacent binding sites will not be handled well.
@@ -875,40 +1079,51 @@ IgG controls also quantify the amount of non-specific enrichment throughout the 
 These controls are mostly irrelevant when testing for DB between ChIP samples. 
 However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
 
-<<>>=
-in.demo <- windowCounts(c(bam.files, "input.bam"), ext=frag.len, param=param)
-chip <- in.demo[,1:4]
-control <- in.demo[,5]
-@
+\begin{Schunk}
+\begin{Sinput}
+> in.demo <- windowCounts(c(bam.files, "input.bam"), ext=frag.len, param=param)
+> chip <- in.demo[,1:4]
+> control <- in.demo[,5]
+\end{Sinput}
+\end{Schunk}
 
 Some additional work is required to account for composition biases (see Section~\ref{sec:compo_norm}).
 These are likely to be present when comparing ChIP to negative control samples.
 A simple strategy for normalization involves counting reads into large bins, as shown below.
 
-<<>>=
-in.binned <- windowCounts(c(bam.files, "input.bam"), bin=TRUE, width=10000, param=param)
-chip.binned <- in.binned[,1:4]
-control.binned <- in.binned[,5]
-@
+\begin{Schunk}
+\begin{Sinput}
+> in.binned <- windowCounts(c(bam.files, "input.bam"), bin=TRUE, width=10000, param=param)
+> chip.binned <- in.binned[,1:4]
+> control.binned <- in.binned[,5]
+\end{Sinput}
+\end{Schunk}
 
 The \code{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
 A larger \code{prior.count} of 5 is used to compute the average abundance.
 This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
 Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from larger bins with more counts.
 
-<<>>=
-filter.stat <- filterWindows(chip, control, type="control", prior.count=5,
-    norm.fac=list(chip.binned, control.binned))
-@
+\begin{Schunk}
+\begin{Sinput}
+> filter.stat <- filterWindows(chip, control, type="control", prior.count=5,
++     norm.fac=list(chip.binned, control.binned))
+\end{Sinput}
+\end{Schunk}
 
 The binned counts are also supplied as a list to the \code{norm.fac} argument, where the first and second elements contain the counts for the ChIP and control samples, respectively.
 The log-fold enrichment of the ChIP sample over the control is then computed for each window, after normalizing for composition bias with the binned counts.
 The example below requires a 3-fold or greater increase in abundance over the control to retain each window.
 
-<<>>=
-keep <- filter.stat$filter > log2(3)
-sum(keep)
-@
+\begin{Schunk}
+\begin{Sinput}
+> keep <- filter.stat$filter > log2(3)
+> sum(keep)
+\end{Sinput}
+\begin{Soutput}
+[1] 5910
+\end{Soutput}
+\end{Schunk}
 
 As an aside, the \pkgname{} pipeline can also be applied to search for ``DB'' between ChIP libraries and control libraries. 
 The ChIP and control libraries can be treated as separate groups, in which most ``DB'' events are expected to be enriched in the ChIP samples. 
@@ -924,21 +1139,41 @@ Such regions could include promoters, enhancers, gene bodies or exons.
 Alternatively, sites could be defined from a previous experiment or based on the genome sequence, e.g., TF motif matches.
 The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
 
-<<>>=
-require(TxDb.Mmusculus.UCSC.mm10.knownGene)
-broads <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)
-broads <- resize(broads, width(broads)+3000, fix="end")
-head(broads)
-@
+\begin{Schunk}
+\begin{Sinput}
+> require(TxDb.Mmusculus.UCSC.mm10.knownGene)
+> broads <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)
+> broads <- resize(broads, width(broads)+3000, fix="end")
+> head(broads)
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 6 ranges and 1 metadata column:
+            seqnames                 ranges strand |     gene_id
+               <Rle>              <IRanges>  <Rle> | <character>
+  100009600     chr9 [ 21062393,  21078496]      - |   100009600
+  100009609     chr7 [ 84940169,  84967009]      - |   100009609
+  100009614    chr10 [ 77708446,  77712009]      + |   100009614
+  100009664    chr11 [ 45805083,  45842878]      + |   100009664
+     100012     chr4 [144157556, 144165651]      - |      100012
+     100017     chr4 [134745412, 134771004]      - |      100017
+  -------
+  seqinfo: 66 sequences (1 circular) from mm10 genome
+\end{Soutput}
+\end{Schunk}
  
 Windows can be filtered to only retain those which overlap with the regions of interest. 
 Discerning users may wish to distinguish between full and partial overlaps, though this should not be a significant issue for small windows.
 This could also be combined with abundance filtering to retain windows that contain putative binding sites in the regions of interest.
 
-<<>>=
-suppressWarnings(keep <- overlapsAny(rowRanges(data), broads))
-sum(keep)
-@
+\begin{Schunk}
+\begin{Sinput}
+> suppressWarnings(keep <- overlapsAny(rowRanges(data), broads))
+> sum(keep)
+\end{Sinput}
+\begin{Soutput}
+[1] 2012876
+\end{Soutput}
+\end{Schunk}
 
 Any information used here should be independent of the DB status under the null in the current dataset. 
 For example, DB calls from a separate dataset and/or independent annotation can be used without problems. 
@@ -966,11 +1201,6 @@ The greatest effect is observed for filters that operate on different principles
 For example, the low-count filter can be combined with others to ensure that all retained windows surpass some minimum count.
 This is especially relevant for the local background filters, where a large enrichment value does not guarantee a large count.
 
-<<results=hide,echo=FALSE>>=
-rm(binned, in.demo, wider, neighbor, chip, control, filter.stat,
-	in.binned, chip.binned, control.binned)
-gc()
-@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1006,11 +1236,16 @@ To remove composition biases in \pkgname{}, reads are counted in large bins and 
 This uses the trimmed mean of M-values (TMM) method \citep{oshlack2010} to correct for any sytematic fold change in the coverage of the bins. 
 The assumption here is that most bins represent non-DB background regions so any consistent difference across bins must be spurious.
 
-<<>>=
-binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-normfacs <- normOffsets(binned)
-normfacs
-@
+\begin{Schunk}
+\begin{Sinput}
+> binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+> normfacs <- normOffsets(binned)
+> normfacs
+\end{Sinput}
+\begin{Soutput}
+[1] 1.0075434 0.9745238 1.0137867 1.0046093
+\end{Soutput}
+\end{Schunk}
 
 The TMM method trims away putative DB bins (i.e., those with extreme M-values) and computes normalization factors from the remainder to use in \edger{}. 
 The size of each library is scaled by the corresponding factor to obtain an effective library size for modelling. 
@@ -1042,12 +1277,22 @@ On the other hand, the counts will be too low if the bins are too small.
 Testing multiple bin sizes is recommended to ensure that the estimates are robust to any changes. 
 A value of 10 kbp is suitable for most datasets.
 
-<<>>=
-demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
-normOffsets(demo)
-demo <- windowCounts(bam.files, bin=TRUE, width=15000, param=param)
-normOffsets(demo)
-@
+\begin{Schunk}
+\begin{Sinput}
+> demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
+> normOffsets(demo)
+\end{Sinput}
+\begin{Soutput}
+[1] 1.0093596 0.9754046 1.0105468 1.0051082
+\end{Soutput}
+\begin{Sinput}
+> demo <- windowCounts(bam.files, bin=TRUE, width=15000, param=param)
+> normOffsets(demo)
+\end{Sinput}
+\begin{Soutput}
+[1] 1.007559 0.972134 1.016096 1.004775
+\end{Soutput}
+\end{Schunk}
 
 These factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
 See Section~\ref{sec:eff_norm_ma} for some examples with greater bias.
@@ -1066,24 +1311,24 @@ This indicates that undersampling has been identified and corrected.
 % bins should still be free of binding, though (8000/260000 bins, based on 
 % those that overlap globally filtered windows in Chapter 4).
 
-<<eval=FALSE,label=normplot>>=
-par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
-adj.counts <- cpm(asDGEList(binned), log=TRUE)
-for (i in 1:(length(bam.files)-1)) {
-    cur.x <- adj.counts[,1]
-    cur.y <- adj.counts[,1+i]
-    smoothScatter(x=(cur.x+cur.y)/2+6*log2(10), y=cur.x-cur.y,
-        xlab="A", ylab="M", main=paste("1 vs", i+1))
-    all.dist <- diff(log2(normfacs[c(i+1, 1)]))
-    abline(h=all.dist, col="red")
-}
-@
+\begin{Schunk}
+\begin{Sinput}
+> par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
+> adj.counts <- cpm(asDGEList(binned), log=TRUE)
+> for (i in 1:(length(bam.files)-1)) {
++     cur.x <- adj.counts[,1]
++     cur.y <- adj.counts[,1+i]
++     smoothScatter(x=(cur.x+cur.y)/2+6*log2(10), y=cur.x-cur.y,
++         xlab="A", ylab="M", main=paste("1 vs", i+1))
++     all.dist <- diff(log2(normfacs[c(i+1, 1)]))
++     abline(h=all.dist, col="red")
++ }
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE,width=8,height=3>>=
-<<normplot>>
-@
+\includegraphics{plots-ug/ug-060}
 \end{center}
 
 \section{Eliminating efficiency biases}
@@ -1098,20 +1343,30 @@ In the examples below, reads are counted into 150 bp windows for histone mark da
 High-abundance windows are chosen using a global filtering approach described in Section~\ref{sec:global_filter}. 
 The TMM method can then be applied to eliminate systematic differences across those windows.
 
-<<>>=
-me.files <- c("h3k4me3_mat.bam", "h3k4me3_pro.bam")
-me.demo <- windowCounts(me.files, width=150, param=param)
-me.bin <- windowCounts(me.files, bin=TRUE, width=10000, param=param) 
-keep <- filterWindows(me.demo, me.bin, type="global")$filter > log2(3)
-me.eff <- normOffsets(me.demo[keep,])
-me.eff
-ac.files <- c("h3ac.bam", "h3ac_2.bam")
-ac.demo <- windowCounts(ac.files, width=150, param=param)
-ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
-keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
-ac.eff <- normOffsets(ac.demo[keep,])
-ac.eff
-@
+\begin{Schunk}
+\begin{Sinput}
+> me.files <- c("h3k4me3_mat.bam", "h3k4me3_pro.bam")
+> me.demo <- windowCounts(me.files, width=150, param=param)
+> me.bin <- windowCounts(me.files, bin=TRUE, width=10000, param=param) 
+> keep <- filterWindows(me.demo, me.bin, type="global")$filter > log2(3)
+> me.eff <- normOffsets(me.demo[keep,])
+> me.eff
+\end{Sinput}
+\begin{Soutput}
+[1] 0.791484 1.263449
+\end{Soutput}
+\begin{Sinput}
+> ac.files <- c("h3ac.bam", "h3ac_2.bam")
+> ac.demo <- windowCounts(ac.files, width=150, param=param)
+> ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
+> keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
+> ac.eff <- normOffsets(ac.demo[keep,])
+> ac.eff
+\end{Sinput}
+\begin{Soutput}
+[1] 1.2012717 0.8324512
+\end{Soutput}
+\end{Schunk}
 \label{data:norm}
 
 This method also assumes that most binding sites in the genome are not DB.
@@ -1134,36 +1389,46 @@ Plots are constructed using counts for 10 kbp bins, rather than with those from 
 This is useful as the behavior of the entire genome can be examined, rather than just that of the high-abundance windows.
 It also allows calculation of and comparison to the factors for composition bias.
 
-<<>>=
-me.comp <- normOffsets(me.bin)
-me.comp
-ac.comp <- normOffsets(ac.bin)
-ac.comp
-@
+\begin{Schunk}
+\begin{Sinput}
+> me.comp <- normOffsets(me.bin)
+> me.comp
+\end{Sinput}
+\begin{Soutput}
+[1] 1.2801380 0.7811658
+\end{Soutput}
+\begin{Sinput}
+> ac.comp <- normOffsets(ac.bin)
+> ac.comp
+\end{Sinput}
+\begin{Soutput}
+[1] 0.9049943 1.1049793
+\end{Soutput}
+\end{Schunk}
 
 The clouds at low and high A-values represent the background and bound regions, respectively.
 The normalization factors from removal of composition bias (dashed) pass through the former, whereas the factors to remove efficiency bias (full) pass through the latter.
 A non-zero M-value location for the high A-value cloud represents a systematic difference between libraries for the bound regions, either due to genuine DB or variable IP efficiency. 
 This also induces composition bias, leading to a non-zero M-value for the background cloud.
 
-<<eval=FALSE,label=methplot,strip.white=false>>=
-par(mfrow=c(1,2))
-for (main in c("H3K4me3", "H3ac")) { 
-    if (main=="H3K4me3") { bins <- me.bin; comp <- me.comp; eff <- me.eff }
-    else { bins <- ac.bin; comp <- ac.comp; eff <- ac.eff }
-    adjc <- cpm(asDGEList(bins), log=TRUE)
-    smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
-        xlab="A", ylab="M", main=main)
-    abline(h=log2(eff[1]/eff[2]), col="red")
-    abline(h=log2(comp[1]/comp[2]), col="red", lty=2)
-}
-@
+\begin{Schunk}
+\begin{Sinput}
+> par(mfrow=c(1,2))
+> for (main in c("H3K4me3", "H3ac")) { 
++     if (main=="H3K4me3") { bins <- me.bin; comp <- me.comp; eff <- me.eff }
++     else { bins <- ac.bin; comp <- ac.comp; eff <- ac.eff }
++     adjc <- cpm(asDGEList(bins), log=TRUE)
++     smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
++         xlab="A", ylab="M", main=main)
++     abline(h=log2(eff[1]/eff[2]), col="red")
++     abline(h=log2(comp[1]/comp[2]), col="red", lty=2)
++ }
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE,width=10,height=5>>=
-<<methplot>>
-@
+\includegraphics{plots-ug/ug-064}
 \end{center}
 
 \subsection{Choosing between normalization strategies}
@@ -1194,13 +1459,12 @@ In this calculation, the total number of reads for the endogenous genome is used
 This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
 Otherwise, if the total number of spike-in reads was used as the library size, the estimated factors would always be equal to unity.
 
-<<echo=FALSE, results=hide>>=
-spike.data <- data
-@
 
-<<>>=
-spike.facs <- normOffsets(spike.data, lib.sizes=data$totals)
-@
+\begin{Schunk}
+\begin{Sinput}
+> spike.facs <- normOffsets(spike.data, lib.sizes=data$totals)
+\end{Sinput}
+\end{Schunk}
 
 The spike-in approach does not distinguish between composition and efficiency biases.
 Instead, it uses the differences in spike-in coverage to empirically measure and remove the net bias between libraries.
@@ -1228,14 +1492,25 @@ The example below operates on the filtered counts for 2 kbp windows.
 This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
 Obviously, users should pick a more appropriate value for their analysis.
 
-<<>>=
-ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
-filtered <- filterWindows(ac.demo2, ac.bin, type="global")
-keep <- filtered$filter > log2(4)
-ac.demo2 <- ac.demo2[keep,]
-ac.off <- normOffsets(ac.demo2, type="loess")
-head(ac.off)
-@
+\begin{Schunk}
+\begin{Sinput}
+> ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
+> filtered <- filterWindows(ac.demo2, ac.bin, type="global")
+> keep <- filtered$filter > log2(4)
+> ac.demo2 <- ac.demo2[keep,]
+> ac.off <- normOffsets(ac.demo2, type="loess")
+> head(ac.off)
+\end{Sinput}
+\begin{Soutput}
+          [,1]       [,2]
+[1,] 0.1382389 -0.1382389
+[2,] 0.1382389 -0.1382389
+[3,] 0.1673179 -0.1673179
+[4,] 0.1805067 -0.1805067
+[5,] 0.2021534 -0.2021534
+[6,] 0.2144910 -0.2144910
+\end{Soutput}
+\end{Schunk}
 
 MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. 
@@ -1243,33 +1518,33 @@ In addition, any filter statistic for the windows should be based on the average
 An average abundance threshold will act as a clean vertical cutoff in the plots below. 
 Spurious trends that might affect normalization will not be introduced at the filter boundary. 
 
-<<eval=FALSE,keep.source=true,label=trendplot1>>=
-abval <- filtered$abundances[keep]
-o <- order(abval)
-adjc <- cpm(asDGEList(ac.demo2), log=TRUE)
-mval <- adjc[,1]-adjc[,2]
-fit <- loessFit(x=abval, y=mval)
-smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
-   main="Raw", ylim=c(-2,2), xlim=c(0, 7))
-lines(abval[o], fit$fitted[o], col="red")
-@
-<<eval=FALSE,keep.source=true,label=trendplot2>>=
-# Repeating after normalization.
-re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
-mval <- re.adjc[,1]-re.adjc[,2]
-fit <- loessFit(x=abval, y=mval)
-smoothScatter(abval, re.adjc[,1]-re.adjc[,2], ylab="M", 
-   xlab="Average logCPM", main="Normalized", ylim=c(-2,2), xlim=c(0, 7))
-lines(abval[o], fit$fitted[o], col="red")
-@
+\begin{Schunk}
+\begin{Sinput}
+> abval <- filtered$abundances[keep]
+> o <- order(abval)
+> adjc <- cpm(asDGEList(ac.demo2), log=TRUE)
+> mval <- adjc[,1]-adjc[,2]
+> fit <- loessFit(x=abval, y=mval)
+> smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
++    main="Raw", ylim=c(-2,2), xlim=c(0, 7))
+> lines(abval[o], fit$fitted[o], col="red")
+\end{Sinput}
+\end{Schunk}
+\begin{Schunk}
+\begin{Sinput}
+> # Repeating after normalization.
+> re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
+> mval <- re.adjc[,1]-re.adjc[,2]
+> fit <- loessFit(x=abval, y=mval)
+> smoothScatter(abval, re.adjc[,1]-re.adjc[,2], ylab="M", 
++    xlab="Average logCPM", main="Normalized", ylim=c(-2,2), xlim=c(0, 7))
+> lines(abval[o], fit$fitted[o], col="red")
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE,width=10,height=5>>=
-par(mfrow=c(1,2))
-<<trendplot1>>
-<<trendplot2>>
-@
+\includegraphics{plots-ug/ug-070}
 \end{center}
 
 Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
@@ -1297,10 +1572,6 @@ Of course, this also assumes that the targeted differences have no biological re
 Detection power may be lost if this is not true. 
 For example, differences in the GC content distribution can be driven by technical bias as well as biology, e.g., when protein binding is associated with a specific GC composition.
 
-<<results=hide,echo=FALSE>>=
-rm(demo, ac.demo, ac.bin, me.demo, me.bin, ac.demo2, filtered, keep, adjc)
-gc()
-@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1334,9 +1605,11 @@ A \code{DGEList} object is first formed from the count matrix, library sizes and
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
 If an offset matrix was generated (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
 
-<<>>=
-y <- asDGEList(filtered.data, norm.factors=normfacs)
-@
+\begin{Schunk}
+\begin{Sinput}
+> y <- asDGEList(filtered.data, norm.factors=normfacs)
+\end{Sinput}
+\end{Schunk}
 
 The experimental design is described by a design matrix. 
 In this case, the only relevant factor is the cell type of each sample. 
@@ -1344,9 +1617,23 @@ A generalized linear model (GLM) will be fitted to the counts for each window us
 This provides a general framework for the analysis of complex experiments with multiple factors. 
 Readers are referred to the user's guide in \edger{} for more details on parametrization.
 
-<<>>=
-design
-@
+\begin{Schunk}
+\begin{Sinput}
+> design
+\end{Sinput}
+\begin{Soutput}
+  intercept cell.type
+1         1         0
+2         1         0
+3         1         1
+4         1         1
+attr(,"assign")
+[1] 0 1
+attr(,"contrasts")
+attr(,"contrasts")$`factor(c("es", "es", "tn", "tn"))`
+[1] "contr.treatment"
+\end{Soutput}
+\end{Schunk}
 
 \section{Estimating the dispersions}
 
@@ -1371,32 +1658,44 @@ Another mean-dependent trend is fitted to the raw QL estimates.
 An empirical Bayes (EB) strategy is then used to stabilize the raw QL dispersion estimates by shrinking them towards the second trend \citep{lund2012}. 
 The ideal amount of shrinkage is determined from the variability of the dispersions.
 
-<<>>=
-y <- estimateDisp(y, design)
-summary(y$trended.dispersion)
-fit <- glmQLFit(y, design, robust=TRUE)
-summary(fit$var.post)
-@
+\begin{Schunk}
+\begin{Sinput}
+> y <- estimateDisp(y, design)
+> summary(y$trended.dispersion)
+\end{Sinput}
+\begin{Soutput}
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+0.02980 0.08454 0.08953 0.09334 0.10200 0.11720 
+\end{Soutput}
+\begin{Sinput}
+> fit <- glmQLFit(y, design, robust=TRUE)
+> summary(fit$var.post)
+\end{Sinput}
+\begin{Soutput}
+    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+ 0.04998  1.06100  1.08900  1.08400  1.11600 17.06000 
+\end{Soutput}
+\end{Schunk}
 
 The effect of EB stabilisation can be visualized by examining the biological coefficient of variation (for the NB dispersion) and the quarter-root deviance (for the QL dispersion). 
 These plots can also be used to decide whether the fitted trend is appropriate. 
 Sudden irregulaties may be indicative of an underlying structure in the data which cannot be modelled with the mean-dispersion trend. 
 Discrete patterns in the raw dispersions are indicative of low counts and suggest that more aggressive filtering is required.
 
-<<eval=FALSE,label=shrinkx>>=
-par(mfrow=c(1,2))
-o <- order(y$AveLogCPM)
-plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
-  ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
-  ylab=("Biological coefficient of variation"))
-plotQLDisp(fit)
-@
+\begin{Schunk}
+\begin{Sinput}
+> par(mfrow=c(1,2))
+> o <- order(y$AveLogCPM)
+> plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
++   ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
++   ylab=("Biological coefficient of variation"))
+> plotQLDisp(fit)
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.99\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE,width=10,height=5>>=
-<<shrinkx>>
-@
+\includegraphics{plots-ug/ug-076}
 \end{center}
 
 A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
@@ -1407,23 +1706,23 @@ Filtering of low-abundance regions (as described in Chapter~\ref{chap:filter}) p
 Users can compare raw and filtered results to see whether it makes any difference.
 Filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
-<<label=rmchecker,eval=FALSE>>=
-relevant <- rowSums(assay(data)) >= 20 # some filtering; otherwise, it takes too long.
-yo <- asDGEList(data[relevant], norm.factors=normfacs)
-yo <- estimateDisp(yo, design)
-oo <- order(yo$AveLogCPM)
-plot(yo$AveLogCPM[oo], sqrt(yo$trended.dispersion[oo]), type="l", lwd=2,
-  ylim=c(0, max(sqrt(yo$trended))), xlab=expression("Ave."~Log[2]~"CPM"), 
-  ylab=("Biological coefficient of variation"))
-lines(y$AveLogCPM[o], sqrt(y$trended[o]), lwd=2, col="grey")
-legend("topright", c("raw", "filtered"), col=c("black", "grey"), lwd=2)
-@
+\begin{Schunk}
+\begin{Sinput}
+> relevant <- rowSums(assay(data)) >= 20 # some filtering; otherwise, it takes too long.
+> yo <- asDGEList(data[relevant], norm.factors=normfacs)
+> yo <- estimateDisp(yo, design)
+> oo <- order(yo$AveLogCPM)
+> plot(yo$AveLogCPM[oo], sqrt(yo$trended.dispersion[oo]), type="l", lwd=2,
++   ylim=c(0, max(sqrt(yo$trended))), xlab=expression("Ave."~Log[2]~"CPM"), 
++   ylab=("Biological coefficient of variation"))
+> lines(y$AveLogCPM[o], sqrt(y$trended[o]), lwd=2, col="grey")
+> legend("topright", c("raw", "filtered"), col=c("black", "grey"), lwd=2)
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.8\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<rmchecker>>
-@
+\includegraphics{plots-ug/ug-078}
 \end{center}
 
 \subsection{Modelling variable dispersions between windows}
@@ -1433,9 +1732,15 @@ This means that more EB shrinkage can be performed to reduce uncertainty and max
 However, strong shrinkage is not appropriate if the dispersions are highly variable. 
 Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
 
-<<>>=
-summary(fit$df.prior)
-@
+\begin{Schunk}
+\begin{Sinput}
+> summary(fit$df.prior)
+\end{Sinput}
+\begin{Soutput}
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.4131 64.7000 64.7000 64.6200 64.7000 64.7000 
+\end{Soutput}
+\end{Schunk}
 
 On occasion, the estimated prior degrees of freedom will be infinite. 
 This is indicative of a strong batch effect where the dispersions are consistently large.
@@ -1457,10 +1762,21 @@ In the QL framework, $p$-values are computed using the QL F-test \citep{lund2012
 This is more appropriate than using the likelihood ratio test as the F-test accounts for uncertainty in the dispersion estimates. 
 Associated statistics such as log-fold changes and log-counts per million are also computed for each window.
 
-<<>>=
-results <- glmQLFTest(fit, contrast=c(0, 1))
-head(results$table)
-@
+\begin{Schunk}
+\begin{Sinput}
+> results <- glmQLFTest(fit, contrast=c(0, 1))
+> head(results$table)
+\end{Sinput}
+\begin{Soutput}
+      logFC     logCPM         F     PValue
+1 0.2657962 -0.9478889 0.1306817 0.71886889
+2 0.2822794 -0.9519491 0.1429828 0.70653427
+3 1.7984975 -0.8667843 5.5429311 0.02150824
+4 0.7676641 -0.9870732 1.0274521 0.31442074
+5 0.9151091  0.3674876 3.0489265 0.08539467
+6 1.0975167  1.1942729 5.1775075 0.02609996
+\end{Soutput}
+\end{Schunk}
 
 The null hypothesis here is that the cell type has no effect. 
 The \code{contrast} argument in the \code{glmQLFTest} function specifies which factors are of interest. 
@@ -1475,11 +1791,22 @@ Nonetheless, it may be helpful to salvage some information from datasets that la
 This is done by supplying a ``reasonable'' value for the NB dispersion during GLM fitting (e.g., 0.05 - 0.1, based on past experience).
 DB windows are then identified using the likelihood ratio test.
 
-<<>>=
-fit.norep <- glmFit(y, design, dispersion=0.05)
-results.norep <- glmLRT(fit.norep, contrast=c(0, 1))
-head(results.norep$table)
-@
+\begin{Schunk}
+\begin{Sinput}
+> fit.norep <- glmFit(y, design, dispersion=0.05)
+> results.norep <- glmLRT(fit.norep, contrast=c(0, 1))
+> head(results.norep$table)
+\end{Sinput}
+\begin{Soutput}
+      logFC     logCPM        LR      PValue
+1 0.2684752 -0.9478889 0.2120285 0.645182146
+2 0.2780084 -0.9519491 0.2272337 0.633582614
+3 1.8018136 -0.8667843 8.2161956 0.004151815
+4 0.7577212 -0.9870732 1.5872704 0.207716548
+5 0.9143437  0.3674876 4.2229915 0.039879791
+6 1.0965133  1.1942729 7.5864545 0.005880849
+\end{Soutput}
+\end{Schunk}
 
 Obviously, this approach has a number of pitfalls. 
 The lack of replicates means that the biological variability in the data cannot be modelled.
@@ -1496,20 +1823,20 @@ A small top set visualizes the most extreme differences whereas a large set visu
 Checking a range of \code{top} values may be useful when the scope of DB is unknown.
 Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
 
-<<label=mds,eval=false>>=
-par(mfrow=c(2,2), mar=c(5,4,2,2))
-adj.counts <- cpm(y, log=TRUE)
-for (top in c(100, 500, 1000, 5000)) {
-    out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"),
-        labels=c("es.1", "es.2", "tn.1", "tn.2"), top=top)
-}
-@
+\begin{Schunk}
+\begin{Sinput}
+> par(mfrow=c(2,2), mar=c(5,4,2,2))
+> adj.counts <- cpm(y, log=TRUE)
+> for (top in c(100, 500, 1000, 5000)) {
++     out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"),
++         labels=c("es.1", "es.2", "tn.1", "tn.2"), top=top)
++ }
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=0.8\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<mds>>
-@
+\includegraphics{plots-ug/ug-083}
 \end{center}
 
 Replicates from different groups should form separate clusters in the MDS plot, as observed above.
@@ -1518,10 +1845,6 @@ Mixing between replicates of different conditions indicates that the biological 
 Any outliers should also be noted as their presence may confound the downstream analysis.
 In the worst case, outlier samples may need to be removed to obtain sensible results.
 
-<<echo=FALSE,results=hide>>=
-rm(adj.counts)
-gc()
-@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1591,10 +1914,31 @@ The most obvious source of pre-defined regions is that of annotated features suc
 Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \citep{lun2014}.
 In either case, the \code{findOverlaps} function from the \granges{} package can be used to identify all windows in or overlapping each specified region. 
 
-<<>>=
-olap <- findOverlaps(broads, rowRanges(filtered.data))
-olap
-@
+\begin{Schunk}
+\begin{Sinput}
+> olap <- findOverlaps(broads, rowRanges(filtered.data))
+> olap
+\end{Sinput}
+\begin{Soutput}
+Hits object with 15508 hits and 0 metadata columns:
+          queryHits subjectHits
+          <integer>   <integer>
+      [1]         7        8690
+      [2]         7        8691
+      [3]         7        8692
+      [4]        18       10377
+      [5]        18       10378
+      ...       ...         ...
+  [15504]     23949        8504
+  [15505]     23949        8505
+  [15506]     23952        8218
+  [15507]     23952        8219
+  [15508]     23952        8220
+  -------
+  queryLength: 23956
+  subjectLength: 15072
+\end{Soutput}
+\end{Schunk}
 
 The \code{combineOverlaps} function can be used to combine the $p$-values for all windows in each region. 
 This is a wrapper around \code{combineTests} for \code{Hits} objects.
@@ -1602,10 +1946,21 @@ It returns a single combined $p$-value (and its BH-adjusted value) for each regi
 The number of windows in each region that change by more than $\sqrt{2}$ in either direction are also reported.
 Regions that do not overlap any windows have values of \code{NA} in all fields for the corresponding rows.
 
-<<>>=
-tabbroad <- combineOverlaps(olap, results$table)
-head(tabbroad[!is.na(tabbroad$PValue),])
-@
+\begin{Schunk}
+\begin{Sinput}
+> tabbroad <- combineOverlaps(olap, results$table)
+> head(tabbroad[!is.na(tabbroad$PValue),])
+\end{Sinput}
+\begin{Soutput}
+   nWindows logFC.up logFC.down       PValue         FDR
+7         3        3          0 0.0001260474 0.002164724
+18        4        4          0 0.0001305998 0.002164724
+22        1        1          0 0.1765568477 0.247628460
+23        5        5          0 0.0017587719 0.010381338
+25        4        0          0 0.9862478964 0.990019479
+28        3        3          0 0.0027875571 0.014419259
+\end{Soutput}
+\end{Schunk}
 
 At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
 This is a valid strategy but will yield different results. 
@@ -1622,20 +1977,51 @@ Windows that are less than \code{tol} apart are considered to be adjacent and ar
 The chosen \code{tol} represents the minimum distance at which two binding events are treated as separate sites.
 Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpretation of the results, while smaller values ($< 200$ bp) allow resolution of individual binding sites.
 
-<<>>=
-merged <- mergeWindows(rowRanges(filtered.data), tol=1000L)
-merged$region
-@
+\begin{Schunk}
+\begin{Sinput}
+> merged <- mergeWindows(rowRanges(filtered.data), tol=1000L)
+> merged$region
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 4422 ranges and 0 metadata columns:
+         seqnames                 ranges strand
+            <Rle>              <IRanges>  <Rle>
+     [1]     chr1     [6466701, 6466760]      *
+     [2]     chr1     [7088951, 7088960]      *
+     [3]     chr1     [7397851, 7398110]      *
+     [4]     chr1     [9541401, 9541510]      *
+     [5]     chr1     [9545251, 9545360]      *
+     ...      ...                    ...    ...
+  [4418]     chrX [164076151, 164076560]      *
+  [4419]     chrX [166170351, 166170410]      *
+  [4420]     chrY [   259151,    259360]      *
+  [4421]     chrY [ 90808801,  90808860]      *
+  [4422]     chrY [ 90812401,  90812910]      *
+  -------
+  seqinfo: 66 sequences from an unspecified genome
+\end{Soutput}
+\end{Schunk}
 
 A combined $p$-value is computed for each cluster with the \code{combineTests} function.
 The BH method is then applied to control the FDR across all detected clusters.
 The number of \code{up} or \code{down} windows can be used to gauge whether binding increases or decreases across the cluster.
 A complex DB event may be present if both \code{up} and \code{down} are substantially non-zero (i.e., opposing changes within the region) or if the total number of windows is much larger than either number (e.g., interval of constant binding adjacent to the DB interval).
 
-<<>>=
-tabcom <- combineTests(merged$id, results$table)
-head(tabcom)
-@
+\begin{Schunk}
+\begin{Sinput}
+> tabcom <- combineTests(merged$id, results$table)
+> head(tabcom)
+\end{Sinput}
+\begin{Soutput}
+  nWindows logFC.up logFC.down     PValue        FDR
+1        2        0          0 0.71886889 0.78431735
+2        1        1          0 0.02150824 0.05666366
+3        6        6          0 0.07829988 0.14190248
+4        3        3          0 0.04172490 0.08978468
+5        3        3          0 0.05912563 0.11482359
+6        2        2          0 0.01364943 0.04188604
+\end{Soutput}
+\end{Schunk}
 
 If many adjacent windows are present, very large clusters may be formed that are difficult to interpret. 
 A simple check can be used to determine whether most clusters are of an acceptable size. 
@@ -1645,9 +2031,15 @@ This mitigates chaining effects by reducing the density of windows in the genome
 % Note that several large clusters may still be present due to high coverage within long tandem repeat loci.  
 % In general, chaining isn't as bad as single-linkage on the reads themselves, because windows that survive weak filtering should have reasonably high read counts. 
 
-<<>>=
-summary(width(merged$region))
-@
+\begin{Schunk}
+\begin{Sinput}
+> summary(width(merged$region))
+\end{Sinput}
+\begin{Soutput}
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   10.0    60.0   110.0   159.2   160.0 15710.0 
+\end{Soutput}
+\end{Schunk}
 
 Alternatively, chaining can be limited by setting \code{max.width} to restrict the size of the merged intervals. 
 Clusters substantially larger than \code{max.width} are split into several smaller subclusters of roughly equal size.
@@ -1655,10 +2047,16 @@ The chosen value should be small enough so as to separate DB regions from unchan
 Any value from 2000 to 10000 bp is recommended. 
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
-<<>>=
-merged.max <- mergeWindows(rowRanges(filtered.data), tol=1000L, max.width=5000L)
-summary(width(merged.max$region))
-@
+\begin{Schunk}
+\begin{Sinput}
+> merged.max <- mergeWindows(rowRanges(filtered.data), tol=1000L, max.width=5000L)
+> summary(width(merged.max$region))
+\end{Sinput}
+\begin{Soutput}
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+     10      60     110     158     160    4410 
+\end{Soutput}
+\end{Schunk}
 
 \subsection{Summarizing the direction of DB per cluster}
 The number of significant clusters can be counted at a FDR threshold of 5\%.
@@ -1666,24 +2064,36 @@ This is performed for clusters that contain windows changing in one direction on
 The former includes simpler DB events involving consistent changes throughout a region, while the latter corresponds to complex DB.
 In this manner, the overall direction of significant DB can be summarized for the entire experiment.
 
-<<>>=
-is.sig <- tabcom$FDR <= 0.05
-has.up <- tabcom$logFC.up > 0
-has.down <- tabcom$logFC.down > 0
-data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
-    DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
-@
+\begin{Schunk}
+\begin{Sinput}
+> is.sig <- tabcom$FDR <= 0.05
+> has.up <- tabcom$logFC.up > 0
+> has.down <- tabcom$logFC.down > 0
+> data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
++     DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
+\end{Sinput}
+\begin{Soutput}
+  Total.DB DB.up DB.down DB.both
+1     1543  1317     220       6
+\end{Soutput}
+\end{Schunk}
 
 The same approach can be applied for the promoter-based clusters.
 This requires some protection against the \code{NA} values for the promoters that contain no windows.
 
-<<>>=
-is.sig <- tabbroad$FDR <= 0.05 & !is.na(tabbroad$FDR)
-has.up <- tabbroad$logFC.up > 0
-has.down <- tabbroad$logFC.down > 0
-data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
-    DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
-@
+\begin{Schunk}
+\begin{Sinput}
+> is.sig <- tabbroad$FDR <= 0.05 & !is.na(tabbroad$FDR)
+> has.up <- tabbroad$logFC.up > 0
+> has.down <- tabbroad$logFC.down > 0
+> data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
++     DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
+\end{Sinput}
+\begin{Soutput}
+  Total.DB DB.up DB.down DB.both
+1     1629  1529      70      30
+\end{Soutput}
+\end{Schunk}
 
 An alternative approach to defining the direction of DB for each cluster is to use the log-fold change of a single representative window (see below).
 This is simpler and allows quantification of the magnitude of DB, but is not sufficient to describe complex events.
@@ -1696,14 +2106,16 @@ The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
 Some filtering is performed to avoid excessive chaining in this demonstration.
 Corresponding tables of DB results should also be obtained (for brevity, mock results are used here).
 
-<<>>=
-ac.small <- windowCounts(ac.files, width=150L, spacing=100L, filter=25, param=param)
-ac.large <- windowCounts(ac.files, width=1000L, spacing=500L, filter=35, param=param)
-ns <- nrow(ac.small)
-mock.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
-nl <- nrow(ac.large)
-mock.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
-@
+\begin{Schunk}
+\begin{Sinput}
+> ac.small <- windowCounts(ac.files, width=150L, spacing=100L, filter=25, param=param)
+> ac.large <- windowCounts(ac.files, width=1000L, spacing=500L, filter=35, param=param)
+> ns <- nrow(ac.small)
+> mock.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
+> nl <- nrow(ac.large)
+> mock.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
+\end{Sinput}
+\end{Schunk}
 
 The \code{consolidateSizes} function can then be applied to combine these results.
 This merges windows of all sizes into a single set of clusters, and computes a combined $p$-value from the associated $p$-values for each cluster.
@@ -1712,19 +2124,41 @@ This is not ideal when results from all window sizes are of equal interest.
 Equal contributions from each window size can be enforced by setting \code{equiweight=TRUE}, whereby a weighted version of Simes' method \citep{benjamini1997} is used.
 The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
 
-<<>>=
-cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
-    result.list=list(mock.small, mock.large), equiweight=TRUE)
-cons$region
-@
+\begin{Schunk}
+\begin{Sinput}
+> cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
++     result.list=list(mock.small, mock.large), equiweight=TRUE)
+> cons$region
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 29892 ranges and 0 metadata columns:
+          seqnames               ranges strand
+             <Rle>            <IRanges>  <Rle>
+      [1]     chr1   [4571001, 4572500]      *
+      [2]     chr1   [4783501, 4787000]      *
+      [3]     chr1   [4806501, 4809500]      *
+      [4]     chr1   [4856501, 4859500]      *
+      [5]     chr1   [5082501, 5084500]      *
+      ...      ...                  ...    ...
+  [29888]     chrY [  897001,   899000]      *
+  [29889]     chrY [ 1010001,  1012000]      *
+  [29890]     chrY [ 1244001,  1246500]      *
+  [29891]     chrY [ 1285001,  1287000]      *
+  [29892]     chrY [90738501, 90740500]      *
+  -------
+  seqinfo: 66 sequences from an unspecified genome
+\end{Soutput}
+\end{Schunk}
 
 The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
 This is done by specifying the \code{region} argument, as shown below.
 
-<<>>=
-cons.broad <- consolidateSizes(data.list=list(ac.small, ac.large),
-    result.list=list(mock.small, mock.large), region=broads, equiweight=TRUE)
-@
+\begin{Schunk}
+\begin{Sinput}
+> cons.broad <- consolidateSizes(data.list=list(ac.small, ac.large),
++     result.list=list(mock.small, mock.large), region=broads, equiweight=TRUE)
+\end{Sinput}
+\end{Schunk}
 
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
 Consolidation is most useful for histone marks and other analyses involving diffuse regions of enrichment.
@@ -1738,10 +2172,21 @@ This information can be useful for identifying the change in binding within larg
 Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
 This reports the index of the window with the lowest $p$-value in each cluster.
 
-<<>>=
-tab.best <- getBestTest(merged$id, results$table)
-head(tab.best)
-@
+\begin{Schunk}
+\begin{Sinput}
+> tab.best <- getBestTest(merged$id, results$table)
+> head(tab.best)
+\end{Sinput}
+\begin{Soutput}
+  best     logFC      logCPM         F     PValue        FDR
+1    2 0.2822794 -0.95194906 0.1429828 1.00000000 1.00000000
+2    3 1.7984975 -0.86678426 5.5429311 0.02150824 0.05927619
+3    7 1.2159955  1.12635657 6.0437746 0.09935180 0.17475485
+4   11 1.4410886  0.01763413 5.4939481 0.06621118 0.13105902
+5   14 1.4995058 -0.66575939 4.5954730 0.10711880 0.18572120
+6   17 2.1478921 -0.80663417 7.7960329 0.01364943 0.04361112
+\end{Soutput}
+\end{Schunk}
 
 A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
 This value is useful as it focuses on the most DB interval within the cluster.
@@ -1749,22 +2194,44 @@ In contrast, taking the average log-fold change across all windows in a cluster 
 It may also be useful to report the start location of the best window.
 This allows investigators to easily identify the DB subinterval within large clusters.
 
-<<>>=
-tabcom$best.logFC <- tab.best$logFC
-tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
-head(tabcom[,c("best.logFC", "best.start")])
-@
+\begin{Schunk}
+\begin{Sinput}
+> tabcom$best.logFC <- tab.best$logFC
+> tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
+> head(tabcom[,c("best.logFC", "best.start")])
+\end{Sinput}
+\begin{Soutput}
+  best.logFC best.start
+1  0.2822794    6466751
+2  1.7984975    7088951
+3  1.2159955    7398001
+4  1.4410886    9541451
+5  1.4995058    9545301
+6  2.1478921    9748451
+\end{Soutput}
+\end{Schunk}
 
 The same approach can be applied to the overlaps between windows and pre-specified regions, using the \code{getBestOverlaps} wrapper function.
 This is demonstrated below for the broad gene body example.
 As with \code{combineOverlaps}, regions with no windows are assigned \code{NA} in the output table, but these are removed here to show some actual results.
 
-<<>>=
-tab.best.broad <- getBestOverlaps(olap, results$table)
-tabbroad$best.logFC <- tab.best.broad$logFC
-tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
-head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
-@
+\begin{Schunk}
+\begin{Sinput}
+> tab.best.broad <- getBestOverlaps(olap, results$table)
+> tabbroad$best.logFC <- tab.best.broad$logFC
+> tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
+> head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
+\end{Sinput}
+\begin{Soutput}
+   best.logFC best.start
+7   4.5767466   32657051
+18  3.9834677    8259301
+22  0.9872510  118937801
+23  3.6001757   92934401
+25 -0.3387664   71596001
+28  2.6344820    4137001
+\end{Soutput}
+\end{Schunk}
 
 Typically, the best window will only be used as a descriptive measure for each cluster.
 However, more statistical rigour is required if these windows are treated as the features of interest over which the error rate is to be controlled.
@@ -1776,10 +2243,21 @@ Alternatively, the best window can be defined as the one with the highest averag
 This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
 As the average abundance is (roughly) independent of the $p$-value, there is no need to correct for multiple testing within each cluster.
 
-<<>>=
-tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
-head(tab.ave)
-@
+\begin{Schunk}
+\begin{Sinput}
+> tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
+> head(tab.ave)
+\end{Sinput}
+\begin{Soutput}
+  best     logFC      logCPM         F      PValue        FDR
+1    1 0.2657962 -0.94788895 0.1306817 0.718868886 0.77062745
+2    3 1.7984975 -0.86678426 5.5429311 0.021508241 0.05726035
+3    6 1.0975167  1.19427291 5.1775075 0.026099959 0.06535335
+4   11 1.4410886  0.01763413 5.4939481 0.022070395 0.05805787
+5   14 1.4995058 -0.66575939 4.5954730 0.035706265 0.08122073
+6   17 2.1478921 -0.80663417 7.7960329 0.006824716 0.02673064
+\end{Soutput}
+\end{Schunk}
 
 For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
 This will usually provide more power as it avoids the conservativeness of Simes' method.
@@ -1796,9 +2274,11 @@ This will indicate whether any DB is present at the strongest binding site withi
 If not, the DB event may be complex, e.g., involving multiple peaks or peaks that change in shape or position between conditions.
 These require more careful interpretation than simpler ``binary'' (i.e., on/off) changes.
 
-<<>>=
-tabcom$mab.logFC <- tab.ave$logFC # 'mab' stands for most abundant.
-@
+\begin{Schunk}
+\begin{Sinput}
+> tabcom$mab.logFC <- tab.ave$logFC # 'mab' stands for most abundant.
+\end{Sinput}
+\end{Schunk}
 
 \subsection{Weighting windows on abundance}
 A more graduated approach uses the weighted version of Simes' method, where the window with the highest abundance is upweighted.
@@ -1807,24 +2287,53 @@ This means that the behavior of the top window will have a greater influence on 
 That said, the other windows in the cluster still have unity weights.
 Any DB events in those windows will still be considered when the $p$-values are combined.
 
-<<>>=
-weights <- upweightSummit(merged$id, tab.ave$best)
-head(weights)
-tabcom.w <- combineTests(merged$id, results$table, weight=weights)
-head(tabcom.w)
-@
+\begin{Schunk}
+\begin{Sinput}
+> weights <- upweightSummit(merged$id, tab.ave$best)
+> head(weights)
+\end{Sinput}
+\begin{Soutput}
+[1] 2 1 1 1 1 6
+\end{Soutput}
+\begin{Sinput}
+> tabcom.w <- combineTests(merged$id, results$table, weight=weights)
+> head(tabcom.w)
+\end{Sinput}
+\begin{Soutput}
+  nWindows logFC.up logFC.down     PValue        FDR
+1        2        0          0 0.71886889 0.78084948
+2        1        1          0 0.02150824 0.05639790
+3        6        6          0 0.04101422 0.08816961
+4        3        3          0 0.03477075 0.07848712
+5        3        3          0 0.04927136 0.09998988
+6        2        2          0 0.01023707 0.03429420
+\end{Soutput}
+\end{Schunk}
 
 The weighting approach can also be applied to the clusters from the broad gene body example.
 This is done by replacing the call to \code{getBestTest} with one to \code{getBestOverlaps}, as before.
 Similarly, \code{upweightSummit} can be replaced with \code{summitOverlaps}.
 These wrappers are designed to minimize book-keeping problems when one window overlaps multiple regions.
 
-<<>>=
-broad.best <- getBestOverlaps(olap, results$table, by.pval=FALSE)
-head(broad.best[!is.na(broad.best$PValue),])
-broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
-tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights) 
-@
+\begin{Schunk}
+\begin{Sinput}
+> broad.best <- getBestOverlaps(olap, results$table, by.pval=FALSE)
+> head(broad.best[!is.na(broad.best$PValue),])
+\end{Sinput}
+\begin{Soutput}
+    best      logFC     logCPM           F       PValue         FDR
+7   8691  3.2094650 -0.4991514 17.54921659 8.403162e-05 0.001466904
+18 10378  1.3722377  0.7281036  6.70640612 1.178493e-02 0.037563381
+22  4460  0.9872510 -0.8557649  1.86569653 1.765568e-01 0.250560086
+23   405  1.1650432  0.4128039  4.54937666 3.661441e-02 0.079371186
+25 12509 -0.1802385 -0.2788275  0.09146493 7.632641e-01 0.800574320
+28 10964  2.1645344 -0.6245511  8.59062200 4.623758e-03 0.020063701
+\end{Soutput}
+\begin{Sinput}
+> broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
+> tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights) 
+\end{Sinput}
+\end{Schunk}
 
 \section{Filtering after testing but before correction}
 Most of the filters in Chapter~\ref{chap:filter} are applied before the statistical analysis.
@@ -1840,21 +2349,19 @@ Assume that the test statistics are computed from \code{filtered.data}, as gener
 These filtered windows are re-filtered using the \code{maxed} vector from Section~\ref{sec:localmax}, to identify those that are local maxima.
 The re-filtered windows and their corresponding test statistics can then be used for all FDR-controlling procedures described in this chapter.
 
-<<>>=
-keep.new <- maxed[keep.simple]
-refilt.data <- filtered.data[keep.new,]
-refilt.res <- results[keep.new,]
-@
+\begin{Schunk}
+\begin{Sinput}
+> keep.new <- maxed[keep.simple]
+> refilt.data <- filtered.data[keep.new,]
+> refilt.res <- results[keep.new,]
+\end{Sinput}
+\end{Schunk}
 
 Any filter vector from Chapter~\ref{chap:filter} can be used in place of \code{maxed}, so long as it was generated with the original \code{data}.
 Generating the filter vectors with \code{data} instead of \code{filtered.data} is generally recommended, as it avoids any unforseen interactions between filters.
 In particular, the local maxima filter depends on the abundance of adjacent windows.
 It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
 
-<<echo=FALSE,results=hide>>=
-rm(ac.small, ac.large, refilt.data)
-gc()
-@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1875,14 +2382,34 @@ This will identify overlaps between the regions and annotated genomic features s
 Here, the promoter region of each gene is defined as some interval 3 kbp up- and 1 kbp downstream of the TSS for that gene. 
 Any exonic features within \code{dist} on the left or right side of each supplied region will also be reported.
 
-<<>>=
-require(org.Mm.eg.db)
-anno <- detailRanges(merged$region, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
-   orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
-head(anno$overlap)
-head(anno$left)
-head(anno$right)
-@
+\begin{Schunk}
+\begin{Sinput}
+> require(org.Mm.eg.db)
+> anno <- detailRanges(merged$region, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
++    orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
+> head(anno$overlap)
+\end{Sinput}
+\begin{Soutput}
+[1] ""                               "Pcmtd1|0-1|+"                  
+[3] ""                               ""                              
+[5] "Rrs1|0|+,Adhfe1|0|+"            "Vcpip1|0|-,1700034P13Rik|0-1|+"
+\end{Soutput}
+\begin{Sinput}
+> head(anno$left)
+\end{Sinput}
+\begin{Soutput}
+[1] ""               ""               ""               ""              
+[5] ""               "Vcpip1|1|-[19]"
+\end{Soutput}
+\begin{Sinput}
+> head(anno$right)
+\end{Sinput}
+\begin{Soutput}
+[1] ""                                ""                               
+[3] ""                                "Rrs1|1|+[3898]"                 
+[5] "Rrs1|1|+[48],Adhfe1|1-2|+[2686]" "1700034P13Rik|2|+[3989]"        
+\end{Soutput}
+\end{Schunk}
 
 Character vectors of compact string representations are provided to summarize the features overlapped by each supplied region. 
 Each pattern contains \code{GENE|EXONS|STRAND} to describe the strand and overlapped exons of that gene. 
@@ -1894,10 +2421,43 @@ While the string representation saves space in the output, it is not easy to wor
 If the annotation needs to manipulated directly, users can obtain it from the \code{detailRanges} command by not specifying the regions of interest. 
 This can then be used for interactive manipulation, e.g., to identify all genes where the promoter contains DB sites.
 
-<<>>=
-anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
-anno.ranges
-@
+\begin{Schunk}
+\begin{Sinput}
+> anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, orgdb=org.Mm.eg.db)
+> anno.ranges
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 288419 ranges and 3 metadata columns:
+            seqnames                 ranges strand   |      symbol      exon
+               <Rle>              <IRanges>  <Rle>   | <character> <integer>
+  100009600     chr9   [21062393, 21062717]      -   |       Zglp1         7
+  100009600     chr9   [21062894, 21062987]      -   |       Zglp1         6
+  100009600     chr9   [21063314, 21063396]      -   |       Zglp1         5
+  100009600     chr9   [21066024, 21066377]      -   |       Zglp1         4
+  100009600     chr9   [21066940, 21067925]      -   |       Zglp1         3
+        ...      ...                    ...    ... ...         ...       ...
+      99889     chr3 [ 85785218,  85887518]      -   |      Arfip1        -1
+      99890     chr3 [110246104, 110250999]      -   |       Prmt6        -1
+      99899     chr3 [151730923, 151749959]      -   |       Ifi44        -1
+      99929     chr3 [ 65528447,  65555518]      +   |      Tiparp        -1
+      99982     chr4 [136550533, 136602723]      -   |       Kdm1a        -1
+             internal
+            <integer>
+  100009600         1
+  100009600         1
+  100009600         1
+  100009600         1
+  100009600         1
+        ...       ...
+      99889     24180
+      99890     24181
+      99899     24182
+      99929     24183
+      99982     24184
+  -------
+  seqinfo: 66 sequences (1 circular) from mm10 genome
+\end{Soutput}
+\end{Schunk}
 
 \section{Checking bimodality for TF studies}
 For TF experiments, a simple measure of strand bimodality can be reported as a diagnostic.
@@ -1905,12 +2465,17 @@ Given a set of regions, the \code{checkBimodality} function will return the maxi
 The bimodality score at each base position is defined as the minimum of the ratio of the number of forward- to reverse-stranded reads to the left of that position, and the ratio of the reverse- to forward-stranded reads to the right.
 A high score is only possible if both ratios are large, i.e., strand bimodality is present.
 
-<<>>=
-expanded <- suppressWarnings(resize(merged$region, fix="center", 
-    width=width(merged$region)+50))
-sbm.score <- checkBimodality(bam.files, expanded, width=frag.len)
-head(sbm.score)
-@
+\begin{Schunk}
+\begin{Sinput}
+> expanded <- suppressWarnings(resize(merged$region, fix="center", 
++     width=width(merged$region)+50))
+> sbm.score <- checkBimodality(bam.files, expanded, width=frag.len)
+> head(sbm.score)
+\end{Sinput}
+\begin{Soutput}
+[1] 1.272727 1.437500 1.406977 2.315789 1.454545 1.222222
+\end{Soutput}
+\end{Schunk}
 
 In the above code, all regions are expanded by \code{spacing}, i.e., 50 bp.
 This ensures that the optimal bimodality score can be computed for the centre of the binding site, even if that position is not captured by a window.
@@ -1928,36 +2493,51 @@ It is a simple matter to save the results for later perusal.
 This is done here in the \code{*.tsv} format where all detail is preserved. 
 Compression is used to reduce the file size. 
 
-<<>>=
-ofile <- gzfile("clusters.gz", open="w")
-write.table(data.frame(as.data.frame(merged$region)[,1:3], tabcom, anno), 
-    file=ofile, row.names=FALSE, quote=FALSE, sep="\t")
-close(ofile)
-@
+\begin{Schunk}
+\begin{Sinput}
+> ofile <- gzfile("clusters.gz", open="w")
+> write.table(data.frame(as.data.frame(merged$region)[,1:3], tabcom, anno), 
++     file=ofile, row.names=FALSE, quote=FALSE, sep="\t")
+> close(ofile)
+\end{Sinput}
+\end{Schunk}
 
 Of course, other formats can be used depending on the purpose of the file. 
 For example, significantly DB regions can be exported to BED files through the \rtracklayer{} package for visual inspection with genomic browsers.
 A transformed FDR is used here for the score field.
 
-<<>>=
-is.sig <- tabcom$FDR <= 0.05
-require(rtracklayer)
-test <- merged$region[is.sig]
-test$score <- -10*log10(tabcom$FDR[is.sig])
-names(test) <- paste0("region", 1:sum(is.sig))
-export(test, "clusters.bed")
-head(read.table("clusters.bed"))
-@
+\begin{Schunk}
+\begin{Sinput}
+> is.sig <- tabcom$FDR <= 0.05
+> require(rtracklayer)
+> test <- merged$region[is.sig]
+> test$score <- -10*log10(tabcom$FDR[is.sig])
+> names(test) <- paste0("region", 1:sum(is.sig))
+> export(test, "clusters.bed")
+> head(read.table("clusters.bed"))
+\end{Sinput}
+\begin{Soutput}
+    V1       V2       V3      V4       V5 V6
+1 chr1  9748400  9748460 region1 13.77931  .
+2 chr1 15805500 15805660 region2 17.29547  .
+3 chr1 23762950 23762960 region3 15.15878  .
+4 chr1 32172600 32172710 region4 13.62579  .
+5 chr1 33565950 33566010 region5 27.74059  .
+6 chr1 35985450 35985560 region6 29.95586  .
+\end{Soutput}
+\end{Schunk}
 
 Another useful format is to store the results as a \code{GRanges} object.
 Statistics are stored in the various metadata fields, which is convenient as it synchronizes the subsetting of statistics and genomic coordinates.
 This object can also be saved to file and reloaded later for direct manipulation in the R environment, e.g., to find overlaps with other regions of interest.
 
-<<>>=
-output.ranges <- merged$region
-elementMetadata(output.ranges) <- tabcom
-saveRDS(output.ranges, "ranges.rds")
-@
+\begin{Schunk}
+\begin{Sinput}
+> output.ranges <- merged$region
+> elementMetadata(output.ranges) <- tabcom
+> saveRDS(output.ranges, "ranges.rds")
+\end{Sinput}
+\end{Schunk}
 
 \section{Simple visualization of genomic coverage}
 Visualization of the read depth around interesting features is often desired.
@@ -1966,10 +2546,30 @@ The returned \code{GRanges} object can then be used to plot the sequencing cover
 Note that the \code{extractReads} function also accepts a \code{readParam} object.
 This ensures that the same reads used in the analysis will be pulled out during visualization.
 
-<<>>=
-cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
-extractReads(bam.files[1], cur.region, param=param)
-@
+\begin{Schunk}
+\begin{Sinput}
+> cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
+> extractReads(bam.files[1], cur.region, param=param)
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 45 ranges and 0 metadata columns:
+       seqnames               ranges strand
+          <Rle>            <IRanges>  <Rle>
+   [1]    chr18 [77806886, 77806922]      +
+   [2]    chr18 [77806887, 77806923]      +
+   [3]    chr18 [77806887, 77806923]      +
+   [4]    chr18 [77806887, 77806923]      +
+   [5]    chr18 [77806890, 77806926]      +
+   ...      ...                  ...    ...
+  [41]    chr18 [77807048, 77807084]      -
+  [42]    chr18 [77807068, 77807104]      -
+  [43]    chr18 [77807082, 77807119]      -
+  [44]    chr18 [77807084, 77807120]      -
+  [45]    chr18 [77807087, 77807123]      -
+  -------
+  seqinfo: 1 sequence from an unspecified genome
+\end{Soutput}
+\end{Schunk}
 
 Here, coverage is visualized as the number of reads covering each base pair in the interval of interest.
 Specifically, the reads-per-million is shown to allow comparisons between libraries of different size.
@@ -1978,33 +2578,29 @@ The blue and red tracks represent the coverage on the forward and reverse strand
 Strong strand bimodality is consistent with a genuine TF binding site.
 For paired-end data, coverage can be similarly plotted for fragments, i.e., proper read pairs.
 
-<<eval=FALSE,label=regionplot>>=
-require(Gviz)
-collected <- list()
-for (i in 1:length(bam.files)) { 
-    reads <- extractReads(bam.files[i], cur.region, param=param)
-    pcov <- as(coverage(reads[strand(reads)=="+"])/data$totals[i]*1e6, "GRanges")
-    ncov <- as(coverage(reads[strand(reads)=="-"])/data$totals[i]*1e6, "GRanges")
-    ptrack <- DataTrack(pcov, type="histogram", lwd=0, fill=rgb(0,0,1,.4), ylim=c(0,1.1), 
-        name=bam.files[i], col.axis="black", col.title="black")
-    ntrack <- DataTrack(ncov, type="histogram", lwd=0, fill=rgb(1,0,0,.4), ylim=c(0,1.1))
-    collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
-}
-gax <- GenomeAxisTrack(col="black")
-plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
-@
+\begin{Schunk}
+\begin{Sinput}
+> require(Gviz)
+> collected <- list()
+> for (i in 1:length(bam.files)) { 
++     reads <- extractReads(bam.files[i], cur.region, param=param)
++     pcov <- as(coverage(reads[strand(reads)=="+"])/data$totals[i]*1e6, "GRanges")
++     ncov <- as(coverage(reads[strand(reads)=="-"])/data$totals[i]*1e6, "GRanges")
++     ptrack <- DataTrack(pcov, type="histogram", lwd=0, fill=rgb(0,0,1,.4), ylim=c(0,1.1), 
++         name=bam.files[i], col.axis="black", col.title="black")
++     ntrack <- DataTrack(ncov, type="histogram", lwd=0, fill=rgb(1,0,0,.4), ylim=c(0,1.1))
++     collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
++ }
+> gax <- GenomeAxisTrack(col="black")
+> plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
+\end{Sinput}
+\end{Schunk}
 
 \setkeys{Gin}{width=.8\textwidth}
 \begin{center}
-<<fig=TRUE,echo=FALSE>>=
-<<regionplot>>
-@
+\includegraphics{plots-ug/ug-113}
 \end{center}
 
-<<echo=FALSE,results=hide>>=
-rm(anno)
-gc()
-@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2063,14 +2659,86 @@ Indexing was performed using \code{samtools index}.
 If all relevant SRA files have been obtained, a set of explicit commands can be used to produce each BAM file.
 These commands are stored in a Bash file, accessible by running:
 
-<<results=hide>>=
-system.file("doc", "sra2bam.sh", package = "csaw")
-@
+\begin{Schunk}
+\begin{Sinput}
+> system.file("doc", "sra2bam.sh", package = "csaw")
+\end{Sinput}
+\end{Schunk}
 
 \section{Session information}
-<<>>=
-sessionInfo()
-@
+\begin{Schunk}
+\begin{Sinput}
+> sessionInfo()
+\end{Sinput}
+\begin{Soutput}
+R Under development (unstable) (2015-10-30 r69588)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: CentOS release 6.4 (Final)
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+ [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+
+attached base packages:
+ [1] grid      stats4    parallel  stats     graphics  grDevices utils    
+ [8] datasets  methods   base     
+
+other attached packages:
+ [1] Gviz_1.15.0                             
+ [2] rtracklayer_1.31.2                      
+ [3] org.Mm.eg.db_3.2.3                      
+ [4] RSQLite_1.0.0                           
+ [5] DBI_0.3.1                               
+ [6] TxDb.Mmusculus.UCSC.mm10.knownGene_3.2.2
+ [7] GenomicFeatures_1.23.15                 
+ [8] AnnotationDbi_1.33.3                    
+ [9] edgeR_3.13.4                            
+[10] limma_3.27.6                            
+[11] csaw_1.5.7                              
+[12] SummarizedExperiment_1.1.11             
+[13] Biobase_2.31.3                          
+[14] GenomicRanges_1.23.7                    
+[15] GenomeInfoDb_1.7.3                      
+[16] IRanges_2.5.18                          
+[17] S4Vectors_0.9.15                        
+[18] BiocGenerics_0.17.2                     
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_0.12.2                  locfit_1.5-9.1              
+ [3] biovizBase_1.19.2            lattice_0.20-33             
+ [5] Rsamtools_1.23.1             Biostrings_2.39.3           
+ [7] digest_0.6.8                 mime_0.4                    
+ [9] R6_2.1.1                     plyr_1.8.3                  
+[11] futile.options_1.0.0         acepack_1.3-3.3             
+[13] BiocInstaller_1.21.2         httr_1.0.0                  
+[15] ggplot2_2.0.0                zlibbioc_1.17.0             
+[17] rpart_4.1-10                 splines_3.3.0               
+[19] BiocParallel_1.5.0           statmod_1.4.22              
+[21] Rhtslib_1.3.1                AnnotationHub_2.3.6         
+[23] stringr_1.0.0                foreign_0.8-66              
+[25] RCurl_1.95-4.7               biomaRt_2.27.2              
+[27] munsell_0.4.2                shiny_0.12.2                
+[29] httpuv_1.3.3                 htmltools_0.2.6             
+[31] nnet_7.3-11                  gridExtra_2.0.0             
+[33] interactiveDisplayBase_1.9.0 Hmisc_3.17-1                
+[35] matrixStats_0.50.1           XML_3.98-1.3                
+[37] GenomicAlignments_1.7.3      bitops_1.0-6                
+[39] xtable_1.8-0                 gtable_0.1.2                
+[41] magrittr_1.5                 scales_0.3.0                
+[43] KernSmooth_2.23-15           stringi_1.0-1               
+[45] XVector_0.11.1               latticeExtra_0.6-26         
+[47] futile.logger_1.4.1          Formula_1.2-1               
+[49] lambda.r_1.1.7               RColorBrewer_1.1-2          
+[51] ensembldb_1.3.8              tools_3.3.0                 
+[53] dichromat_2.0-0              BSgenome_1.39.0             
+[55] survival_2.38-3              colorspace_1.2-6            
+[57] cluster_2.0.3                VariantAnnotation_1.17.14   
+\end{Soutput}
+\end{Schunk}
 
 \section{References}
 

@@ -1,0 +1,17 @@
+*.bam
+*.bam.bai
+*.tsv
+*.sra
+*.bed
+*.gz
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.pdf
+*.toc
+*.rds
+mm10_index
+plots-ug/
+
