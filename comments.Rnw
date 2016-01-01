@@ -685,7 +685,7 @@ The log-fold change threshold is more stable to the sequencing depth, especially
 The analogy to the normal case suggests that the average abundance is the independent filter statistic.
 This seems to hold up for different library sizes, unbalanced designs and correlations.
 Note that this assumes that the null design matrix can be parametrized with an intercept column.
-This is important as most windows are low-abundance, which means that the density at the filter boundary is high relative to the number of retained windows.
+The independence of the filter is important as most windows are low-abundance, which means that the density at the filter boundary is high relative to the number of retained windows.
 Thus, any biases introduced during filtering will have a large effect on the DB analysis.
 (Incidentally, this is another justification for the stringent peak-calling threshold in the simulations of 2014 NAR paper.)
 
