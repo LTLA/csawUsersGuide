@@ -692,15 +692,18 @@ Thus, any biases introduced during filtering will have a large effect on the DB 
 With respect to clustering; it should be valid to cluster retained windows, as the clustering depends on coordinates and not the statistics of each window.
 Or, you can think about it as conditioning on cluster formation where each constituent window must pass the filter threshold.
 Independence ensures that the $p$-values of all windows are still uniformly distributed within each cluster, so it should be okay.
-
 The problem is a bit more difficult for the local methods, where we're working with a difference in correlated abundances between each window and its neighbourhood.
 Independence between the $p$-value and each abundance is not enough.
-Cut up the uniform distribution into four slices; two upper triangles, and two lower triangles. 
-Filtering on either statistic alone could acquire one upper and lower triangle, such that the $p$-value distribution is still uniform.
-However, filtering on both statistics yields only one triangle and a non-uniform distribution.
-A proof of validity requires consideration of the correlation structure -- 
-	it seems to work out under normality, where filtering on a difference in abundances will remove the same proportion from each hyperplane of the multivariate normal.
-See commit \texttt{e8efd8f85ae62428c765716bad97a87ed514572d} of \texttt{master/filtering/filtration.tex} in my thesis.
+Fortunately, analogies with the normal case suggest that any statistic computed from the overall means of correlated windows is independent of the $p$-values for those windows.
+
+% Cut up the uniform distribution into two halves length-wise, and each of those halfs into two triangular slices.
+% This gives you four slices; two upper triangles, and two lower triangles.
+% Assume that each slice corresponds to a combination of two filter statistics, where both must be okay to retain.
+% Filtering on either statistic alone could acquire one upper and lower triangle, such that the $p$-value distribution is still uniform.
+% However, filtering on both statistics could yield only one triangle and a non-uniform distribution.
+% A proof of validity requires consideration of the correlation structure -- 
+%	it seems to work out under normality, where filtering on a difference in abundances will remove the same proportion from each hyperplane of the multivariate normal.
+% See commit \texttt{e8efd8f85ae62428c765716bad97a87ed514572d} of \texttt{master/filtering/filtration.tex} in my thesis.
 
 \subsubsection*{Selective filtering based on the contrast}
 
