@@ -727,7 +727,7 @@ Fortunately, analogies with the normal case suggest that any statistic computed 
 % This mean vector is equal to the sample means of the observed instances corresponding to that hyperplane.
 % Thus, as long as your filter statistic only depends on the sample means, the same proportion will be removed from each hyperplane.
 % For example, requiring that all windows are above a threshold would be equivalent to saying that mean(y*_i + t_i) > T.
-% This becomes t_i > T/n - mean(y*_i), which will always be T/n above the mean vector for each hyperplane.
+% This becomes t_i > T - mean(y*_i), which will always be T above the mean vector for each hyperplane.
 % The same applies for more complex filters involving interactions between windows, e.g., if mean(y*_1 + t_1) - mean(y*_2 + t_2) > T.
 
 \subsubsection*{Selective filtering based on the contrast}
