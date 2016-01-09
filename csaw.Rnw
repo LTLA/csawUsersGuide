@@ -1713,8 +1713,8 @@ Equal contributions from each window size can be enforced by setting \code{equiw
 The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
 
 <<>>=
-cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
-    result.list=list(mock.small, mock.large), equiweight=TRUE)
+cons <- consolidateSizes(list(ac.small, ac.large), list(mock.small, mock.large), 
+    equiweight=TRUE, merge.args=list(tol=1000))
 cons$region
 @
 
@@ -1722,8 +1722,8 @@ The same function can also be used to consolidate windows of varying size that o
 This is done by specifying the \code{region} argument, as shown below.
 
 <<>>=
-cons.broad <- consolidateSizes(data.list=list(ac.small, ac.large),
-    result.list=list(mock.small, mock.large), region=broads, equiweight=TRUE)
+cons.broad <- consolidateSizes(list(ac.small, ac.large), list(mock.small, mock.large), 
+    region=broads, equiweight=TRUE)
 @
 
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
@@ -1863,7 +1863,7 @@ To overcome this, a \textit{post-hoc} analysis can be performed whereby only sig
 postclust <- clusterWindows(rowRanges(filtered.data), results$table,
     target=0.05, tol=100, max.width=1000)
 postclust$FDR
-postclust$regions
+postclust$region
 @
 
 This will define and cluster significant windows in a manner that controls the cluster-level FDR at 5\%.
