@@ -1851,6 +1851,28 @@ Generating the filter vectors with \code{data} instead of \code{filtered.data} i
 In particular, the local maxima filter depends on the abundance of adjacent windows.
 It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
 
+\section{Clustering only on DB windows}
+The clustering procedures described above rely on independent filtering to remove irrelevant windows.
+This ensures that the regions of interest are reasonably narrow and can be easily interpreted, 
+    which is typically the case for most protein targets, e.g., TFs, narrow histone marks.
+However, enriched regions may be very large for more diffuse marks.
+Such regions may be difficult to interpret when only the DB subinterval is of interest.
+To overcome this, a \textit{post-hoc} analysis can be performed whereby only significant windows are used for clustering.
+
+<<>>=
+postclust <- clusterWindows(rowRanges(filtered.data), results$table,
+    target=0.05, tol=100, max.width=1000)
+postclust$FDR
+postclust$regions
+@
+
+This will define and cluster significant windows in a manner that controls the cluster-level FDR at 5\%.
+The clustering step itself is performed using \code{mergeWindows} with the specified parameters.
+Each cluster consists entirely of DB windows and can be directly interpreted as a DB region or a DB subinterval of a larger enriched region.
+This reduces the pressure on abundance filtering to obtain well-separated regions prior to clustering, e.g., for diffuse marks or in data sets with weak IP signal.
+That said, users should be aware that calculation of the cluster-level FDR is not entirely rigorous.
+As such, independent clustering and FDR control via Simes' method should be considered as the default for routine analyses.
+
 <<echo=FALSE,results=hide>>=
 rm(ac.small, ac.large, refilt.data)
 gc()
