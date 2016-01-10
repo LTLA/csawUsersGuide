@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 21 December 2015}
+Last revised 10 January 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -2126,8 +2126,8 @@ The weight assigned to each window is inversely proportional to the number of wi
 
 \begin{Schunk}
 \begin{Sinput}
-> cons <- consolidateSizes(data.list=list(ac.small, ac.large), 
-+     result.list=list(mock.small, mock.large), equiweight=TRUE)
+> cons <- consolidateSizes(list(ac.small, ac.large), list(mock.small, mock.large), 
++     equiweight=TRUE, merge.args=list(tol=1000))
 > cons$region
 \end{Sinput}
 \begin{Soutput}
@@ -2155,8 +2155,8 @@ This is done by specifying the \code{region} argument, as shown below.
 
 \begin{Schunk}
 \begin{Sinput}
-> cons.broad <- consolidateSizes(data.list=list(ac.small, ac.large),
-+     result.list=list(mock.small, mock.large), region=broads, equiweight=TRUE)
+> cons.broad <- consolidateSizes(list(ac.small, ac.large), list(mock.small, mock.large), 
++     region=broads, equiweight=TRUE)
 \end{Sinput}
 \end{Schunk}
 
@@ -2361,6 +2361,53 @@ Any filter vector from Chapter~\ref{chap:filter} can be used in place of \code{m
 Generating the filter vectors with \code{data} instead of \code{filtered.data} is generally recommended, as it avoids any unforseen interactions between filters.
 In particular, the local maxima filter depends on the abundance of adjacent windows.
 It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
+
+\section{Clustering only on DB windows}
+The clustering procedures described above rely on independent filtering to remove irrelevant windows.
+This ensures that the regions of interest are reasonably narrow and can be easily interpreted, 
+    which is typically the case for most protein targets, e.g., TFs, narrow histone marks.
+However, enriched regions may be very large for more diffuse marks.
+Such regions may be difficult to interpret when only the DB subinterval is of interest.
+To overcome this, a \textit{post-hoc} analysis can be performed whereby only significant windows are used for clustering.
+
+\begin{Schunk}
+\begin{Sinput}
+> postclust <- clusterWindows(rowRanges(filtered.data), results$table,
++     target=0.05, tol=100, max.width=1000)
+> postclust$FDR
+\end{Sinput}
+\begin{Soutput}
+[1] 0.05018587
+\end{Soutput}
+\begin{Sinput}
+> postclust$region
+\end{Sinput}
+\begin{Soutput}
+GRanges object with 1614 ranges and 0 metadata columns:
+         seqnames                 ranges strand
+            <Rle>              <IRanges>  <Rle>
+     [1]     chr1   [15805551, 15805610]      *
+     [2]     chr1   [33565951, 33566010]      *
+     [3]     chr1   [35985451, 35985510]      *
+     [4]     chr1   [36445351, 36445360]      *
+     [5]     chr1   [36684301, 36684360]      *
+     ...      ...                    ...    ...
+  [1610]     chrX [ 75514251,  75514260]      *
+  [1611]     chrX [ 76599001,  76599110]      *
+  [1612]     chrX [100494251, 100494310]      *
+  [1613]     chrX [102157051, 102157060]      *
+  [1614]     chrX [143482951, 143483160]      *
+  -------
+  seqinfo: 66 sequences from an unspecified genome
+\end{Soutput}
+\end{Schunk}
+
+This will define and cluster significant windows in a manner that controls the cluster-level FDR at 5\%.
+The clustering step itself is performed using \code{mergeWindows} with the specified parameters.
+Each cluster consists entirely of DB windows and can be directly interpreted as a DB region or a DB subinterval of a larger enriched region.
+This reduces the pressure on abundance filtering to obtain well-separated regions prior to clustering, e.g., for diffuse marks or in data sets with weak IP signal.
+That said, users should be aware that calculation of the cluster-level FDR is not entirely rigorous.
+As such, independent clustering and FDR control via Simes' method should be considered as the default for routine analyses.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2598,7 +2645,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 
 \setkeys{Gin}{width=.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-113}
+\includegraphics{plots-ug/ug-114}
 \end{center}
 
 
@@ -2671,7 +2718,7 @@ These commands are stored in a Bash file, accessible by running:
 > sessionInfo()
 \end{Sinput}
 \begin{Soutput}
-R Under development (unstable) (2015-10-30 r69588)
+R Under development (unstable) (2015-12-28 r69816)
 Platform: x86_64-pc-linux-gnu (64-bit)
 Running under: CentOS release 6.4 (Final)
 
@@ -2689,54 +2736,53 @@ attached base packages:
 
 other attached packages:
  [1] Gviz_1.15.0                             
- [2] rtracklayer_1.31.2                      
+ [2] rtracklayer_1.31.3                      
  [3] org.Mm.eg.db_3.2.3                      
  [4] RSQLite_1.0.0                           
  [5] DBI_0.3.1                               
  [6] TxDb.Mmusculus.UCSC.mm10.knownGene_3.2.2
  [7] GenomicFeatures_1.23.15                 
- [8] AnnotationDbi_1.33.3                    
+ [8] AnnotationDbi_1.33.5                    
  [9] edgeR_3.13.4                            
-[10] limma_3.27.6                            
-[11] csaw_1.5.7                              
-[12] SummarizedExperiment_1.1.11             
+[10] limma_3.27.7                            
+[11] csaw_1.5.9                              
+[12] SummarizedExperiment_1.1.13             
 [13] Biobase_2.31.3                          
-[14] GenomicRanges_1.23.7                    
+[14] GenomicRanges_1.23.9                    
 [15] GenomeInfoDb_1.7.3                      
 [16] IRanges_2.5.18                          
-[17] S4Vectors_0.9.15                        
+[17] S4Vectors_0.9.16                        
 [18] BiocGenerics_0.17.2                     
 
 loaded via a namespace (and not attached):
  [1] Rcpp_0.12.2                  locfit_1.5-9.1              
  [3] biovizBase_1.19.2            lattice_0.20-33             
- [5] Rsamtools_1.23.1             Biostrings_2.39.3           
- [7] digest_0.6.8                 mime_0.4                    
+ [5] Rsamtools_1.23.1             Biostrings_2.39.6           
+ [7] digest_0.6.9                 mime_0.4                    
  [9] R6_2.1.1                     plyr_1.8.3                  
-[11] futile.options_1.0.0         acepack_1.3-3.3             
-[13] BiocInstaller_1.21.2         httr_1.0.0                  
-[15] ggplot2_2.0.0                zlibbioc_1.17.0             
-[17] rpart_4.1-10                 splines_3.3.0               
-[19] BiocParallel_1.5.0           statmod_1.4.22              
-[21] Rhtslib_1.3.1                AnnotationHub_2.3.6         
-[23] stringr_1.0.0                foreign_0.8-66              
-[25] RCurl_1.95-4.7               biomaRt_2.27.2              
-[27] munsell_0.4.2                shiny_0.12.2                
-[29] httpuv_1.3.3                 htmltools_0.2.6             
-[31] nnet_7.3-11                  gridExtra_2.0.0             
-[33] interactiveDisplayBase_1.9.0 Hmisc_3.17-1                
-[35] matrixStats_0.50.1           XML_3.98-1.3                
-[37] GenomicAlignments_1.7.3      bitops_1.0-6                
-[39] xtable_1.8-0                 gtable_0.1.2                
-[41] magrittr_1.5                 scales_0.3.0                
-[43] KernSmooth_2.23-15           stringi_1.0-1               
-[45] XVector_0.11.1               latticeExtra_0.6-26         
-[47] futile.logger_1.4.1          Formula_1.2-1               
-[49] lambda.r_1.1.7               RColorBrewer_1.1-2          
-[51] ensembldb_1.3.8              tools_3.3.0                 
-[53] dichromat_2.0-0              BSgenome_1.39.0             
-[55] survival_2.38-3              colorspace_1.2-6            
-[57] cluster_2.0.3                VariantAnnotation_1.17.14   
+[11] acepack_1.3-3.3              BiocInstaller_1.21.2        
+[13] httr_1.0.0                   ggplot2_2.0.0               
+[15] zlibbioc_1.17.0              rpart_4.1-10                
+[17] splines_3.3.0                BiocParallel_1.5.12         
+[19] statmod_1.4.23               Rhtslib_1.3.2               
+[21] AnnotationHub_2.3.10         stringr_1.0.0               
+[23] foreign_0.8-66               RCurl_1.95-4.7              
+[25] biomaRt_2.27.2               munsell_0.4.2               
+[27] shiny_0.12.2                 httpuv_1.3.3                
+[29] htmltools_0.3                nnet_7.3-11                 
+[31] gridExtra_2.0.0              interactiveDisplayBase_1.9.0
+[33] Hmisc_3.17-1                 matrixStats_0.50.1          
+[35] XML_3.98-1.3                 GenomicAlignments_1.7.10    
+[37] bitops_1.0-6                 xtable_1.8-0                
+[39] gtable_0.1.2                 magrittr_1.5                
+[41] scales_0.3.0                 KernSmooth_2.23-15          
+[43] stringi_1.0-1                XVector_0.11.2              
+[45] latticeExtra_0.6-26          Formula_1.2-1               
+[47] RColorBrewer_1.1-2           ensembldb_1.3.11            
+[49] tools_3.3.0                  dichromat_2.0-0             
+[51] BSgenome_1.39.1              survival_2.38-3             
+[53] colorspace_1.2-6             cluster_2.0.3               
+[55] VariantAnnotation_1.17.17   
 \end{Soutput}
 \end{Schunk}
 
