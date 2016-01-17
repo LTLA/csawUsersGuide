@@ -43,6 +43,9 @@ require(edgeR)
 Looking for DB is more relevant, as you get changes in binding that you can associate with differences in biology (so you can start poking around at mechanisms). 
 It's also easier than looking for absolute binding, as the null hypothesis is well defined.
 You don't need to construct a background model, as you would do in single-sample peak calling.
+This is laden with assumptions, which don't sound so bad qualitatively but result in uninterpretable significance statistics if you get them wrong quantitatively.
+For example, MACS(2) typically churns out extraordinarily low $p$-values, mostly due to its failure to consider replicates. 
+
 You don't need to compare to a negative control, as you would do in two-sample peak calling.
 In particular, comparisons to input are not like-for-like, as you miss IP-specific biases when you skip the IP.
 This shows up as reproducible differences in the TapeStation profiles (recall Alikesei's H3K27me3 data).
