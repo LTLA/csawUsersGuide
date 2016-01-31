@@ -45,6 +45,8 @@ It's also easier than looking for absolute binding, as the null hypothesis is we
 You don't need to construct a background model, as you would do in single-sample peak calling.
 This is laden with assumptions, which don't sound so bad qualitatively but result in uninterpretable significance statistics if you get them wrong quantitatively.
 For example, MACS(2) typically churns out extraordinarily low $p$-values, mostly due to its failure to consider replicates. 
+There's also the issue of conservativeness if the peak region overflows the window and gets counted as part of the background (or the same with adjacent peaks);
+    and liberalness, if the surrounding regions are not a good estimate of the null enrichment, e.g., due to unmappability or because you're sitting on a repeat unit.
 
 You don't need to compare to a negative control, as you would do in two-sample peak calling.
 In particular, comparisons to input are not like-for-like, as you miss IP-specific biases when you skip the IP.
