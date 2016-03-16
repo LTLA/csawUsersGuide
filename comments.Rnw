@@ -215,6 +215,15 @@ A slow decline in density from high to low won't get picked up if you're looking
 % This will surely lead to an inflated false positive rate during testing.
 % You could do the same thing with libraries (being blind to the condition), but then you'll get an inflated variance if intervals are unique to one replicate.
 
+While I'm here, I might as well note some drawbacks with hidden Markov models.
+HMMs are great for describing the correlations between states, and for using information across the genome to improve inferences.
+However, I don't think they work well for DB because the state distribution of the log-fold change will vary from site to site.
+In other words, different DB regions will have different (expected) log-fold changes.
+Trying to model them as a single state is probably inappropriate if you want site-specific inferences.
+You could treat the empirical distribution of all DB regions as a state distribution, but this means that the assignment for each site gets affected by the effect size of other sites.
+For example, many DB sites with strong log-fold changes would skew up the empirical distribution for the DB state.
+This would reduce the posterior probability of the DB state for a site with a lower log-fold change, even if that log-fold change is large in an absolute sense.
+
 \subsubsection*{Window resolution}
 
 The argument for arbitrary resolution with the window width is akin to that when using a microscope. 
