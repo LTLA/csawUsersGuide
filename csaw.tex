@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 10 January 2016}
+Last revised 12 March 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -108,6 +108,7 @@ Please send requests for general assistance and advice to the support site, rath
 Users posting to the support site for the first time may find it helpful to read the posting guide at \url{http://www.bioconductor.org/help/support/posting-guide}.
 
 \renewcommand{\natexlab}[1]{}
+\newcommand{\doi}[1]{doi: #1}
 
 \section{How to cite this package}
 Most users of \pkgname{} should cite the following in any publications:
@@ -1935,8 +1936,7 @@ Hits object with 15508 hits and 0 metadata columns:
   [15507]     23952        8219
   [15508]     23952        8220
   -------
-  queryLength: 23956
-  subjectLength: 15072
+  queryLength: 23956 / subjectLength: 15072
 \end{Soutput}
 \end{Schunk}
 
@@ -2475,19 +2475,19 @@ This can then be used for interactive manipulation, e.g., to identify all genes 
 \end{Sinput}
 \begin{Soutput}
 GRanges object with 288419 ranges and 3 metadata columns:
-            seqnames                 ranges strand   |      symbol      exon
-               <Rle>              <IRanges>  <Rle>   | <character> <integer>
-  100009600     chr9   [21062393, 21062717]      -   |       Zglp1         7
-  100009600     chr9   [21062894, 21062987]      -   |       Zglp1         6
-  100009600     chr9   [21063314, 21063396]      -   |       Zglp1         5
-  100009600     chr9   [21066024, 21066377]      -   |       Zglp1         4
-  100009600     chr9   [21066940, 21067925]      -   |       Zglp1         3
-        ...      ...                    ...    ... ...         ...       ...
-      99889     chr3 [ 85785218,  85887518]      -   |      Arfip1        -1
-      99890     chr3 [110246104, 110250999]      -   |       Prmt6        -1
-      99899     chr3 [151730923, 151749959]      -   |       Ifi44        -1
-      99929     chr3 [ 65528447,  65555518]      +   |      Tiparp        -1
-      99982     chr4 [136550533, 136602723]      -   |       Kdm1a        -1
+            seqnames                 ranges strand |      symbol      exon
+               <Rle>              <IRanges>  <Rle> | <character> <integer>
+  100009600     chr9   [21062393, 21062717]      - |       Zglp1         7
+  100009600     chr9   [21062894, 21062987]      - |       Zglp1         6
+  100009600     chr9   [21063314, 21063396]      - |       Zglp1         5
+  100009600     chr9   [21066024, 21066377]      - |       Zglp1         4
+  100009600     chr9   [21066940, 21067925]      - |       Zglp1         3
+        ...      ...                    ...    ... .         ...       ...
+      99889     chr3 [ 85785218,  85887518]      - |      Arfip1        -1
+      99890     chr3 [110246104, 110250999]      - |       Prmt6        -1
+      99899     chr3 [151730923, 151749959]      - |       Ifi44        -1
+      99929     chr3 [ 65528447,  65555518]      + |      Tiparp        -1
+      99982     chr4 [136550533, 136602723]      - |       Kdm1a        -1
              internal
             <integer>
   100009600         1
@@ -2735,54 +2735,52 @@ attached base packages:
  [8] datasets  methods   base     
 
 other attached packages:
- [1] Gviz_1.15.0                             
- [2] rtracklayer_1.31.3                      
+ [1] Gviz_1.15.4                             
+ [2] rtracklayer_1.31.7                      
  [3] org.Mm.eg.db_3.2.3                      
  [4] RSQLite_1.0.0                           
  [5] DBI_0.3.1                               
  [6] TxDb.Mmusculus.UCSC.mm10.knownGene_3.2.2
- [7] GenomicFeatures_1.23.15                 
- [8] AnnotationDbi_1.33.5                    
+ [7] GenomicFeatures_1.23.25                 
+ [8] AnnotationDbi_1.33.7                    
  [9] edgeR_3.13.4                            
-[10] limma_3.27.7                            
+[10] limma_3.27.13                           
 [11] csaw_1.5.9                              
-[12] SummarizedExperiment_1.1.13             
+[12] SummarizedExperiment_1.1.22             
 [13] Biobase_2.31.3                          
-[14] GenomicRanges_1.23.9                    
-[15] GenomeInfoDb_1.7.3                      
-[16] IRanges_2.5.18                          
-[17] S4Vectors_0.9.16                        
-[18] BiocGenerics_0.17.2                     
+[14] GenomicRanges_1.23.24                   
+[15] GenomeInfoDb_1.7.6                      
+[16] IRanges_2.5.39                          
+[17] S4Vectors_0.9.41                        
+[18] BiocGenerics_0.17.3                     
 
 loaded via a namespace (and not attached):
- [1] Rcpp_0.12.2                  locfit_1.5-9.1              
- [3] biovizBase_1.19.2            lattice_0.20-33             
- [5] Rsamtools_1.23.1             Biostrings_2.39.6           
+ [1] Rcpp_0.12.3                  locfit_1.5-9.1              
+ [3] biovizBase_1.19.4            lattice_0.20-33             
+ [5] Rsamtools_1.23.3             Biostrings_2.39.12          
  [7] digest_0.6.9                 mime_0.4                    
- [9] R6_2.1.1                     plyr_1.8.3                  
-[11] acepack_1.3-3.3              BiocInstaller_1.21.2        
-[13] httr_1.0.0                   ggplot2_2.0.0               
+ [9] R6_2.1.2                     plyr_1.8.3                  
+[11] acepack_1.3-3.3              httr_1.1.0                  
+[13] ggplot2_2.1.0                BiocInstaller_1.21.3        
 [15] zlibbioc_1.17.0              rpart_4.1-10                
-[17] splines_3.3.0                BiocParallel_1.5.12         
-[19] statmod_1.4.23               Rhtslib_1.3.2               
-[21] AnnotationHub_2.3.10         stringr_1.0.0               
-[23] foreign_0.8-66               RCurl_1.95-4.7              
-[25] biomaRt_2.27.2               munsell_0.4.2               
-[27] shiny_0.12.2                 httpuv_1.3.3                
-[29] htmltools_0.3                nnet_7.3-11                 
-[31] gridExtra_2.0.0              interactiveDisplayBase_1.9.0
-[33] Hmisc_3.17-1                 matrixStats_0.50.1          
-[35] XML_3.98-1.3                 GenomicAlignments_1.7.10    
-[37] bitops_1.0-6                 xtable_1.8-0                
-[39] gtable_0.1.2                 magrittr_1.5                
-[41] scales_0.3.0                 KernSmooth_2.23-15          
-[43] stringi_1.0-1                XVector_0.11.2              
-[45] latticeExtra_0.6-26          Formula_1.2-1               
-[47] RColorBrewer_1.1-2           ensembldb_1.3.11            
-[49] tools_3.3.0                  dichromat_2.0-0             
-[51] BSgenome_1.39.1              survival_2.38-3             
-[53] colorspace_1.2-6             cluster_2.0.3               
-[55] VariantAnnotation_1.17.17   
+[17] splines_3.3.0                BiocParallel_1.5.19         
+[19] statmod_1.4.24               Rhtslib_1.3.2               
+[21] AnnotationHub_2.3.14         foreign_0.8-66              
+[23] RCurl_1.95-4.8               biomaRt_2.27.2              
+[25] munsell_0.4.3                shiny_0.13.1                
+[27] httpuv_1.3.3                 htmltools_0.3               
+[29] nnet_7.3-12                  gridExtra_2.2.1             
+[31] interactiveDisplayBase_1.9.0 Hmisc_3.17-2                
+[33] matrixStats_0.50.1           XML_3.98-1.4                
+[35] GenomicAlignments_1.7.20     bitops_1.0-6                
+[37] xtable_1.8-2                 gtable_0.2.0                
+[39] scales_0.4.0                 KernSmooth_2.23-15          
+[41] XVector_0.11.7               latticeExtra_0.6-28         
+[43] Formula_1.2-1                RColorBrewer_1.1-2          
+[45] ensembldb_1.3.18             tools_3.3.0                 
+[47] dichromat_2.0-0              BSgenome_1.39.4             
+[49] survival_2.38-3              colorspace_1.2-6            
+[51] cluster_2.0.3                VariantAnnotation_1.17.18   
 \end{Soutput}
 \end{Schunk}
 
