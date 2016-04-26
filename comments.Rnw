@@ -270,6 +270,12 @@ There is also an implicit assumption that the widths of the binding sites are re
 Finally, it depends on the resolution of the peak-caller, and whether you need to subtract the average fragment length, etc.
 \end{itemize}
 
+The current justification for the width is that it represents the protein's footprint, such that any overlapping fragment (even by only 1 bp) will be pulled down after cross-linking.
+Both forward- and reverse-mapping reads are counted inside the window, in addition to strand-specific reads flanking the window and within the fragment length.
+This assumes that the protein doesn't protect the bound DNA from sonication, such that fragmentation can occur inside the footprint.
+That assumption seems fair enough, otherwise we would routinely see empty spaces between the forward/reverse strand peaks, and we don't (for ChIP-seq data, anyway).
+If such protection was present, the width should probably be set to 10-50 bp, as the estimated fragment length would already include the size of the footprint.
+
 \subsubsection*{Window spacing}
 
 The obvious case is when ext=1, where you would lose reads when windows are shifted by a spacing larger than the window size.
