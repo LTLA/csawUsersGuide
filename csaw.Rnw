@@ -208,6 +208,7 @@ For a given BAM file named \code{xxx.bam}, the corresponding index file should b
 Users should be aware that the sensibility of the supplied index is not checked prior to counting. 
 A common mistake is to replace or update the BAM file without updating the index. 
 This will cause \pkgname{} to return incorrect results when it attempts to load alignments from new BAM file.
+Also, each read should only have one alignment in the file, i.e., secondary alignments should not be present.
 
 \section{Counting reads into windows}
 
