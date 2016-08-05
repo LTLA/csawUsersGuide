@@ -528,33 +528,28 @@ legend("topright", col=c("blue", "red", "forestgreen"),
 \label{sec:coercelen}
 
 The \code{windowCounts} function also supports the use of library-specific fragment lengths.
-For example, libraries with larger fragment lengths will have wider peaks.
-The single-end reads in those peaks will then require more extension, in order to impute a fragment interval that covers the binding site.
-This is done by supplying a vector to the \code{ext} argument.
-Each entry specifies the average fragment length to be used for the corresponding library.
-The extension lengths are also stored in the \code{RangedSummarizedExperiment} output for future reference. 
+For example, libraries with less efficient fragmentation will have larger fragment lengths and wider peaks.
+Single-end reads in the peaks of such libraries will require more directional extension to impute a fragment interval that covers the binding site.
+However, some work is required to avoid detecting irrelevant DB from differences in peak widths.
+This is done by resizing the inferred fragments to the same length in all libraries.
+(Consider a bimodal peak across several libraries.
+Resizing ensures that the subpeak on the forward strand is centered at the same location in each library.
+The same applies for the subpeak on the reverse strand.)
+Thus, the effect of differences in peak width between libraries can be largely mitigated.
 
-<<>>=
-multi.frag.lens <- c(100, 150, 200, 250)
-demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30, param=param)
-demo$ext
-@
-
-Caution is required to avoid detecting irrelevant DB from differences in peak widths.
-\code{windowCounts} can provide some protection by scaling extended reads to the same length in all libraries.
-Consider a bimodal peak across several libraries.
-Scaling ensures that the subpeak on the forward strand is centered at the same location in each library.
-The same applies for the subpeak on the reverse strand.
-As a result, most of the differences in peak width between libraries can be removed.
-The desired final fragment length can be specified by setting \code{ext} to a list (or any subsettable object) of length two.
-The first element of this list represents the library-specific fragment sizes, while the second element represents the final fragment size.
+Variable read extension is performed in \code{windowCounts} by setting \code{ext} to a list with two elements.
+The first element is a vector where each entry specifies the average fragment length to be used for the corresponding library.
+The second specifies the final length to which the inferred fragments are to be resized.
 If the second element is set to \code{NA}, no rescaling is performed and the library-specific fragment sizes are used directly.
 This also works for analyses with paired-end data, though the first element of \code{ext} will be ignored as directional extension is not performed.
-The example below rescales all fragments to the mean of the library-specific sizes.
+The example below rescales all fragments to 200 bp in all libraries.
+Extension information is stored in the \code{RangedSummarizedExperiment} for later use.
 
 <<>>=
-demo <- windowCounts(bam.files, filter=30, param=param,
-    ext=DataFrame(multi.frag.lens, mean(multi.frag.lens))) 
+multi.frag.lens <- list(c(100, 150, 200, 250), 200)
+demo <- windowCounts(bam.files, ext=multi.frag.lens, filter=30, param=param)
+demo$ext
+metadata(demo)$final
 @
 
 In general, use of different extension lengths is unnecessary in well-controlled datasets.
