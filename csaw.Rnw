@@ -1161,12 +1161,10 @@ The quantity of foreign chromatin added per cell should be constant in each samp
 Any difference in spike-in coverage between libraries represents some technical bias that should be removed by scaling.
 
 This normalization strategy can be implemented in \pkgname{} with some work.
-Assume that the \code{spike.data} object contains the counts for all spike-in regions (i.e., from the foreign genome) in each library.
-This object can be constructed by, e.g., running \code{windowCounts} on the BAM files obtained after aligning reads to the foreign genome.
-Normalization factors can be computed by applying the TMM method on these counts, as done before.
-In this calculation, the total number of reads for the endogenous genome is used as the library size.
+Assume that the \code{spike.data} object contains the counts for all spike-in regions in each library (constructed by, say, running \code{regionCounts} on the BAM files obtained after aligning reads to the foreign genome).
+Normalization factors can be computed by applying the TMM method on these counts, but only after setting the library size to the total number of reads mapped to the \textit{endogenous} genome in each sample.
 This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
-Otherwise, if the total number of spike-in reads was used as the library size, the estimated factors would always be equal to unity.
+% Otherwise, if the total number of spike-in reads was used as the library size, the expected factors would be equal to unity for all samples.
 
 <<echo=FALSE, results=hide>>=
 spike.data <- data
