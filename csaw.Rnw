@@ -94,7 +94,7 @@ dir.create(picdir)
 \chapter{Introduction}
 \section{Scope}
 This document gives an overview of the Bioconductor package \pkgname{} for detecting differential binding (DB) in ChIP-seq experiments.
-Specifically, \pkgname{} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions \citep{lun2015csaw}.
+Specifically, \pkgname{} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions \citep{lun2016csaw}.
 However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.
 The statistical methods described here are based upon those in the \edger{} package \citep{robinson2010}. 
 Knowledge of \edger{} is useful but not a prerequesite for reading this guide.
@@ -113,12 +113,11 @@ Please send requests for general assistance and advice to the support site, rath
 Users posting to the support site for the first time may find it helpful to read the posting guide at \url{http://www.bioconductor.org/help/support/posting-guide}.
 
 \renewcommand{\natexlab}[1]{}
-\providecommand{\doi}[1]{doi: #1}
 
 \section{How to cite this package}
 Most users of \pkgname{} should cite the following in any publications:
 \begin{quote}
-\bibentry{lun2015csaw}
+\bibentry{lun2016csaw}
 \end{quote}
 Anyone who uses the Bioconductor \href{https://www.bioconductor.org/help/workflows/chipseqDB/}{workflow} to construct their analyses should also cite:
 \begin{quote}
@@ -556,7 +555,7 @@ In general, use of different extension lengths is unnecessary in well-controlled
 Difference in lengths between libraries are usually smaller than 50 bp.
 This is less than the inherent variability in fragment lengths within each library (see the histogram for the paired-end data in Section~\ref{data:pet}).
 Such variability will affect the read coverage profile more than any difference in lengths, and is likely to mask the latter.
-Thus, an \code{ext} vector should only specified for datasets that exhibit large differences in the fragment sizes.
+Thus, an \code{ext} list should only specified for datasets that exhibit large differences in the fragment sizes.
 
 \section{Choosing an appropriate window size}
 The coverage profile around potential binding sites can be obtained with the \code{profileSites} function.
