@@ -392,10 +392,23 @@ demo <- windowCounts(bam.files, ext=frag.len, width=win.width, filter=30, param=
 head(assay(demo))
 @
 
+Users can parallelize read counting and several other functions by setting \code{BPPARAM} in the \code{param} object.
+This will load and process reads from multiple BAM files simultaneously.
+The number of workers and type of parallelization can be specified using \code{BiocParallelParam} objects.
+However, this approach depends on disk storage systems that support concurrent read access.
+Parallelization also has a computational overhead and may be less useful for fewer files.
+By default, it is turned off by setting \code{BPPARAM} to a \code{SerialParam} object.
+
+<<>>=
+param$BPPARAM
+@
+
+\subsection{Assigning reads into bins}
 Setting \code{bin=TRUE} will cause \code{windowCounts} to count reads into contiguous bins across the genome.
 Specifically, \code{spacing} is set to \code{width} such that each window forms a bin.
 Only the $5'$ end of each read is used for counting into bins, without any directional extension.
-No filtering is performed on the count sum, such that counts will be returned for each genomic bin. 
+(For paired-end data, the midpoint of the originating fragment is used -- see below.)
+No filtering is performed on the count sum which means that counts will be returned for each genomic bin. 
 As a result, users should set \code{width} to a reasonably large value.
 This avoids problems with memory constraints when counts are returned for a large number of small bins.
 
