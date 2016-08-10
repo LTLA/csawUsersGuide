@@ -395,9 +395,7 @@ head(assay(demo))
 Users can parallelize read counting and several other functions by setting \code{BPPARAM} in the \code{param} object.
 This will load and process reads from multiple BAM files simultaneously.
 The number of workers and type of parallelization can be specified using \code{BiocParallelParam} objects.
-However, this approach depends on disk storage systems that support concurrent read access.
-Parallelization also has a computational overhead and may be less useful for fewer files.
-By default, it is turned off by setting \code{BPPARAM} to a \code{SerialParam} object.
+By default, parallelization is turned off (i.e., set to a \code{SerialParam} object) because it seems to provide little benefit for small files or on systems with I/O bottlenecks.
 
 <<>>=
 param$BPPARAM
