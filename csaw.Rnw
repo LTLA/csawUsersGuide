@@ -1426,7 +1426,7 @@ A typical example involves uncorrected differences in IP efficiency across repli
 In severe cases, the trend may fail to pass through the bulk of points as the variability is too low to be properly modelled in the QL framework.
 This problem is usually resolved with appropriate normalization.
 
-Note that the prior degrees of freedom should be robustly estimated \citep{phipson2013}. 
+Note that the prior degrees of freedom should be robustly estimated \citep{phipson2016}. 
 Obviously, this protects against large positive outliers (e.g., highly variable windows) but it also protects against near-zero dispersions at low counts. 
 These will manifest as large negative outliers after a log transformation step during estimation \citep{smyth2004}. 
 Without robustness, incorporation of these outliers will inflate the observed variability in the dispersions.
