@@ -670,7 +670,7 @@ This is easier to compute, and the threshold is easier to pick and interpret for
 In more detail; there's problems with computing the p-values and correcting for multiple tests, but we'll ignore those for now.
 Consider the purest case, where you determine significance based on the enrichment values (use a constant variance, so same selection order).
 If you pick a set based on the FDR, the selection of one region becomes dependent on how many other regions have higher enrichments.
-This might be annoying if you're trying to use a stable pre-set threshold.
+This might be annoying if you're trying to use a stable pre-set threshold for ease of interpretation.
 High FDR thresholds might also start to run into problems with monotonicity, where filter resolution is lost.
 
 Another problem is that you're requiring rejection at a standard FDR of 5\% in order to get into the retained set.
@@ -678,13 +678,10 @@ This may be too conservative for preliminary selection, where windows that canno
 In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20\%), which gets us back to the problem of arbitrariness.
 Remember that the aim of filtering is not to do rigorous peak-calling, but to trim down the total number in order to detect DB regions.
 
-In short, you might get a FDR for your filter, but so what - now it's just another number with an arbitrary threshold.
-It won't tell us much about the effect of the filter on our DB analysis, which is the whole point of filtering.
-The FDR does give us something in terms of the range of possible BH correction values.
-This depends on how many DB things are there, and assumes that all background is non-DB.
-However, this range is pretty wide, and I'm not sure that the extra work is worth this little information.
+In short, you might get a FDR for your filter, but that doesn't have any effect on FDR control for differential binding.
+It will affect power, but not in a way that's easy to interpret, because it depends on how many true and false positives (re. DB, not absolute calling) were retained.
 Conversely, having a minimum log-fold change tells us a bit about the maximum scope of DB change (assuming that background is non-DB).
-For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions which scrape past the filter.
+For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions that scrape past the filter.
 
 In terms of rankings, the $p$-value from Poisson- or NB-based models will favour high counts.
 This means that high-abundance sites with low relative enrichments would be retained over lower abundance counterparts.
