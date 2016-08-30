@@ -1315,9 +1315,9 @@ This author's desire to increase his h-index may also be a factor \citep{chen201
 \subsection{Setting up the data}
 A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
-If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in the \edger{} functions.
-(Alternatively, users can store normalization information directly in the \code{RangedSummarizedExperiment} object, which simplifies data management.
-This information will then be automatically extracted and used to construct the \code{DGEList} object -- see \code{?asDGEList} for more details.)
+If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in various \edger{} functions.
+(Alternatively, users can store normalization information in special fields of the \code{RangedSummarizedExperiment} object, which simplifies data management.
+If present, this information will automatically be used when constructing the \code{DGEList} object -- see \code{?asDGEList} for details.)
 
 <<>>=
 y <- asDGEList(filtered.data, norm.factors=normfacs)
