@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 5 August 2016}
+Last revised 29 August 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -1315,7 +1315,9 @@ This author's desire to increase his h-index may also be a factor \citep{chen201
 \subsection{Setting up the data}
 A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
-If an offset matrix was generated (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
+If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in the \edger{} functions.
+(Alternatively, users can store normalization information directly in the \code{RangedSummarizedExperiment} object, which simplifies data management.
+This information will then be automatically extracted and used to construct the \code{DGEList} object -- see \code{?asDGEList} for more details.)
 
 <<>>=
 y <- asDGEList(filtered.data, norm.factors=normfacs)
