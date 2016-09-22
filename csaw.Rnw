@@ -10,7 +10,7 @@
 \oddsidemargin -0.1in
 \evensidemargin -0.1in
 \textwidth 6.5in
-\textheight 8.3in
+\textheight 8.9in
 
 % Sweave options
 \usepackage{Sweave}

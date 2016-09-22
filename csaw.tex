@@ -10,7 +10,7 @@
 \oddsidemargin -0.1in
 \evensidemargin -0.1in
 \textwidth 6.5in
-\textheight 8.3in
+\textheight 8.9in
 
 % Sweave options
 \usepackage{Sweave}
@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 5 August 2016}
+Last revised 29 August 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -486,10 +486,30 @@ More sophisticated filtering is recommended and should be applied later (see Cha
 \end{Soutput}
 \end{Schunk}
 
+Users can parallelize read counting and several other functions by setting \code{BPPARAM} in the \code{param} object.
+This will load and process reads from multiple BAM files simultaneously.
+The number of workers and type of parallelization can be specified using \code{BiocParallelParam} objects.
+By default, parallelization is turned off (i.e., set to a \code{SerialParam} object) because it seems to provide little benefit for small files or on systems with I/O bottlenecks.
+
+\begin{Schunk}
+\begin{Sinput}
+> param$BPPARAM
+\end{Sinput}
+\begin{Soutput}
+class: SerialParam
+  bpisup: TRUE; bpnworkers: 1; bptasks: 0; bpjobname: BPJOB
+  bplog: FALSE; bpthreshold: INFO; bpstopOnError: TRUE
+  bptimeout: 2592000; bpprogressbar: FALSE
+  bplogdir: NA
+\end{Soutput}
+\end{Schunk}
+
+\subsection{Assigning reads into bins}
 Setting \code{bin=TRUE} will cause \code{windowCounts} to count reads into contiguous bins across the genome.
 Specifically, \code{spacing} is set to \code{width} such that each window forms a bin.
 Only the $5'$ end of each read is used for counting into bins, without any directional extension.
-No filtering is performed on the count sum, such that counts will be returned for each genomic bin. 
+(For paired-end data, the midpoint of the originating fragment is used -- see below.)
+No filtering is performed on the count sum which means that counts will be returned for each genomic bin. 
 As a result, users should set \code{width} to a reasonably large value.
 This avoids problems with memory constraints when counts are returned for a large number of small bins.
 
@@ -549,7 +569,7 @@ The location of the mode should be consistent with the fragmentation and size se
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-021}
+\includegraphics{plots-ug/ug-022}
 \end{center}
 
 The number of fragments exceeding the maximum size can be recorded for quality control. 
@@ -608,7 +628,7 @@ This reflects the strand-dependent bimodality of reads around narrow regions of 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
 \centering
-\includegraphics{plots-ug/ug-025}
+\includegraphics{plots-ug/ug-026}
 \end{center}
 
 The location of the peak can be used as an estimate of the fragment length for read extension in \code{windowCounts}. 
@@ -652,7 +672,7 @@ However, they are less effective for regions of diffuse enrichment where bimodal
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-028}
+\includegraphics{plots-ug/ug-029}
 \end{center}
 
 \subsection{Variable fragment lengths between libraries}
@@ -730,7 +750,7 @@ The values are then averaged across all windows to obtain an aggregated coverage
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-031}
+\includegraphics{plots-ug/ug-032}
 \end{center}
 
 In the example above, enrichment for the two histone marks is mostly contained within a 350 bp region around the maxima (dashed lines).
@@ -959,7 +979,7 @@ This is due to the dominance of the background-containing bins throughout the ge
 
 \setkeys{Gin}{width=0.7\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-042}
+\includegraphics{plots-ug/ug-043}
 \end{center}
 
 Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
@@ -1297,7 +1317,7 @@ This indicates that undersampling has been identified and corrected.
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-057}
+\includegraphics{plots-ug/ug-058}
 \end{center}
 
 \section{Eliminating efficiency biases}
@@ -1397,7 +1417,7 @@ This also induces composition bias, leading to a non-zero M-value for the backgr
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-061}
+\includegraphics{plots-ug/ug-062}
 \end{center}
 
 \subsection{Choosing between normalization strategies}
@@ -1421,12 +1441,10 @@ The quantity of foreign chromatin added per cell should be constant in each samp
 Any difference in spike-in coverage between libraries represents some technical bias that should be removed by scaling.
 
 This normalization strategy can be implemented in \pkgname{} with some work.
-Assume that the \code{spike.data} object contains the counts for all spike-in regions (i.e., from the foreign genome) in each library.
-This object can be constructed by, e.g., running \code{windowCounts} on the BAM files obtained after aligning reads to the foreign genome.
-Normalization factors can be computed by applying the TMM method on these counts, as done before.
-In this calculation, the total number of reads for the endogenous genome is used as the library size.
+Assume that the \code{spike.data} object contains the counts for all spike-in regions in each library (constructed by, say, running \code{regionCounts} on the BAM files obtained after aligning reads to the foreign genome).
+Normalization factors can be computed by applying the TMM method on these counts, but only after setting the library size to the total number of reads mapped to the \textit{endogenous} genome in each sample.
 This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
-Otherwise, if the total number of spike-in reads was used as the library size, the estimated factors would always be equal to unity.
+% Otherwise, if the total number of spike-in reads was used as the library size, the expected factors would be equal to unity for all samples.
 
 
 \begin{Schunk}
@@ -1513,7 +1531,7 @@ Spurious trends that might affect normalization will not be introduced at the fi
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-067}
+\includegraphics{plots-ug/ug-068}
 \end{center}
 
 Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
@@ -1572,7 +1590,9 @@ This author's desire to increase his h-index may also be a factor \citep{chen201
 \subsection{Setting up the data}
 A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
-If an offset matrix was generated (e.g., from non-linear normalization), this can be assigned into \code{y\$offset} for later use in the various \edger{} functions.
+If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in various \edger{} functions.
+(Alternatively, users can store normalization information in special fields of the \code{RangedSummarizedExperiment} object, which simplifies data management.
+If present, this information will automatically be used when constructing the \code{DGEList} object -- see \code{?asDGEList} for details.)
 
 \begin{Schunk}
 \begin{Sinput}
@@ -1664,7 +1684,7 @@ Discrete patterns in the raw dispersions are indicative of low counts and sugges
 
 \setkeys{Gin}{width=0.99\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-073}
+\includegraphics{plots-ug/ug-074}
 \end{center}
 
 A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
@@ -1691,7 +1711,7 @@ Filtering has an additional benefit of removing those tests that have low power 
 
 \setkeys{Gin}{width=0.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-075}
+\includegraphics{plots-ug/ug-076}
 \end{center}
 
 \subsection{Modelling variable dispersions between windows}
@@ -1717,7 +1737,7 @@ A typical example involves uncorrected differences in IP efficiency across repli
 In severe cases, the trend may fail to pass through the bulk of points as the variability is too low to be properly modelled in the QL framework.
 This problem is usually resolved with appropriate normalization.
 
-Note that the prior degrees of freedom should be robustly estimated \citep{phipson2013}. 
+Note that the prior degrees of freedom should be robustly estimated \citep{phipson2016}. 
 Obviously, this protects against large positive outliers (e.g., highly variable windows) but it also protects against near-zero dispersions at low counts. 
 These will manifest as large negative outliers after a log transformation step during estimation \citep{smyth2004}. 
 Without robustness, incorporation of these outliers will inflate the observed variability in the dispersions.
@@ -1805,7 +1825,7 @@ Again, counting with large bins is recommended as fold changes will be undefined
 
 \setkeys{Gin}{width=0.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-080}
+\includegraphics{plots-ug/ug-081}
 \end{center}
 
 Replicates from different groups should form separate clusters in the MDS plot, as observed above.
@@ -2613,7 +2633,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 
 \setkeys{Gin}{width=.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-111}
+\includegraphics{plots-ug/ug-112}
 \end{center}
 
 
@@ -2686,7 +2706,7 @@ These commands are stored in a Bash file, accessible by running:
 > sessionInfo()
 \end{Sinput}
 \begin{Soutput}
-R version 3.3.0 Patched (2016-05-03 r70577)
+R version 3.3.1 Patched (2016-08-08 r71066)
 Platform: x86_64-pc-linux-gnu (64-bit)
 Running under: CentOS release 6.4 (Final)
 
@@ -2703,53 +2723,53 @@ attached base packages:
  [8] datasets  methods   base     
 
 other attached packages:
- [1] Gviz_1.17.4                             
- [2] rtracklayer_1.33.11                     
+ [1] Gviz_1.17.7                             
+ [2] rtracklayer_1.33.12                     
  [3] org.Mm.eg.db_3.3.0                      
  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.2.2
  [5] GenomicFeatures_1.25.16                 
  [6] AnnotationDbi_1.35.4                    
  [7] edgeR_3.15.2                            
- [8] limma_3.29.17                           
+ [8] limma_3.29.21                           
  [9] csaw_1.7.3                              
-[10] BiocParallel_1.7.5                      
-[11] SummarizedExperiment_1.3.81             
-[12] Biobase_2.33.0                          
-[13] GenomicRanges_1.25.93                   
-[14] GenomeInfoDb_1.9.4                      
-[15] IRanges_2.7.12                          
-[16] S4Vectors_0.11.10                       
+[10] BiocParallel_1.7.8                      
+[11] SummarizedExperiment_1.3.82             
+[12] Biobase_2.33.3                          
+[13] GenomicRanges_1.25.94                   
+[14] GenomeInfoDb_1.9.12                     
+[15] IRanges_2.7.15                          
+[16] S4Vectors_0.11.16                       
 [17] BiocGenerics_0.19.2                     
 
 loaded via a namespace (and not attached):
- [1] Rcpp_0.12.6                   locfit_1.5-9.1               
- [3] biovizBase_1.21.0             lattice_0.20-33              
- [5] Rsamtools_1.25.1              Biostrings_2.41.4            
+ [1] Rcpp_0.12.7                   locfit_1.5-9.1               
+ [3] biovizBase_1.21.0             lattice_0.20-34              
+ [5] Rsamtools_1.25.2              Biostrings_2.41.4            
  [7] digest_0.6.10                 mime_0.5                     
- [9] R6_2.1.2                      plyr_1.8.4                   
+ [9] R6_2.1.3                      plyr_1.8.4                   
 [11] chron_2.3-47                  acepack_1.3-3.3              
-[13] RSQLite_1.0.0                 BiocInstaller_1.23.6         
+[13] RSQLite_1.0.0                 BiocInstaller_1.23.9         
 [15] httr_1.2.1                    ggplot2_2.1.0                
 [17] zlibbioc_1.19.0               data.table_1.9.6             
-[19] rpart_4.1-10                  Matrix_1.2-6                 
-[21] splines_3.3.0                 statmod_1.4.24               
-[23] Rhtslib_1.5.3                 AnnotationHub_2.5.6          
-[25] foreign_0.8-66                RCurl_1.95-4.8               
+[19] rpart_4.1-10                  Matrix_1.2-7.1               
+[21] splines_3.3.1                 statmod_1.4.26               
+[23] Rhtslib_1.5.3                 AnnotationHub_2.5.12         
+[25] foreign_0.8-67                RCurl_1.95-4.8               
 [27] biomaRt_2.29.2                munsell_0.4.3                
-[29] shiny_0.13.2                  httpuv_1.3.3                 
+[29] shiny_0.14                    httpuv_1.3.3                 
 [31] htmltools_0.3.5               nnet_7.3-12                  
 [33] gridExtra_2.2.1               interactiveDisplayBase_1.11.3
 [35] Hmisc_3.17-4                  matrixStats_0.50.2           
 [37] XML_3.98-1.4                  GenomicAlignments_1.9.6      
 [39] bitops_1.0-6                  xtable_1.8-2                 
-[41] gtable_0.2.0                  DBI_0.4-1                    
+[41] gtable_0.2.0                  DBI_0.5-1                    
 [43] scales_0.4.0                  KernSmooth_2.23-15           
 [45] XVector_0.13.7                latticeExtra_0.6-28          
 [47] Formula_1.2-1                 RColorBrewer_1.1-2           
-[49] ensembldb_1.5.9               tools_3.3.0                  
+[49] ensembldb_1.5.14              tools_3.3.1                  
 [51] dichromat_2.0-0               BSgenome_1.41.2              
 [53] survival_2.39-5               colorspace_1.2-6             
-[55] cluster_2.0.4                 VariantAnnotation_1.19.9     
+[55] cluster_2.0.4                 VariantAnnotation_1.19.10    
 \end{Soutput}
 \end{Schunk}
 
