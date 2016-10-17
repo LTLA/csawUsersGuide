@@ -362,8 +362,7 @@ var(out[is.finite(out)])
 var(log(rnbinom(1000, mu=20, size=100)/rnbinom(1000, mu=20, size=100)))
 @
 
-The undefined nature of the log FC's with zero counts also complicates matters. Adding
-an offset doesn't help as the results will change dramatically with the value of the offset. 
+The undefined nature of the log FC's with zero counts also complicates matters. Adding an offset doesn't help as the results will change dramatically with the value of the offset. 
 This is because the choice of offset is a massive contributor to the magnitude of the resulting fold change, and thus determines where that FC is placed in the distribution.
 Treatment as Inf or -Inf is suboptimal as a 1 vs 0 situation is usually not enriched (but will definitely be trimmed at Inf) whereas a 100 vs 10 situation is enriched but will be trimmed later. 
 
@@ -468,7 +467,13 @@ You can also run TMM on high-abundance bins instead of windows.
 This uses larger counts that will be easier to visualize in a MA plot (can also see the behaviour of the entire genome on the plot).
 However, I prefer running it on the same windows you're going to use for the analysis.
 This synchronizes the normalization with the filtering, and guarantees that you're eliminating the biases in the counts of interest.
-It's also a step closer to the procedure for non-linear normalization, so you can switch to that, e.g., if you didn't filter away all of the background.
+
+Using window counts for TMM is also a step closer to the procedure for non-linear normalization.
+This means you can easily switch to that, e.g., if you didn't filter away all of the background and you want to normalize them as well.
+However, I generally find that it's quite difficult to identify a trend when you have window-based counts, as the covariate range is usually too small.
+This motivates the use of scaling normalization, even in the likely presence of some background windows.
+(Non-linear methods also have some other problems that are discussed below.)
+
 Note that each read is counted multiple times with windows instead of bins, though this isn't a real problem.
 The only thing to worry about is that it will effectively upweight high-abundance peaks which get caught by multiple windows, but everyone should have high abundances so it shouldn't matter.
 
