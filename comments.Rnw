@@ -599,6 +599,7 @@ It is reasonable to correct for these, though it may result in loss of power if 
 Also, the correction uses offsets which might not be compatible with non-linear normalization.
 Given a choice, I'd prefer to remove any trended bias directly, as I \textit{know} it would mess with my mean-dispersion trend estimation.
 Besides, the GC content vs. M-value plots are pretty tame; there's not much of a trend as the bulk of points occur in a limited range of GC contents.
+(Or specifically, the noise around the trend is larger than the range of covariates, making it difficult to pull out a trend.)
 \end{itemize}
 
 \subsubsection*{Why spike-ins work}
