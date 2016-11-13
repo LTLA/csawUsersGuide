@@ -1648,13 +1648,6 @@ tabcom <- combineTests(merged$id, results$table)
 head(tabcom)
 @
 
-As before, consolidation can be performed by storing these statistics in the per-element metadata of the \code{GRanges} object.
-This is often convenient as it synchronizes the processing of the statistics and genomic coordinates.
-
-<<>>=
-mcols(merged$region) <- tabcom
-@
-
 If many adjacent windows are present, very large clusters may be formed that are difficult to interpret. 
 A simple check can be used to determine whether most clusters are of an acceptable size. 
 Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:filter} is required.  

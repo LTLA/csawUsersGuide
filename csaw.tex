@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 29 August 2016}
+Last revised 13 November 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -870,8 +870,8 @@ This restricts the analysis to windows with abundances above this threshold.
 > summary(keep.simple)
 \end{Sinput}
 \begin{Soutput}
-   Mode   FALSE    TRUE    NA's 
-logical 3674738   15072       0 
+   Mode   FALSE    TRUE 
+logical 3674738   15072 
 \end{Soutput}
 \end{Schunk}
 
@@ -895,8 +895,8 @@ The code below retains windows with (library size-adjusted) average counts great
 > summary(keep)
 \end{Sinput}
 \begin{Soutput}
-   Mode   FALSE    TRUE    NA's 
-logical 3621824   67986       0 
+   Mode   FALSE    TRUE 
+logical 3621824   67986 
 \end{Soutput}
 \end{Schunk}
 
@@ -1052,8 +1052,8 @@ This can also be combined with other filters to ensure that the retained windows
 > summary(maxed)
 \end{Sinput}
 \begin{Soutput}
-   Mode   FALSE    TRUE    NA's 
-logical 2823683  866127       0 
+   Mode   FALSE    TRUE 
+logical 2823683  866127 
 \end{Soutput}
 \end{Schunk}
 
@@ -1160,7 +1160,7 @@ This could also be combined with abundance filtering to retain windows that cont
 > sum(keep)
 \end{Sinput}
 \begin{Soutput}
-[1] 2012876
+[1] 2017611
 \end{Soutput}
 \end{Schunk}
 
@@ -1198,9 +1198,9 @@ This is especially relevant for the local background filters, where a large enri
 \chapter{Calculating normalization factors}
 \label{chap:norm}
 \begin{combox}
-This chapter will need the \code{bam.files} vector again (from the introduction). 
-We'll also need the \code{param} object that we defined in Chapter~\ref{chap:count}.
-You'll notice that that a number of other BAM files are used in this chapter. 
+This chapter will need to use the \code{bam.files} vector again (from the introduction). 
+We'll also need the \code{param} object that we defined in Chapter~\ref{chap:count}, as well as the \code{filtered.data} object that we constructed in Chapter~\ref{chap:filter}.
+You'll notice that character vectors containing paths to other BAM files are defined throughout this chapter. 
 However, these are only present for demonstration purposes and aren't necessary for the main NF-YA example.
 \end{combox}
 
@@ -1420,7 +1420,7 @@ This also induces composition bias, leading to a non-zero M-value for the backgr
 \includegraphics{plots-ug/ug-062}
 \end{center}
 
-\subsection{Choosing between normalization strategies}
+\section{Choosing between normalization strategies}
 The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of factors will ultimately be used.
 The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
 If so, composition bias should be removed to preserve the assumed DB.
@@ -1432,6 +1432,17 @@ Thus, normalization factors will be computed to remove composition biases.
 This ensures that any genuine systematic changes in binding will still be picked up.
 In general, normalization for composition bias is a good starting point for any analysis.
 This can be considered as the ``default'' unless there is evidence for a confounding efficiency bias.
+
+Once chosen, the appropriate normalization factors can be stored inside the relevant \code{RangedSummarizedExperiment} object.
+This ensures that they are attached to the counts on which they should be used, simplifying data management in complex analyses.
+Here, the normalization factors are stored alongside the \textit{window} counts, despite being computed from the binned counts.
+This is because the former is of interest in the actual DB analysis.
+
+\begin{Schunk}
+\begin{Sinput}
+> filtered.data$norm.factors <- normfacs
+\end{Sinput}
+\end{Schunk}
 
 \section{Scaling normalization with spike-in chromatin}
 Several studies have used spike-in chromatin for scaling normalization of ChIP-seq data \citep{bonhoure2014quantifying,orlando2014quantitative}.
@@ -1531,8 +1542,19 @@ Spurious trends that might affect normalization will not be introduced at the fi
 
 \setkeys{Gin}{width=0.98\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-068}
+\includegraphics{plots-ug/ug-069}
 \end{center}
+
+Similar to the normalization factors, the offsets can be stored in the \code{RangedSummarizedExperiment} object containing the counts of interest.
+This is done by adding the offset matrix as an extra entry in the \code{assays} slot.
+Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, thus synchronising data management.
+The counts of interest should be the same as those used to compute the offsets, given that each offset represents the amount of normalization required for a corresponding count.
+
+\begin{Schunk}
+\begin{Sinput}
+> assays(ac.demo2)$offset <- ac.off
+\end{Sinput}
+\end{Schunk}
 
 Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
 This is a stronger assumption than that for scaling methods, which only require a non-DB majority across all features.
@@ -1568,8 +1590,8 @@ For example, differences in the GC content distribution can be driven by technic
 \label{chap:stats}
 
 \begin{combox}
-Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter} along with the original \code{data} from Chapter~\ref{chap:count}.
-We'll also use the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
+Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter}, the \code{normfacs} vector from Chapter~\ref{chap:norm}, and the \code{design} matrix from the introduction. 
+We'll also need the original \code{data} from Chapter~\ref{chap:count}, but just for a demonstration.
 Finally, we'll be executing a number of \edger{} functions, so make sure the \edger{} package is loaded if you've been skipping chapters.
 \end{combox}
 
@@ -1588,11 +1610,12 @@ The choice of \edger{} is primarily motivated by its performance relative to som
 This author's desire to increase his h-index may also be a factor \citep{chen2014}.
 
 \subsection{Setting up the data}
-A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
+A \code{DGEList} object is first constructed from the count matrix, library sizes and normalization factors.
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
 If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in various \edger{} functions.
-(Alternatively, users can store normalization information in special fields of the \code{RangedSummarizedExperiment} object, which simplifies data management.
-If present, this information will automatically be used when constructing the \code{DGEList} object -- see \code{?asDGEList} for details.)
+(If this normalization information is already stored in the \code{RangedSummarizedExperiment} object -- see Chapter~\ref{chap:norm} -- it will be automatically extracted and used to construct the \code{DGEList} object.
+Thus, manual specification of \code{norm.factors=} is not strictly necessary in the example below, and is shown here for pedagogical purposes only.
+See \code{?asDGEList} for details.)
 
 \begin{Schunk}
 \begin{Sinput}
@@ -1654,7 +1677,7 @@ The ideal amount of shrinkage is determined from the variability of the dispersi
 \end{Sinput}
 \begin{Soutput}
    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-0.02979 0.08471 0.08958 0.09344 0.10320 0.11640 
+0.02979 0.08471 0.08958 0.09344 0.10319 0.11643 
 \end{Soutput}
 \begin{Sinput}
 > fit <- glmQLFit(y, design, robust=TRUE)
@@ -1662,7 +1685,7 @@ The ideal amount of shrinkage is determined from the variability of the dispersi
 \end{Sinput}
 \begin{Soutput}
     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
- 0.05018  1.06100  1.08800  1.08300  1.11600 16.85000 
+ 0.05019  1.06069  1.08775  1.08328  1.11554 16.84582 
 \end{Soutput}
 \end{Schunk}
 
@@ -1684,7 +1707,7 @@ Discrete patterns in the raw dispersions are indicative of low counts and sugges
 
 \setkeys{Gin}{width=0.99\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-074}
+\includegraphics{plots-ug/ug-076}
 \end{center}
 
 A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
@@ -1711,7 +1734,7 @@ Filtering has an additional benefit of removing those tests that have low power 
 
 \setkeys{Gin}{width=0.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-076}
+\includegraphics{plots-ug/ug-078}
 \end{center}
 
 \subsection{Modelling variable dispersions between windows}
@@ -1727,7 +1750,7 @@ Fewer prior degrees of freedom (and less shrinkage) are required to maintain typ
 \end{Sinput}
 \begin{Soutput}
    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
- 0.4153 64.4900 64.4900 64.4100 64.4900 64.4900 
+ 0.4153 64.4922 64.4922 64.4080 64.4922 64.4922 
 \end{Soutput}
 \end{Schunk}
 
@@ -1772,6 +1795,16 @@ The \code{contrast} argument in the \code{glmQLFTest} function specifies which f
 In this case, a contrast of \code{c(0, 1)} defines the null hypothesis as \code{0*intercept + 1*cell.type = 0}, i.e., that the log-fold change between cell types is zero. 
 DB windows can then be identified by rejecting the null. 
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
+
+Once the significance statistics have been calculated, they can be stored in row metadata of the \code{RangedSummarizedExperiment} object.
+This simplifies data management by consolidating relevant information into a single container. 
+In particular, it ensures that the statistics and coordinates are synchronised when, e.g., subsetting to select certain windows.
+
+\begin{Schunk}
+\begin{Sinput}
+> rowData(filtered.data) <- cbind(rowData(filtered.data), results$table)
+\end{Sinput}
+\end{Schunk}
 
 \section{What to do without replicates}
 Designing a ChIP-seq experiment without any replicates is strongly discouraged.
@@ -1825,7 +1858,7 @@ Again, counting with large bins is recommended as fold changes will be undefined
 
 \setkeys{Gin}{width=0.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-081}
+\includegraphics{plots-ug/ug-084}
 \end{center}
 
 Replicates from different groups should form separate clusters in the MDS plot, as observed above.
@@ -1843,9 +1876,8 @@ In the worst case, outlier samples may need to be removed to obtain sensible res
 
 \begin{combox}
 All right, we're almost there. 
-This chapter needs the \code{results} object from the last chapter.
-We also need a bunch of things from Chapter~\ref{chap:filter} - namely, the \code{filtered.data} list, the \code{broads} object and the \code{keep.simple} and \code{maxed} vectors.
-Finally, we'll need \code{ac.files} and \code{param} from Chapters~\ref{chap:norm} and \ref{chap:count}, respectively, for a little demonstration.
+This chapter needs the \code{results} object from the last chapter, as well as \code{filtered.data} from Chapter~\ref{chap:filter}.
+A few other things are also required for some of the optional sections below -- namely, \code{broads} and the \code{keep.simple} and \code{maxed} vectors from Chapter~\ref{chap:filter}, and \code{ac.files} and \code{param} from Chapters~\ref{chap:norm} and \ref{chap:count}, respectively.
 \end{combox}
 
 \section{Problems with false discovery rate control}
@@ -1909,7 +1941,7 @@ In either case, the \code{findOverlaps} function from the \granges{} package can
 > olap
 \end{Sinput}
 \begin{Soutput}
-Hits object with 15508 hits and 0 metadata columns:
+Hits object with 15546 hits and 0 metadata columns:
           queryHits subjectHits
           <integer>   <integer>
       [1]         7        8690
@@ -1918,13 +1950,13 @@ Hits object with 15508 hits and 0 metadata columns:
       [4]        18       10377
       [5]        18       10378
       ...       ...         ...
-  [15504]     23949        8504
-  [15505]     23949        8505
-  [15506]     23952        8218
-  [15507]     23952        8219
-  [15508]     23952        8220
+  [15542]     24037        8504
+  [15543]     24037        8505
+  [15544]     24040        8218
+  [15545]     24040        8219
+  [15546]     24040        8220
   -------
-  queryLength: 23956 / subjectLength: 15072
+  queryLength: 24044 / subjectLength: 15072
 \end{Soutput}
 \end{Schunk}
 
@@ -1941,12 +1973,12 @@ Regions that do not overlap any windows have values of \code{NA} in all fields f
 \end{Sinput}
 \begin{Soutput}
    nWindows logFC.up logFC.down       PValue         FDR
-7         3        3          0 0.0001261987 0.002172133
-18        4        4          0 0.0001351921 0.002195775
-22        1        1          0 0.1770551333 0.248246412
-23        5        5          0 0.0017510593 0.010350011
-25        4        0          0 0.9862127085 0.989993480
-28        3        3          0 0.0028348431 0.014591304
+7         3        3          0 0.0001261987 0.002152362
+18        4        4          0 0.0001351921 0.002177250
+22        1        1          0 0.1770551333 0.248210819
+23        5        5          0 0.0017510593 0.010336280
+25        4        0          0 0.9862127085 0.989985137
+28        3        3          0 0.0028348431 0.014562319
 \end{Soutput}
 \end{Schunk}
 
@@ -2079,7 +2111,7 @@ This requires some protection against the \code{NA} values for the promoters tha
 \end{Sinput}
 \begin{Soutput}
   Total.DB DB.up DB.down DB.both
-1     1626  1526      70      30
+1     1630  1529      71      30
 \end{Soutput}
 \end{Schunk}
 
@@ -2310,12 +2342,12 @@ These wrappers are designed to minimize book-keeping problems when one window ov
 \end{Sinput}
 \begin{Soutput}
     best      logFC     logCPM          F       PValue         FDR
-7   8691  3.2094654 -0.5127818 17.5534526 8.413249e-05 0.001477641
-18 10378  1.3722344  0.7189963  6.7069163 1.178898e-02 0.037604145
-22  4460  0.9872845 -0.8611100  1.8614717 1.770551e-01 0.250905556
-23   405  1.1650460  0.4066434  4.5519542 3.657466e-02 0.079285015
-25 12509 -0.1802183 -0.2793734  0.0914079 7.633386e-01 0.799962497
-28 10964  2.1645373 -0.6385065  8.5838616 4.643181e-03 0.020120451
+7   8691  3.2094654 -0.5127818 17.5534526 8.413249e-05 0.001469764
+18 10378  1.3722344  0.7189963  6.7069163 1.178898e-02 0.037625340
+22  4460  0.9872845 -0.8611100  1.8614717 1.770551e-01 0.250944672
+23   405  1.1650460  0.4066434  4.5519542 3.657466e-02 0.079266524
+25 12509 -0.1802183 -0.2793734  0.0914079 7.633386e-01 0.800397734
+28 10964  2.1645373 -0.6385065  8.5838616 4.643181e-03 0.020115789
 \end{Soutput}
 \begin{Sinput}
 > broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
@@ -2397,6 +2429,23 @@ This reduces the pressure on abundance filtering to obtain well-separated region
 That said, users should be aware that calculation of the cluster-level FDR is not entirely rigorous.
 As such, independent clustering and FDR control via Simes' method should be considered as the default for routine analyses.
 
+\section{Further points on data management}
+Technically, \code{results\$table} was not required in any of the calls performed in this chapter.
+Recall that the per-window significance statistics were stored in the row metadata of \code{filtered.data}.
+Thus, \code{rowData(filtered.data)} can be used instead of \code{results\$table}.
+The former may be more convenient as it avoids the need to keep track of a separate object.
+
+On a similar note, it is possible to store the results for each region in the metadata of the \code{GRanges}.
+This synchronises the storage and handling of the statistics and coordinates for each region.
+Thus, data management throughout the rest of the analysis can be simplified.
+
+\begin{Schunk}
+\begin{Sinput}
+> mcols(broads) <- tabbroad 
+> mcols(merged$region) <- tabcom
+\end{Sinput}
+\end{Schunk}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2406,9 +2455,8 @@ As such, independent clustering and FDR control via Simes' method should be cons
 
 \begin{combox}
 This is where we bring it all together.
-We'll need the \code{merged} list and the \code{tabcom} table from the previous chapter. 
-Oh, and the \code{org.Mm.eg.db} object that we loaded in Chapter~\ref{chap:filter}.
-There's a bit about visualization at the end where we need the \code{data} and \code{param} objects from Chapter~\ref{chap:count}, along with the \code{bam.files} that we started off with.
+We'll need the \code{merged} list from the previous chapter -- oh, and the \code{org.Mm.eg.db} object that we loaded in Chapter~\ref{chap:filter}.
+There's a bit about visualization at the end where we need the \code{data} and \code{param} objects from Chapter~\ref{chap:count}, along with the original \code{bam.files} that we started with in the introduction.
 \end{combox}
 
 \section{Adding gene-based annotation}
@@ -2451,6 +2499,15 @@ Each pattern contains \code{GENE|EXONS|STRAND} to describe the strand and overla
 Promoters are labelled as exon \code{0} whereas introns are labelled as \code{I}. 
 For \code{left} and \code{right}, an additional \code{[DISTANCE]} field is included.
 This indicates the gap between the annotated feature and the supplied region.
+All of this annotation can be stored in the metadata of the \code{GRanges} object for later use.
+
+\begin{Schunk}
+\begin{Sinput}
+> merged$region$overlap <- anno$overlap
+> merged$region$left <- anno$left
+> merged$region$right <- anno$right
+\end{Sinput}
+\end{Schunk}
 
 While the string representation saves space in the output, it is not easy to work with.
 If the annotation needs to manipulated directly, users can obtain it from the \code{detailRanges} command by not specifying the regions of interest. 
@@ -2462,7 +2519,7 @@ This can then be used for interactive manipulation, e.g., to identify all genes 
 > anno.ranges
 \end{Sinput}
 \begin{Soutput}
-GRanges object with 288419 ranges and 3 metadata columns:
+GRanges object with 289428 ranges and 3 metadata columns:
             seqnames                 ranges strand |      symbol      exon
                <Rle>              <IRanges>  <Rle> | <character> <integer>
   100009600     chr9   [21062393, 21062717]      - |       Zglp1         7
@@ -2484,11 +2541,11 @@ GRanges object with 288419 ranges and 3 metadata columns:
   100009600         1
   100009600         1
         ...       ...
-      99889     24180
-      99890     24181
-      99899     24182
-      99929     24183
-      99982     24184
+      99889     24268
+      99890     24269
+      99899     24270
+      99929     24271
+      99982     24272
   -------
   seqinfo: 66 sequences (1 circular) from mm10 genome
 \end{Soutput}
@@ -2530,9 +2587,9 @@ Compression is used to reduce the file size.
 
 \begin{Schunk}
 \begin{Sinput}
-> ofile <- gzfile("clusters.gz", open="w")
-> write.table(data.frame(as.data.frame(merged$region)[,1:3], tabcom, anno), 
-+     file=ofile, row.names=FALSE, quote=FALSE, sep="\t")
+> ofile <- gzfile("clusters.tsv.gz", open="w")
+> write.table(as.data.frame(merged$region), file=ofile, 
++     row.names=FALSE, quote=FALSE, sep="\t")
 > close(ofile)
 \end{Sinput}
 \end{Schunk}
@@ -2543,10 +2600,10 @@ A transformed FDR is used here for the score field.
 
 \begin{Schunk}
 \begin{Sinput}
-> is.sig <- tabcom$FDR <= 0.05
+> is.sig <- merged$region$FDR <= 0.05
 > require(rtracklayer)
 > test <- merged$region[is.sig]
-> test$score <- -10*log10(tabcom$FDR[is.sig])
+> test$score <- -10*log10(merged$region$FDR[is.sig])
 > names(test) <- paste0("region", 1:sum(is.sig))
 > export(test, "clusters.bed")
 > head(read.table("clusters.bed"))
@@ -2562,15 +2619,11 @@ A transformed FDR is used here for the score field.
 \end{Soutput}
 \end{Schunk}
 
-Another useful format is to store the results as a \code{GRanges} object.
-Statistics are stored in the various metadata fields, which is convenient as it synchronizes the subsetting of statistics and genomic coordinates.
-This object can also be saved to file and reloaded later for direct manipulation in the R environment, e.g., to find overlaps with other regions of interest.
+Alternatively, the \code{GRanges} object can be directly saved to file and reloaded later for direct manipulation in the R environment, e.g., to find overlaps with other regions of interest.
 
 \begin{Schunk}
 \begin{Sinput}
-> output.ranges <- merged$region
-> elementMetadata(output.ranges) <- tabcom
-> saveRDS(output.ranges, "ranges.rds")
+> saveRDS(merged$region, "ranges.rds")
 \end{Sinput}
 \end{Schunk}
 
@@ -2633,7 +2686,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 
 \setkeys{Gin}{width=.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-112}
+\includegraphics{plots-ug/ug-118}
 \end{center}
 
 
@@ -2706,7 +2759,7 @@ These commands are stored in a Bash file, accessible by running:
 > sessionInfo()
 \end{Sinput}
 \begin{Soutput}
-R version 3.3.1 Patched (2016-08-08 r71066)
+R Under development (unstable) (2016-10-20 r71540)
 Platform: x86_64-pc-linux-gnu (64-bit)
 Running under: CentOS release 6.4 (Final)
 
@@ -2723,53 +2776,58 @@ attached base packages:
  [8] datasets  methods   base     
 
 other attached packages:
- [1] Gviz_1.17.7                             
- [2] rtracklayer_1.33.12                     
- [3] org.Mm.eg.db_3.3.0                      
- [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.2.2
- [5] GenomicFeatures_1.25.16                 
- [6] AnnotationDbi_1.35.4                    
- [7] edgeR_3.15.2                            
- [8] limma_3.29.21                           
- [9] csaw_1.7.3                              
-[10] BiocParallel_1.7.8                      
-[11] SummarizedExperiment_1.3.82             
-[12] Biobase_2.33.3                          
-[13] GenomicRanges_1.25.94                   
-[14] GenomeInfoDb_1.9.12                     
-[15] IRanges_2.7.15                          
-[16] S4Vectors_0.11.16                       
-[17] BiocGenerics_0.19.2                     
+ [1] Gviz_1.19.0                             
+ [2] rtracklayer_1.35.1                      
+ [3] org.Mm.eg.db_3.4.0                      
+ [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.0
+ [5] GenomicFeatures_1.27.2                  
+ [6] AnnotationDbi_1.37.0                    
+ [7] edgeR_3.17.2                            
+ [8] limma_3.31.3                            
+ [9] csaw_1.9.1                              
+[10] BiocParallel_1.9.1                      
+[11] SummarizedExperiment_1.5.3              
+[12] Biobase_2.35.0                          
+[13] GenomicRanges_1.27.6                    
+[14] GenomeInfoDb_1.11.4                     
+[15] IRanges_2.9.7                           
+[16] S4Vectors_0.13.2                        
+[17] BiocGenerics_0.21.0                     
 
 loaded via a namespace (and not attached):
- [1] Rcpp_0.12.7                   locfit_1.5-9.1               
- [3] biovizBase_1.21.0             lattice_0.20-34              
- [5] Rsamtools_1.25.2              Biostrings_2.41.4            
- [7] digest_0.6.10                 mime_0.5                     
- [9] R6_2.1.3                      plyr_1.8.4                   
-[11] chron_2.3-47                  acepack_1.3-3.3              
-[13] RSQLite_1.0.0                 BiocInstaller_1.23.9         
-[15] httr_1.2.1                    ggplot2_2.1.0                
-[17] zlibbioc_1.19.0               data.table_1.9.6             
-[19] rpart_4.1-10                  Matrix_1.2-7.1               
-[21] splines_3.3.1                 statmod_1.4.26               
-[23] Rhtslib_1.5.3                 AnnotationHub_2.5.12         
-[25] foreign_0.8-67                RCurl_1.95-4.8               
-[27] biomaRt_2.29.2                munsell_0.4.3                
-[29] shiny_0.14                    httpuv_1.3.3                 
-[31] htmltools_0.3.5               nnet_7.3-12                  
-[33] gridExtra_2.2.1               interactiveDisplayBase_1.11.3
-[35] Hmisc_3.17-4                  matrixStats_0.50.2           
-[37] XML_3.98-1.4                  GenomicAlignments_1.9.6      
-[39] bitops_1.0-6                  xtable_1.8-2                 
-[41] gtable_0.2.0                  DBI_0.5-1                    
-[43] scales_0.4.0                  KernSmooth_2.23-15           
-[45] XVector_0.13.7                latticeExtra_0.6-28          
-[47] Formula_1.2-1                 RColorBrewer_1.1-2           
-[49] ensembldb_1.5.14              tools_3.3.1                  
-[51] dichromat_2.0-0               BSgenome_1.41.2              
-[53] survival_2.39-5               colorspace_1.2-6             
-[55] cluster_2.0.4                 VariantAnnotation_1.19.10    
+ [1] httr_1.2.1                    AnnotationHub_2.7.0          
+ [3] splines_3.4.0                 Formula_1.2-1                
+ [5] shiny_0.14.2                  assertthat_0.1               
+ [7] interactiveDisplayBase_1.13.0 statmod_1.4.26               
+ [9] latticeExtra_0.6-28           BSgenome_1.43.1              
+[11] Rsamtools_1.27.2              RSQLite_1.0.0                
+[13] lattice_0.20-34               biovizBase_1.23.1            
+[15] chron_2.3-47                  digest_0.6.10                
+[17] RColorBrewer_1.1-2            XVector_0.15.0               
+[19] colorspace_1.3-0              htmltools_0.3.5              
+[21] httpuv_1.3.3                  Matrix_1.2-7.1               
+[23] plyr_1.8.4                    XML_3.98-1.5                 
+[25] biomaRt_2.31.1                zlibbioc_1.21.0              
+[27] xtable_1.8-2                  scales_0.4.1                 
+[29] htmlTable_1.7                 tibble_1.2                   
+[31] ggplot2_2.2.0                 nnet_7.3-12                  
+[33] lazyeval_0.2.0                survival_2.40-1              
+[35] magrittr_1.5                  mime_0.5                     
+[37] foreign_0.8-67                BiocInstaller_1.25.2         
+[39] tools_3.4.0                   data.table_1.9.6             
+[41] matrixStats_0.51.0            stringr_1.1.0                
+[43] Rhtslib_1.7.0                 munsell_0.4.3                
+[45] locfit_1.5-9.1                cluster_2.0.5                
+[47] ensembldb_1.99.0              Biostrings_2.43.0            
+[49] RCurl_1.95-4.8                dichromat_2.0-0              
+[51] VariantAnnotation_1.21.2      bitops_1.0-6                 
+[53] gtable_0.2.0                  DBI_0.5-1                    
+[55] R6_2.2.0                      GenomicAlignments_1.11.1     
+[57] gridExtra_2.2.1               knitr_1.15                   
+[59] Hmisc_4.0-0                   ProtGenerics_1.7.0           
+[61] KernSmooth_2.23-15            stringi_1.1.2                
+[63] Rcpp_0.12.7                   rpart_4.1-10                 
+[65] acepack_1.4.1                
 \end{Soutput}
 \end{Schunk}
 
