@@ -1266,7 +1266,7 @@ par(mfrow=c(1,2))
 
 Similar to the normalization factors, the offsets can be stored in the \code{RangedSummarizedExperiment} object containing the counts of interest.
 This is done by adding the offset matrix as an extra entry in the \code{assays} slot.
-Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, thus synchronising data management.
+Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, allowing for synchronised processing.
 The counts of interest should be the same as those used to compute the offsets, given that each offset represents the amount of normalization required for a corresponding count.
 
 <<>>=
@@ -1473,8 +1473,7 @@ DB windows can then be identified by rejecting the null.
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
 
 Once the significance statistics have been calculated, they can be stored in row metadata of the \code{RangedSummarizedExperiment} object.
-This simplifies data management by consolidating relevant information into a single container. 
-In particular, it ensures that the statistics and coordinates are synchronised when, e.g., subsetting to select certain windows.
+This ensures that the statistics and coordinates are processed together, e.g., when subsetting to select certain windows.
 
 <<>>=
 rowData(filtered.data) <- cbind(rowData(filtered.data), results$table)
@@ -1890,9 +1889,10 @@ Recall that the per-window significance statistics were stored in the row metada
 Thus, \code{rowData(filtered.data)} can be used instead of \code{results\$table}.
 The former may be more convenient as it avoids the need to keep track of a separate object.
 
-On a similar note, it is possible to store the results for each region in the metadata of the \code{GRanges}.
+On a similar note, it is possible to store the results for each region in the per-element metadata of the corresponding \code{GRanges} object.
 This synchronises the storage and handling of the statistics and coordinates for each region.
 Thus, data management throughout the rest of the analysis can be simplified.
+This is demonstrated below for \code{tabcom} and \code{tabbroad}.
 
 <<>>=
 mcols(broads) <- tabbroad 
