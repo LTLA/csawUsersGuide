@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 13 November 2016}
+Last revised 11 December 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -1547,7 +1547,7 @@ Spurious trends that might affect normalization will not be introduced at the fi
 
 Similar to the normalization factors, the offsets can be stored in the \code{RangedSummarizedExperiment} object containing the counts of interest.
 This is done by adding the offset matrix as an extra entry in the \code{assays} slot.
-Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, thus synchronising data management.
+Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, allowing for synchronised processing.
 The counts of interest should be the same as those used to compute the offsets, given that each offset represents the amount of normalization required for a corresponding count.
 
 \begin{Schunk}
@@ -1612,9 +1612,9 @@ This author's desire to increase his h-index may also be a factor \citep{chen201
 \subsection{Setting up the data}
 A \code{DGEList} object is first constructed from the count matrix, library sizes and normalization factors.
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
-If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in various \edger{} functions.
-(If this normalization information is already stored in the \code{RangedSummarizedExperiment} object -- see Chapter~\ref{chap:norm} -- it will be automatically extracted and used to construct the \code{DGEList} object.
-Thus, manual specification of \code{norm.factors=} is not strictly necessary in the example below, and is shown here for pedagogical purposes only.
+If an offset matrix was computed, it can be assigned to \code{y} using the \code{scaleOffset} function and will be used instead of normalization factors in various \edger{} functions.
+(If this normalization information was already stored in the \code{RangedSummarizedExperiment} object -- see Chapter~\ref{chap:norm} -- it will automatically be extracted and used to construct the \code{DGEList} object.
+In such cases, manual specification of \code{norm.factors=} is not strictly necessary, but is still shown below for pedagogical purposes.
 See \code{?asDGEList} for details.)
 
 \begin{Schunk}
@@ -1797,8 +1797,7 @@ DB windows can then be identified by rejecting the null.
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
 
 Once the significance statistics have been calculated, they can be stored in row metadata of the \code{RangedSummarizedExperiment} object.
-This simplifies data management by consolidating relevant information into a single container. 
-In particular, it ensures that the statistics and coordinates are synchronised when, e.g., subsetting to select certain windows.
+This ensures that the statistics and coordinates are processed together, e.g., when subsetting to select certain windows.
 
 \begin{Schunk}
 \begin{Sinput}
@@ -2435,9 +2434,10 @@ Recall that the per-window significance statistics were stored in the row metada
 Thus, \code{rowData(filtered.data)} can be used instead of \code{results\$table}.
 The former may be more convenient as it avoids the need to keep track of a separate object.
 
-On a similar note, it is possible to store the results for each region in the metadata of the \code{GRanges}.
+On a similar note, it is possible to store the results for each region in the per-element metadata of the corresponding \code{GRanges} object.
 This synchronises the storage and handling of the statistics and coordinates for each region.
 Thus, data management throughout the rest of the analysis can be simplified.
+This is demonstrated below for \code{tabcom} and \code{tabbroad}.
 
 \begin{Schunk}
 \begin{Sinput}
@@ -2686,7 +2686,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 
 \setkeys{Gin}{width=.8\textwidth}
 \begin{center}
-\includegraphics{plots-ug/ug-118}
+\includegraphics{plots-ug/ug-117}
 \end{center}
 
 
@@ -2776,58 +2776,59 @@ attached base packages:
  [8] datasets  methods   base     
 
 other attached packages:
- [1] Gviz_1.19.0                             
+ [1] Gviz_1.19.2                             
  [2] rtracklayer_1.35.1                      
  [3] org.Mm.eg.db_3.4.0                      
  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.0
- [5] GenomicFeatures_1.27.2                  
+ [5] GenomicFeatures_1.27.4                  
  [6] AnnotationDbi_1.37.0                    
- [7] edgeR_3.17.2                            
- [8] limma_3.31.3                            
- [9] csaw_1.9.1                              
-[10] BiocParallel_1.9.1                      
+ [7] edgeR_3.17.5                            
+ [8] limma_3.31.6                            
+ [9] csaw_1.9.2                              
+[10] BiocParallel_1.9.2                      
 [11] SummarizedExperiment_1.5.3              
 [12] Biobase_2.35.0                          
-[13] GenomicRanges_1.27.6                    
-[14] GenomeInfoDb_1.11.4                     
-[15] IRanges_2.9.7                           
-[16] S4Vectors_0.13.2                        
-[17] BiocGenerics_0.21.0                     
+[13] GenomicRanges_1.27.16                   
+[14] GenomeInfoDb_1.11.6                     
+[15] IRanges_2.9.14                          
+[16] S4Vectors_0.13.5                        
+[17] BiocGenerics_0.21.1                     
 
 loaded via a namespace (and not attached):
- [1] httr_1.2.1                    AnnotationHub_2.7.0          
+ [1] httr_1.2.1                    AnnotationHub_2.7.8          
  [3] splines_3.4.0                 Formula_1.2-1                
  [5] shiny_0.14.2                  assertthat_0.1               
- [7] interactiveDisplayBase_1.13.0 statmod_1.4.26               
+ [7] interactiveDisplayBase_1.13.0 statmod_1.4.27               
  [9] latticeExtra_0.6-28           BSgenome_1.43.1              
-[11] Rsamtools_1.27.2              RSQLite_1.0.0                
-[13] lattice_0.20-34               biovizBase_1.23.1            
-[15] chron_2.3-47                  digest_0.6.10                
+[11] Rsamtools_1.27.8              yaml_2.1.14                  
+[13] RSQLite_1.1-1                 lattice_0.20-34              
+[15] biovizBase_1.23.2             digest_0.6.10                
 [17] RColorBrewer_1.1-2            XVector_0.15.0               
-[19] colorspace_1.3-0              htmltools_0.3.5              
-[21] httpuv_1.3.3                  Matrix_1.2-7.1               
+[19] colorspace_1.3-1              httpuv_1.3.3                 
+[21] htmltools_0.3.5               Matrix_1.2-7.1               
 [23] plyr_1.8.4                    XML_3.98-1.5                 
-[25] biomaRt_2.31.1                zlibbioc_1.21.0              
+[25] biomaRt_2.31.3                zlibbioc_1.21.0              
 [27] xtable_1.8-2                  scales_0.4.1                 
 [29] htmlTable_1.7                 tibble_1.2                   
-[31] ggplot2_2.2.0                 nnet_7.3-12                  
-[33] lazyeval_0.2.0                survival_2.40-1              
-[35] magrittr_1.5                  mime_0.5                     
-[37] foreign_0.8-67                BiocInstaller_1.25.2         
-[39] tools_3.4.0                   data.table_1.9.6             
-[41] matrixStats_0.51.0            stringr_1.1.0                
-[43] Rhtslib_1.7.0                 munsell_0.4.3                
-[45] locfit_1.5-9.1                cluster_2.0.5                
-[47] ensembldb_1.99.0              Biostrings_2.43.0            
-[49] RCurl_1.95-4.8                dichromat_2.0-0              
-[51] VariantAnnotation_1.21.2      bitops_1.0-6                 
-[53] gtable_0.2.0                  DBI_0.5-1                    
-[55] R6_2.2.0                      GenomicAlignments_1.11.1     
-[57] gridExtra_2.2.1               knitr_1.15                   
-[59] Hmisc_4.0-0                   ProtGenerics_1.7.0           
-[61] KernSmooth_2.23-15            stringi_1.1.2                
-[63] Rcpp_0.12.7                   rpart_4.1-10                 
-[65] acepack_1.4.1                
+[31] openssl_0.9.5                 ggplot2_2.2.0                
+[33] nnet_7.3-12                   lazyeval_0.2.0               
+[35] mime_0.5                      survival_2.40-1              
+[37] magrittr_1.5                  memoise_1.0.0                
+[39] foreign_0.8-67                BiocInstaller_1.25.2         
+[41] tools_3.4.0                   data.table_1.10.0            
+[43] matrixStats_0.51.0            stringr_1.1.0                
+[45] Rhtslib_1.7.0                 munsell_0.4.3                
+[47] locfit_1.5-9.1                cluster_2.0.5                
+[49] ensembldb_1.99.8              Biostrings_2.43.1            
+[51] base64_2.0                    RCurl_1.95-4.8               
+[53] dichromat_2.0-0               VariantAnnotation_1.21.11    
+[55] bitops_1.0-6                  gtable_0.2.0                 
+[57] DBI_0.5-1                     R6_2.2.0                     
+[59] GenomicAlignments_1.11.6      gridExtra_2.2.1              
+[61] knitr_1.15.1                  Hmisc_4.0-1                  
+[63] ProtGenerics_1.7.0            KernSmooth_2.23-15           
+[65] stringi_1.1.2                 Rcpp_0.12.8                  
+[67] rpart_4.1-10                  acepack_1.4.1                
 \end{Soutput}
 \end{Schunk}
 
