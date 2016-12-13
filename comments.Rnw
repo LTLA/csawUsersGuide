@@ -688,6 +688,12 @@ If you pick a set based on the FDR, the selection of one region becomes dependen
 This might be annoying if you're trying to use a stable pre-set threshold for ease of interpretation.
 High FDR thresholds might also start to run into problems with monotonicity, where filter resolution is lost.
 
+Furthermore, the use of a constant threshold for the p-value focuses on control of type I error and elimination of uninteresting features. 
+This is fair enough but you're not controlling for the type II error rate, i.e., retention of interesting features.
+For example, if the variability under the null is high, then all features will have large p-values and nothing will be retained.
+Applying a constant threshold on the enrichment ensures retention of interesting features (with sufficient enrichment), no matter what the variability may be.
+This is more generally applicable to different experiments and systems where the null model may change in its variability.
+
 Another problem is that you're requiring rejection at a standard FDR of 5\% in order to get into the retained set.
 This may be too conservative for preliminary selection, where windows that cannot reject here might have a lot of evidence for DB.
 In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20\%), which gets us back to the problem of arbitrariness.
