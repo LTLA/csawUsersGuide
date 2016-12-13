@@ -723,6 +723,8 @@ For example, a log-enrichment of 2 suggests that you can get, at most, a DB fold
 Using a NB model seems better but that assumes you can get a sensible dispersion estimate without biasing edgeR's inferences.
 In both cases, the filter outcome is dependent on sequencing depth, as the NB model will eventually reject all locations if the counts are large enough.
 Using an enrichment threshold (or \code{treat}) is more stable with respect to depth, and possibly gives more relevant regions by focusing on large enrichments.
+For example, we could avoid detecting DB due to changes in chromatin state, as most of these shouldn't have strong enrichment above background (unless you do DNase/ATAC-seq).
+At the same time, we preserve power for enriched regions by removing unnecessary and uninteresting tests.
 \end{itemize}
 
 % Using a local estimate of background will also result in correlations between the window count and the background.
