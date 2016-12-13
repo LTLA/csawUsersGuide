@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 29 August 2016}
+Last revised 11 December 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -966,9 +966,9 @@ gc()
 \chapter{Calculating normalization factors}
 \label{chap:norm}
 \begin{combox}
-This chapter will need the \code{bam.files} vector again (from the introduction). 
-We'll also need the \code{param} object that we defined in Chapter~\ref{chap:count}.
-You'll notice that that a number of other BAM files are used in this chapter. 
+This chapter will need to use the \code{bam.files} vector again (from the introduction). 
+We'll also need the \code{param} object that we defined in Chapter~\ref{chap:count}, as well as the \code{filtered.data} object that we constructed in Chapter~\ref{chap:filter}.
+You'll notice that character vectors containing paths to other BAM files are defined throughout this chapter. 
 However, these are only present for demonstration purposes and aren't necessary for the main NF-YA example.
 \end{combox}
 
@@ -1153,7 +1153,7 @@ for (main in c("H3K4me3", "H3ac")) {
 @
 \end{center}
 
-\subsection{Choosing between normalization strategies}
+\section{Choosing between normalization strategies}
 The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of factors will ultimately be used.
 The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
 If so, composition bias should be removed to preserve the assumed DB.
@@ -1165,6 +1165,15 @@ Thus, normalization factors will be computed to remove composition biases.
 This ensures that any genuine systematic changes in binding will still be picked up.
 In general, normalization for composition bias is a good starting point for any analysis.
 This can be considered as the ``default'' unless there is evidence for a confounding efficiency bias.
+
+Once chosen, the appropriate normalization factors can be stored inside the relevant \code{RangedSummarizedExperiment} object.
+This ensures that they are attached to the counts on which they should be used, simplifying data management in complex analyses.
+Here, the normalization factors are stored alongside the \textit{window} counts, despite being computed from the binned counts.
+This is because the former is of interest in the actual DB analysis.
+
+<<>>=
+filtered.data$norm.factors <- normfacs
+@
 
 \section{Scaling normalization with spike-in chromatin}
 Several studies have used spike-in chromatin for scaling normalization of ChIP-seq data \citep{bonhoure2014quantifying,orlando2014quantitative}.
@@ -1257,6 +1266,15 @@ par(mfrow=c(1,2))
 @
 \end{center}
 
+Similar to the normalization factors, the offsets can be stored in the \code{RangedSummarizedExperiment} object containing the counts of interest.
+This is done by adding the offset matrix as an extra entry in the \code{assays} slot.
+Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, allowing for synchronised processing.
+The counts of interest should be the same as those used to compute the offsets, given that each offset represents the amount of normalization required for a corresponding count.
+
+<<>>=
+assays(ac.demo2)$offset <- ac.off
+@
+
 Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
 This is a stronger assumption than that for scaling methods, which only require a non-DB majority across all features.
 Removal of the trend may not be appropriate if it represents some genuine biological phenomenon, e.g., involving changes in overall binding. 
@@ -1295,8 +1313,8 @@ gc()
 \label{chap:stats}
 
 \begin{combox}
-Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter} along with the original \code{data} from Chapter~\ref{chap:count}.
-We'll also use the \code{normfacs} vector from Chapter~\ref{chap:norm}, as well as the \code{design} matrix from the introduction. 
+Here, we'll need the \code{filtered.data} from Chapter~\ref{chap:filter}, the \code{normfacs} vector from Chapter~\ref{chap:norm}, and the \code{design} matrix from the introduction. 
+We'll also need the original \code{data} from Chapter~\ref{chap:count}, but just for a demonstration.
 Finally, we'll be executing a number of \edger{} functions, so make sure the \edger{} package is loaded if you've been skipping chapters.
 \end{combox}
 
@@ -1315,11 +1333,12 @@ The choice of \edger{} is primarily motivated by its performance relative to som
 This author's desire to increase his h-index may also be a factor \citep{chen2014}.
 
 \subsection{Setting up the data}
-A \code{DGEList} object is first formed from the count matrix, library sizes and normalization factors.
+A \code{DGEList} object is first constructed from the count matrix, library sizes and normalization factors.
 Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
-If an offset matrix was computed, it can be assigned to \code{y\$offset}, in which case it will be used in favour of normalization factors in various \edger{} functions.
-(Alternatively, users can store normalization information in special fields of the \code{RangedSummarizedExperiment} object, which simplifies data management.
-If present, this information will automatically be used when constructing the \code{DGEList} object -- see \code{?asDGEList} for details.)
+If an offset matrix was computed, it can be assigned to \code{y} using the \code{scaleOffset} function and will be used instead of normalization factors in various \edger{} functions.
+(If this normalization information was already stored in the \code{RangedSummarizedExperiment} object -- see Chapter~\ref{chap:norm} -- it will automatically be extracted and used to construct the \code{DGEList} object.
+In such cases, manual specification of \code{norm.factors=} is not strictly necessary, but is still shown below for pedagogical purposes.
+See \code{?asDGEList} for details.)
 
 <<>>=
 y <- asDGEList(filtered.data, norm.factors=normfacs)
@@ -1455,6 +1474,13 @@ In this case, a contrast of \code{c(0, 1)} defines the null hypothesis as \code{
 DB windows can then be identified by rejecting the null. 
 Specification of the contrast is explained in greater depth in the \edger{} user's manual. 
 
+Once the significance statistics have been calculated, they can be stored in row metadata of the \code{RangedSummarizedExperiment} object.
+This ensures that the statistics and coordinates are processed together, e.g., when subsetting to select certain windows.
+
+<<>>=
+rowData(filtered.data) <- cbind(rowData(filtered.data), results$table)
+@
+
 \section{What to do without replicates}
 Designing a ChIP-seq experiment without any replicates is strongly discouraged.
 Without replication, the reproducibility of any findings cannot be determined. 
@@ -1518,9 +1544,8 @@ gc()
 
 \begin{combox}
 All right, we're almost there. 
-This chapter needs the \code{results} object from the last chapter.
-We also need a bunch of things from Chapter~\ref{chap:filter} - namely, the \code{filtered.data} list, the \code{broads} object and the \code{keep.simple} and \code{maxed} vectors.
-Finally, we'll need \code{ac.files} and \code{param} from Chapters~\ref{chap:norm} and \ref{chap:count}, respectively, for a little demonstration.
+This chapter needs the \code{results} object from the last chapter, as well as \code{filtered.data} from Chapter~\ref{chap:filter}.
+A few other things are also required for some of the optional sections below -- namely, \code{broads} and the \code{keep.simple} and \code{maxed} vectors from Chapter~\ref{chap:filter}, and \code{ac.files} and \code{param} from Chapters~\ref{chap:norm} and \ref{chap:count}, respectively.
 \end{combox}
 
 \section{Problems with false discovery rate control}
@@ -1860,6 +1885,22 @@ This reduces the pressure on abundance filtering to obtain well-separated region
 That said, users should be aware that calculation of the cluster-level FDR is not entirely rigorous.
 As such, independent clustering and FDR control via Simes' method should be considered as the default for routine analyses.
 
+\section{Further points on data management}
+Technically, \code{results\$table} was not required in any of the calls performed in this chapter.
+Recall that the per-window significance statistics were stored in the row metadata of \code{filtered.data}.
+Thus, \code{rowData(filtered.data)} can be used instead of \code{results\$table}.
+The former may be more convenient as it avoids the need to keep track of a separate object.
+
+On a similar note, it is possible to store the results for each region in the per-element metadata of the corresponding \code{GRanges} object.
+This synchronises the storage and handling of the statistics and coordinates for each region.
+Thus, data management throughout the rest of the analysis can be simplified.
+This is demonstrated below for \code{tabcom} and \code{tabbroad}.
+
+<<>>=
+mcols(broads) <- tabbroad 
+mcols(merged$region) <- tabcom
+@
+
 <<echo=FALSE,results=hide>>=
 rm(ac.small, ac.large, refilt.data)
 gc()
@@ -1873,9 +1914,8 @@ gc()
 
 \begin{combox}
 This is where we bring it all together.
-We'll need the \code{merged} list and the \code{tabcom} table from the previous chapter. 
-Oh, and the \code{org.Mm.eg.db} object that we loaded in Chapter~\ref{chap:filter}.
-There's a bit about visualization at the end where we need the \code{data} and \code{param} objects from Chapter~\ref{chap:count}, along with the \code{bam.files} that we started off with.
+We'll need the \code{merged} list from the previous chapter -- oh, and the \code{org.Mm.eg.db} object that we loaded in Chapter~\ref{chap:filter}.
+There's a bit about visualization at the end where we need the \code{data} and \code{param} objects from Chapter~\ref{chap:count}, along with the original \code{bam.files} that we started with in the introduction.
 \end{combox}
 
 \section{Adding gene-based annotation}
@@ -1898,6 +1938,13 @@ Each pattern contains \code{GENE|EXONS|STRAND} to describe the strand and overla
 Promoters are labelled as exon \code{0} whereas introns are labelled as \code{I}. 
 For \code{left} and \code{right}, an additional \code{[DISTANCE]} field is included.
 This indicates the gap between the annotated feature and the supplied region.
+All of this annotation can be stored in the metadata of the \code{GRanges} object for later use.
+
+<<>>=
+merged$region$overlap <- anno$overlap
+merged$region$left <- anno$left
+merged$region$right <- anno$right
+@
 
 While the string representation saves space in the output, it is not easy to work with.
 If the annotation needs to manipulated directly, users can obtain it from the \code{detailRanges} command by not specifying the regions of interest. 
@@ -1938,9 +1985,9 @@ This is done here in the \code{*.tsv} format where all detail is preserved.
 Compression is used to reduce the file size. 
 
 <<>>=
-ofile <- gzfile("clusters.gz", open="w")
-write.table(data.frame(as.data.frame(merged$region)[,1:3], tabcom, anno), 
-    file=ofile, row.names=FALSE, quote=FALSE, sep="\t")
+ofile <- gzfile("clusters.tsv.gz", open="w")
+write.table(as.data.frame(merged$region), file=ofile, 
+    row.names=FALSE, quote=FALSE, sep="\t")
 close(ofile)
 @
 
@@ -1949,23 +1996,19 @@ For example, significantly DB regions can be exported to BED files through the \
 A transformed FDR is used here for the score field.
 
 <<>>=
-is.sig <- tabcom$FDR <= 0.05
+is.sig <- merged$region$FDR <= 0.05
 require(rtracklayer)
 test <- merged$region[is.sig]
-test$score <- -10*log10(tabcom$FDR[is.sig])
+test$score <- -10*log10(merged$region$FDR[is.sig])
 names(test) <- paste0("region", 1:sum(is.sig))
 export(test, "clusters.bed")
 head(read.table("clusters.bed"))
 @
 
-Another useful format is to store the results as a \code{GRanges} object.
-Statistics are stored in the various metadata fields, which is convenient as it synchronizes the subsetting of statistics and genomic coordinates.
-This object can also be saved to file and reloaded later for direct manipulation in the R environment, e.g., to find overlaps with other regions of interest.
+Alternatively, the \code{GRanges} object can be directly saved to file and reloaded later for direct manipulation in the R environment, e.g., to find overlaps with other regions of interest.
 
 <<>>=
-output.ranges <- merged$region
-elementMetadata(output.ranges) <- tabcom
-saveRDS(output.ranges, "ranges.rds")
+saveRDS(merged$region, "ranges.rds")
 @
 
 \section{Simple visualization of genomic coverage}
