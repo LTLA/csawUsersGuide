@@ -696,36 +696,34 @@ Windows with low adjusted $p$-values can then be selected to obtain a set of pot
 While this can be done in \pkgname{}, the philosophy of the background-based filters in \code{filterWindows} is to use the log-fold increase of each window relative to the background.
 This is easier to compute, and the threshold is easier to pick and interpret for users.
 
-In more detail; there's problems with computing the p-values and correcting for multiple tests, but we'll ignore those for now.
-Consider the purest case, where you determine significance based on the enrichment values (use a constant variance, so same selection order).
+\begin{itemize}
+\item Consider the purest case, where you determine significance based on the enrichment values (use a constant variance, so same selection order).
 If you pick a set based on the FDR, the selection of one region becomes dependent on how many other regions have higher enrichments.
 This might be annoying if you're trying to use a stable pre-set threshold for ease of interpretation.
 High FDR thresholds might also start to run into problems with monotonicity, where filter resolution is lost.
 
-Furthermore, the use of a constant threshold for the p-value focuses on control of type I error and elimination of uninteresting features. 
+\item The use of a constant threshold for the p-value focuses on control of type I error and elimination of uninteresting features. 
 This is fair enough but you're not controlling for the type II error rate, i.e., retention of interesting features.
 For example, if the variability under the null is high, then all features will have large p-values and nothing will be retained.
 Applying a constant threshold on the enrichment ensures retention of interesting features (with sufficient enrichment), no matter what the variability may be.
 This is more generally applicable to different experiments and systems where the null model may change in its variability.
+The test statistic is only more stable if effect size is positively correlated with the null variability, and it's hard to see how that would happen.
 
-Another problem is that you're requiring rejection at a standard FDR of 5\% in order to get into the retained set.
+\item Another problem is that you're requiring rejection at a standard FDR of 5\% in order to get into the retained set.
 This may be too conservative for preliminary selection, where windows that cannot reject here might have a lot of evidence for DB.
 In the end, you might end up having to fiddle with non-conventional FDR thresholds (e.g., 10-20\%), which gets us back to the problem of arbitrariness.
 Remember that the aim of filtering is not to do rigorous peak-calling, but to trim down the total number in order to detect DB regions.
 
-In short, you might get a FDR for your filter, but that doesn't have any effect on FDR control for differential binding.
+\item Getting a FDR for your filter doesn't have any effect on FDR control for differential binding.
 It will affect power, but not in a way that's easy to interpret, because it depends on how many true and false positives (re. DB, not absolute calling) were retained.
-Conversely, having a minimum log-fold change tells us a bit about the maximum scope of DB change (assuming that background is non-DB).
-For example, a log-fold change of 2 suggests that you can get, at most, a DB fold change of 2 for your regions that scrape past the filter.
+Conversely, having a minimum log-enrichment tells us a bit about the maximum scope of DB change (assuming that background is non-DB).
+For example, a log-enrichment of 2 suggests that you can get, at most, a DB fold change of 2 for your regions that scrape past the filter.
 
-In terms of rankings, the $p$-value from Poisson- or NB-based models will favour high counts.
-This means that high-abundance sites with low relative enrichments would be retained over lower abundance counterparts.
-This is opposed to the log-fold change, for which the expected value does not change with count size (prior count issues notwithstanding).
-As in \code{treat}, the magnitude of the enrichment over background is more important than the significance of a non-zero enrichment (\code{treat} itself would be a compromise between the two).
-The $p$-value might be more sensible at low counts, but that's what the prior count is for.
-A related consideration is that the $p$-value will eventually detect all non-background regions with increasing library size.
-This seems great but, again, it does not regard the magnitude of enrichment. 
-The log-fold change threshold is more stable to the sequencing depth, especially if the model is wrong.
+\item Most analyses use a Poisson model with lambda set to the background coverage, but how do you model variability between replicates, or variability between genomic regions?
+Using a NB model seems better but that assumes you can get a sensible dispersion estimate without biasing edgeR's inferences.
+In both cases, the filter outcome is dependent on sequencing depth, as the NB model will eventually reject all locations if the counts are large enough.
+Using an enrichment threshold (or \code{treat}) is more stable with respect to depth, and possibly gives more relevant regions by focusing on large enrichments.
+\end{itemize}
 
 % Using a local estimate of background will also result in correlations between the window count and the background.
 % This will likely result in sub-Poisson variation and conservative p-values. 
