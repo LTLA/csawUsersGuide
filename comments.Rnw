@@ -631,6 +631,14 @@ This is fine for histone marks that tend to be uibiquitous across species, but i
 
 \subsection*{Comments on filtering}
 
+\subsubsection*{Further on the motivation for filtering}
+
+The main argument for filtering - that low-abundance windows don't have enough power for DB - is true to a point, but not near the thresholds used in actual analyses.
+You'll still be able reject the null for windows with consistently low counts in one group and zeroes in the other group.
+The real motivations include the need to avoid discreteness (and other oddities at low counts) during mean-variance modelling, where discreteness can inflate the prior d.f.;
+    avoiding discreteness during normalization, which relies on some level of smoothness in the M-values;
+    and removing windows that are unlikely (for biological/experimental reasons) to reject the null hypothesis, or are uninteresting when they do so, e.g., background regions.
+
 \subsubsection*{Circular dependencies between normalization and filtering}
 The NB mean depends on the effective library size, so filtering for efficiency bias becomes a bit circular.
 However, it shouldn't be too bad, as the normalization procedure isn't so sensitive to irregularities at the filter boundary.
