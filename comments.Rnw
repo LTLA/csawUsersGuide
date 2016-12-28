@@ -40,6 +40,8 @@ require(edgeR)
 
 \subsection*{General comments on DB}
 
+\subsection*{Motivation for DB}
+
 Looking for DB is more relevant, as you get changes in binding that you can associate with differences in biology (so you can start poking around at mechanisms). 
 It's also easier than looking for absolute binding, as the null hypothesis is well defined.
 You don't need to construct a background model, as you would do in single-sample peak calling.
@@ -101,6 +103,7 @@ Of course, if there are likely to be extreme changes, then control correction ma
 Subtraction may be okay if there aren't a lot of regions with high control coverage, as the other high-abundance regions will buffer any damage to the variance and EB statistics (though, if those regions are rare, then there mightn't be much point in correcting anyway; you might also get more false positives if variance inflation is prevented).
 
 \subsubsection*{Justifying the \textit{de novo} focus}
+
 With a new data set, it's generally a good strategy to do a \textit{de novo} analysis.
 If most of the peaks occur around the TSS or genes, then you can switch to an approach using pre-defined regions. 
 Otherwise, you'd be throwing out a lot of information. 
@@ -159,7 +162,7 @@ The idea is determine whether a DB region is likely to be a genuine TF binding s
 However, one counter-argument is that you could get a large region containing a bimodal site that is distinct from the DB subinterval.
 In such cases, the best approach would be to reduce the clustering tolerance so that such sites are separated out.
 Otherwise, we'd have to filter directly on bimodality at the window level, which I don't want to do.
-\item Watch out for large peaks, because even in TF data, the subpeaks tend to spread such that you end up with little bimodality.
+\item Watch out for large peaks, because even in TF data, the strand-specific subpeaks tend to spread such that you end up with little bimodality.
 The same applies for situations with many adjacent binding events, such that you end up with a histone-like broad peak.
 \end{itemize}
 
@@ -214,6 +217,10 @@ Using a suboptimal value might reduce power but it shouldn't change the rankings
 You could also get methods designed to create regions based on differences in density.
 But, the magnitude of the difference required for the creation of a new region is going to be arbitrary.
 A slow decline in density from high to low won't get picked up if you're looking for big differences.
+MACS2 does try to identify subpeaks in large binding regions.
+However, for interpretation, you'll want to report the entire region, and to do that you'll have to combine the subpeak statistics anyway, e.g., with \code{combineTests}.
+In addition, the behaviour of the subpeak identification algorithm behaves may not have predictable properties regarding resolution and count size.
+We might as well make our lives simpler and use windows directly.
 
 % One might propose to call peaks in each condition, and then do a setdiff on the genomic intervals between conditions.
 % This would get the unique (and shared) subintervals, which you could then count over.
@@ -321,7 +328,7 @@ If this is true, you could just use the estimated fragment length without any wi
 
 \subsubsection*{Variable fragment lengths}
 
-There's no satisfactory way of dealing with differences in the subpeak widths.
+There's no satisfactory way of dealing with differences in the strand-specific subpeak widths.
 You'll need to shrink wide subpeaks towards the center of the subpeak.
 This requires knowledge of where the read is in the subpeak, which is difficult to say without an explicit model.
 Fortunately, I don't think is a major issue.
@@ -635,6 +642,7 @@ This is fine for histone marks that tend to be uibiquitous across species, but i
 
 The main argument for filtering - that low-abundance windows don't have enough power for DB - is true to a point, but not near the thresholds used in actual analyses.
 You'll still be able reject the null for windows with consistently low counts in one group and zeroes in the other group.
+Even accounting for the fact that the trended NB dispersion is very high at low counts, you can get low p-values if the sample size is large enough.
 The real motivations include the need to avoid discreteness (and other oddities at low counts) during mean-variance modelling, where discreteness can inflate the prior d.f.;
     avoiding discreteness during normalization, which relies on some level of smoothness in the M-values;
     and removing windows that are unlikely (for biological/experimental reasons) to reject the null hypothesis, or are uninteresting when they do so, e.g., background regions.
