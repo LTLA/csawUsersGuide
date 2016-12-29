@@ -351,6 +351,47 @@ However, I think this pre-processing is beyond the scope of csaw's responsibilit
 Alignment and read quality control is done before entry into csaw, so I'd like to avoid mission creep.
 Besides, pure duplicate stacks (i.e., not driven by repeats) are only really problematic in cases where you don't have biological replicates.
 
+\subsubsection*{What to do about duplicate reads}
+
+For single-end data, duplicate reads should not be removed.
+Consider a binding site of width 400 bp, comprised of two Beta(2, 2) subpeaks on either strand of size 200 bp.
+The maximum depth on each subpeak can be simulated below, where we quickly deviate from the unity line if we remove duplicates.
+Decently sized peaks (counts over 200) will already get a 2-fold decrease in coverage, which is hardly satisfactory.
+
+<<>>=
+depth <- 0:40*10
+collected <- list()
+for (i in seq_along(depth)) { 
+    collected[[i]] <- length(table(round(200*rbeta(depth[i], 2, 2)))) 
+}
+plot(depth, unlist(collected))
+abline(0, 1, col="red")
+@
+
+For paired-end data, the problem is much reduced.
+In the case of the binding site above, you need to have exact overlaps on both ends of the pair.
+Deviations are largely negligible, even at very deep coverage (4000 counts, which rarely occurs even at the strongest binding sites).
+Thus, duplicate removal is probably safe here.
+
+<<>>=
+depth <- 0:40*100
+collected <- list()
+for (i in seq_along(depth)) { 
+    end1 <- round(200*rbeta(depth[i], 2, 2))
+    end2 <- round(200*rbeta(depth[i], 2, 2))
+    collected[[i]] <- length(table(sprintf("%i.%i", end1, end2))) 
+}
+plot(depth, unlist(collected))
+abline(0, 1, col="red")
+@
+
+For most analyses, we are protected against duplicates because they should occur randomly between replicates. 
+This inflates the dispersion and ensures that such regions don't get spuriously detected as DB, especially when robust QL methods are used.
+However, there are two caveats to this.
+The first is that such regions get reduced power because we throw them away rather than attempt to salvage them.
+The second is that the protection of the NB model only works for low-ish duplicate rates where stacks are small/rare.
+If large read stacks are present in the same region for all libraries of a group, it \textit{will} get detected as DB.
+
 \subsubsection*{Dealing with huge data sets}
 
 Read depth isn't much of an issue, because everything gets counted into the same windows.
