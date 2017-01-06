@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 11 December 2016}
+Last revised 29 December 2016}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -346,15 +346,10 @@ Removal of these reads is highly recommended as it will ensure that only the rel
 The exact value of the threshold depends on the range of scores provided by the aligner. 
 The \subread{} program \citep{liao2013} was used to align the reads in this dataset, so a value of 50 might be appropriate.
 
-Reads marked as PCR duplicates in the SAM flag can be ignored by setting \code{dedup=TRUE}. 
-This can reduce the variability caused by inconsistent amplification between replicates, and avoid spurious duplicate-driven DB between groups. 
-However, it also caps the number of reads at each position. 
-This can lead to loss of DB detection power in high abundance regions. 
-Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size. 
-Thus, duplicate removal is not recommended for routine DB analyses. 
-Of course, it may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
-An example of counting with duplicate removal is shown below.
-Comparison to \code{data\$totals} indicates that fewer reads are used from each library.
+Reads mapping to the same genomic position can be marked as putative PCR duplicates using software like Picard's \code{MarkDuplicates} program.
+Marked reads in the BAM file can be ignored during counting by setting \code{dedup=TRUE} in the \code{readParam} object. 
+This reduces the variability caused by inconsistent amplification between replicates, and avoid spurious duplicate-driven DB between groups. 
+An example of counting with duplicate removal is shown below, where fewer reads are used from each library relative to \code{data\$totals}.
 
 \begin{Schunk}
 \begin{Sinput}
@@ -366,6 +361,13 @@ Comparison to \code{data\$totals} indicates that fewer reads are used from each 
 [1] 13925800 13826445 16342981 18905912
 \end{Soutput}
 \end{Schunk}
+
+Duplicate removal is generally not recommended for routine DB analyses. 
+This is because it caps the number of reads at each position, reducing DB detection power in high-abundance regions. 
+Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size. 
+However, it may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
+Duplicate removal is also safer with paired-end data, where the probability of accidentally obtaining exact overlaps for both reads of a pair is greatly reduced 
+(assuming that a pair-aware method was used during marking).
 
 \subsection{Avoiding problematic genomic regions}
 Read extraction and counting can be restricted to particular chromosomes by specifying the names of the chromosomes of interest in \code{restrict}. 
@@ -886,7 +888,7 @@ Each approach yields a logical vector that can be used in the same way as \code{
 
 \section{By count size}
 The simplest approach is to simply filter according to the count size.
-This removes windows for which the counts are simply too low to provide strong evidence for DB.
+This removes windows for which the counts are simply too low for modelling and hypothesis testing.
 The code below retains windows with (library size-adjusted) average counts greater than 5. 
 
 \begin{Schunk}
@@ -929,7 +931,7 @@ Using an inappropriate percentage of binding sites will result in the loss of po
 \section{By global enrichment}
 \label{sec:global_filter}
 An alternative approach involves choosing a filter threshold based on the fold change over the level of non-specific enrichment.
-The degree of background enrichment can be estimated by counting reads into large bins across the genome.
+The degree of background enrichment is estimated by counting reads into large bins across the genome.
 Binning is necessary here to increase the size of the counts when examining low-density background regions. 
 This ensures that precision is maintained when estimating the background abundance.
 
@@ -940,13 +942,15 @@ This ensures that precision is maintained when estimating the background abundan
 \end{Sinput}
 \end{Schunk}
 
-The median of the average abundances across all bins can be computed and used as a global estimate of the background coverage.
-This global background can then be compared to the window-based abundances.
+The median of the average abundances across all bins is computed and used as a global estimate of the background coverage.
+This global background is then compared to the window-based abundances.
+This determines whether a window is driven by background enrichment, and thus, unlikely to be interesting.
 However, some care is required as the sizes of the regions used for read counting are different between bins and windows.
 The average abundance of each bin must be scaled down to be comparable to those of the windows.
 
 With \code{type="global"}, the \code{filterWindows} function returns the increase in the abundance of each window over the global background.
-Windows can be filtered by setting some minimum threshold on this increase.
+Windows are filtered by setting some minimum threshold on this increase.
+The aim is to eliminate the majority of uninteresting windows prior to further analysis.
 Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
@@ -2780,55 +2784,56 @@ other attached packages:
  [2] rtracklayer_1.35.1                      
  [3] org.Mm.eg.db_3.4.0                      
  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.0
- [5] GenomicFeatures_1.27.4                  
+ [5] GenomicFeatures_1.27.6                  
  [6] AnnotationDbi_1.37.0                    
  [7] edgeR_3.17.5                            
- [8] limma_3.31.6                            
- [9] csaw_1.9.2                              
-[10] BiocParallel_1.9.2                      
+ [8] limma_3.31.7                            
+ [9] csaw_1.9.3                              
+[10] BiocParallel_1.9.4                      
 [11] SummarizedExperiment_1.5.3              
 [12] Biobase_2.35.0                          
-[13] GenomicRanges_1.27.16                   
+[13] GenomicRanges_1.27.18                   
 [14] GenomeInfoDb_1.11.6                     
 [15] IRanges_2.9.14                          
 [16] S4Vectors_0.13.5                        
 [17] BiocGenerics_0.21.1                     
 
 loaded via a namespace (and not attached):
- [1] httr_1.2.1                    AnnotationHub_2.7.8          
- [3] splines_3.4.0                 Formula_1.2-1                
- [5] shiny_0.14.2                  assertthat_0.1               
+ [1] httr_1.2.1                    AnnotationHub_2.7.9          
+ [3] splines_3.4.0                 shiny_0.14.2                 
+ [5] Formula_1.2-1                 assertthat_0.1               
  [7] interactiveDisplayBase_1.13.0 statmod_1.4.27               
  [9] latticeExtra_0.6-28           BSgenome_1.43.1              
-[11] Rsamtools_1.27.8              yaml_2.1.14                  
-[13] RSQLite_1.1-1                 lattice_0.20-34              
-[15] biovizBase_1.23.2             digest_0.6.10                
-[17] RColorBrewer_1.1-2            XVector_0.15.0               
-[19] colorspace_1.3-1              httpuv_1.3.3                 
-[21] htmltools_0.3.5               Matrix_1.2-7.1               
-[23] plyr_1.8.4                    XML_3.98-1.5                 
-[25] biomaRt_2.31.3                zlibbioc_1.21.0              
-[27] xtable_1.8-2                  scales_0.4.1                 
-[29] htmlTable_1.7                 tibble_1.2                   
-[31] openssl_0.9.5                 ggplot2_2.2.0                
-[33] nnet_7.3-12                   lazyeval_0.2.0               
-[35] mime_0.5                      survival_2.40-1              
-[37] magrittr_1.5                  memoise_1.0.0                
-[39] foreign_0.8-67                BiocInstaller_1.25.2         
-[41] tools_3.4.0                   data.table_1.10.0            
-[43] matrixStats_0.51.0            stringr_1.1.0                
-[45] Rhtslib_1.7.0                 munsell_0.4.3                
-[47] locfit_1.5-9.1                cluster_2.0.5                
-[49] ensembldb_1.99.8              Biostrings_2.43.1            
-[51] base64_2.0                    RCurl_1.95-4.8               
-[53] dichromat_2.0-0               VariantAnnotation_1.21.11    
-[55] bitops_1.0-6                  gtable_0.2.0                 
-[57] DBI_0.5-1                     R6_2.2.0                     
-[59] GenomicAlignments_1.11.6      gridExtra_2.2.1              
-[61] knitr_1.15.1                  Hmisc_4.0-1                  
-[63] ProtGenerics_1.7.0            KernSmooth_2.23-15           
-[65] stringi_1.1.2                 Rcpp_0.12.8                  
-[67] rpart_4.1-10                  acepack_1.4.1                
+[11] Rsamtools_1.27.9              yaml_2.1.14                  
+[13] RSQLite_1.1-1                 backports_1.0.4              
+[15] lattice_0.20-34               biovizBase_1.23.2            
+[17] digest_0.6.11                 RColorBrewer_1.1-2           
+[19] XVector_0.15.0                checkmate_1.8.2              
+[21] colorspace_1.3-2              httpuv_1.3.3                 
+[23] htmltools_0.3.5               Matrix_1.2-7.1               
+[25] plyr_1.8.4                    XML_3.98-1.5                 
+[27] biomaRt_2.31.3                zlibbioc_1.21.0              
+[29] xtable_1.8-2                  scales_0.4.1                 
+[31] htmlTable_1.8                 tibble_1.2                   
+[33] ggplot2_2.2.1                 nnet_7.3-12                  
+[35] lazyeval_0.2.0                mime_0.5                     
+[37] survival_2.40-1               magrittr_1.5                 
+[39] memoise_1.0.0                 foreign_0.8-67               
+[41] BiocInstaller_1.25.2          tools_3.4.0                  
+[43] data.table_1.10.0             matrixStats_0.51.0           
+[45] stringr_1.1.0                 Rhtslib_1.7.0                
+[47] munsell_0.4.3                 locfit_1.5-9.1               
+[49] cluster_2.0.5                 ensembldb_1.99.10            
+[51] Biostrings_2.43.1             RCurl_1.95-4.8               
+[53] dichromat_2.0-0               VariantAnnotation_1.21.13    
+[55] bitops_1.0-6                  base64enc_0.1-3              
+[57] gtable_0.2.0                  DBI_0.5-1                    
+[59] R6_2.2.0                      GenomicAlignments_1.11.6     
+[61] gridExtra_2.2.1               knitr_1.15.1                 
+[63] Hmisc_4.0-2                   ProtGenerics_1.7.0           
+[65] KernSmooth_2.23-15            stringi_1.1.2                
+[67] Rcpp_0.12.8                   rpart_4.1-10                 
+[69] acepack_1.4.1                
 \end{Soutput}
 \end{Schunk}
 
