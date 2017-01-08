@@ -993,5 +993,43 @@ You can do so by replacing the combined $p$-value with the corrected value durin
 This effectively replaces ``there is DB somewhere in the cluster'' with ``there is DB at this location in the cluster''.
 We preserve a region-level interpretation, as it would be problematic to try to control the window-level FDR.
 
+\subsubsection*{Explaining the lack of rigour in non-standard FDR control methods}
+
+When controlling the FDR with \code{clusterWindows}, we calculate an upper bound on the number of false positive windows.
+This is done based on the total number of detected windows at a particular window-level FDR threshold.
+An upper bound on the number of false positive clusters is computed by filling up as many clusters with false positive windows (starting from the smallest clusters).
+Division by the total number of clusters yields an upper bound on the cluster-level FDR.
+However, this depends on obtaining a good upper bound on the number of false positive windows.
+If the number of detected windows is low and/or they are correlated, sampling stochasticity will affect the precision of the upper bound.
+There are also some theoretical issues with multiplying expected and observed values, which probably become pertinent when precision decreases.
+
+A similar problem is encountered with \code{empiricalFDR}.
+In this case, an estimate of the number of false positives is obtained by looking at the number of rejections in the wrong direction.
+This exploits the fact that the sign is independent of significance under the equality null, so the p-value distribution of false positives in each direction should be equal.
+However, this estimate will not be precise if there are not many rejections, especially at low $p$-value thresholds.
+The accuracy of the estimate also assumes that there are no condition-specific artifacts that bias rejections in one direction or another.
+This is possible if the negative control does not capture the same type of false positives that are present in the ChIP sample.
+
+For example, $p$-values for changes in the wrong direction might be skewed away from zero if it's harder to reject in the negative control.
+This would reduce the estimated number of false positives and lead to underestimation of the empirical FDR.
+In contrast, the BH method would be able to control the FDR correctly.
+This is because it accounts for the absolute size of the $p$-values, rather than their size relative to other $p$-values (i.e., those changing in the wrong direction).
+
+<<>>=
+right <- c(rep(0, 100), runif(1000))
+wrong <- rbeta(1000, 2, 1)
+emp <- findInterval(right, sort(wrong))/rank(right)
+o <- order(right, decreasing=TRUE)
+emp[o] <- cummin(emp[o])
+sum(which(emp<=0.05)>100)/sum(emp <= 0.05)
+bh <- p.adjust(right, method="BH")
+sum(which(bh<=0.05)>100)/sum(bh <= 0.05)
+@
+
+Note that the set of p-values in the wrong direction is not completely representative of false positive regions.
+It includes p-values from regions with one or more true positive windows, which should not be considered false positives, even if they contain false positive windows.
+This results in some conservativeness as the number of false positives at any given threshold is overestimated.
+There's no obvious way to avoid this, as you'd need to know which regions were true positives to prune them out of the set.
+
 \end{document}
 
