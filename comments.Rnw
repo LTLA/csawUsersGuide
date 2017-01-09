@@ -962,8 +962,36 @@ sum(alt.sig[-(1:100)])/sum(alt.sig)
 
 \subsubsection*{Using the highest-abundance window as a representative}
 
-This avoids complex DB events by looking for regions that are changing at the site of maximum binding.
-In this manner, you avoid detecting changes in shoulders or subpeaks of the main binding event.
+Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
+This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
+As the average abundance is (roughly) independent of the $p$-value, there is no need to correct for multiple testing within each cluster.
+
+<<>>=
+tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
+head(tab.ave)
+@
+
+For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
+This will usually provide more power as it avoids the conservativeness of Simes' method.
+The use of the highest-abundance window will also favor detection of simple DB events, where DB occurs at the most strongly bound loci in each cluster.
+This may be preferable for some studies, given that complex DB events are often difficult to interpret.
+
+The obvious drawback is that information is lost when the analysis is restricted to a single window.
+Detection will fail for complex DB events, e.g., clusters of TF binding sites, spreading of diffuse marks.
+Loss of information also increases the sensitivity of the analysis to the clustering procedure.
+For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site, as the window covering the latter will represent the cluster.
+
+A less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
+This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
+If not, the DB event may be complex, e.g., involving multiple peaks or peaks that change in shape or position between conditions.
+These require more careful interpretation than simpler ``binary'' (i.e., on/off) changes.
+
+<<>>=
+tabcom$mab.logFC <- tab.ave$logFC # 'mab' stands for most abundant.
+@
+
+The use of the most abundant window explicitly ignores the possibility of complex DB events by looking for regions that are changing at the site of maximum binding.
+For TF data, this may be beneficial as you avoid detecting (possibly irrelevant) changes in shoulders or subpeaks of the main binding event.
 This still has some advantages over straight-up peak calling, as you still maintain high resolution, i.e., you don't get contamination from miscalled peak boundaries.
 I guess it turns into something similar to a summit-based analysis of peaks.
 
@@ -1030,6 +1058,26 @@ Note that the set of p-values in the wrong direction is not completely represent
 It includes p-values from regions with one or more true positive windows, which should not be considered false positives, even if they contain false positive windows.
 This results in some conservativeness as the number of false positives at any given threshold is overestimated.
 There's no obvious way to avoid this, as you'd need to know which regions were true positives to prune them out of the set.
+
+\subsubsection*{Filtering twice prior to the FDR correction}
+
+For example, say the user wants to focus on local maxima.
+Assume that the test statistics are computed from \code{filtered.data}, as generated with the mild \code{keep.simple} filter in Chapter~\ref{chap:filter}.
+These filtered windows are re-filtered using the \code{maxed} vector from Section~\ref{sec:localmax}, to identify those that are local maxima.
+The re-filtered windows and their corresponding test statistics can then be used for all FDR-controlling procedures described in this chapter.
+
+<<>>=
+keep.new <- maxed[keep.simple]
+refilt.data <- filtered.data[keep.new,]
+refilt.res <- results[keep.new,]
+@
+
+Any filter vector from Chapter~\ref{chap:filter} can be used in place of \code{maxed}, so long as it was generated with the original \code{data}.
+Generating the filter vectors with \code{data} instead of \code{filtered.data} is generally recommended, as it avoids any unforseen interactions between filters.
+In particular, the local maxima filter depends on the abundance of adjacent windows.
+It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
+
+
 
 \end{document}
 

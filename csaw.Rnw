@@ -1675,37 +1675,75 @@ summary(width(merged.max$region))
 @
 
 \subsection{Summarizing the direction of DB per cluster}
-The number of significant clusters can be counted at a FDR threshold of 5\%.
-This is performed for clusters that contain windows changing in one direction only, and for those with changes in both directions.
-The former includes simpler DB events involving consistent changes throughout a region, while the latter corresponds to complex DB.
-In this manner, the overall direction of significant DB can be summarized for the entire experiment.
+
+\subsubsection{Based on the contribution to the combined $p$-value}
+The \code{direction} field returned by \code{combineTests} specifies which DB direction contributes to the combined $p$-value.
+If \code{"up"}, the combined $p$-value for this cluster is driven by $p$-values of windows with positive log-fold changes.
+If \code{"down"}, the combined $p$-value is driven by windows with negative log-fold changes.
+If \code{"mixed"}, windows with both positive and negative log-fold changes are involved.
+This allows the dominant DB in the cluster to be quickly summarized, as shown below for significant regions at a FDR threshold of 5\%.
 
 <<>>=
-is.sig <- tabcom$FDR <= 0.05
-has.up <- tabcom$logFC.up > 0
-has.down <- tabcom$logFC.down > 0
-data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
-    DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
+is.sig.region <- tabcom$FDR <= 0.05
+table(tabcom$direction[is.sig.region])
 @
 
-The same approach can be applied for the promoter-based clusters.
+The same approach can be applied for the gene-based clusters.
 This requires some protection against the \code{NA} values for the promoters that contain no windows.
 
 <<>>=
-is.sig <- tabbroad$FDR <= 0.05 & !is.na(tabbroad$FDR)
-has.up <- tabbroad$logFC.up > 0
-has.down <- tabbroad$logFC.down > 0
-data.frame(Total.DB=sum(is.sig), DB.up=sum(is.sig & has.up & !has.down),
-    DB.down=sum(is.sig & !has.up & has.down), DB.both=sum(is.sig & has.up & has.down))
+is.sig.gene <- tabcom$FDR <= 0.05
+table(tabbroad$direction[is.sig.gene])
 @
 
-An alternative approach to defining the direction of DB for each cluster is to use the log-fold change of a single representative window (see below).
-This is simpler and allows quantification of the magnitude of DB, but is not sufficient to describe complex events.
+Mixed clusters represent complex DB events involving changes in binding beyond simple increases or decreases in intensity.
+This includes regions with multiple DB peaks changing in opposite directions, or peaks that change in shape or position between conditions.
+Users should be aware that regions labelled as \code{"up"} or \code{"down"} may also be complex events,
+but are not labelled as such due to the fact that the significance calculations are dominated by windows changing in one direction.
 
-\section{Integrating results from multiple window sizes}
+\subsubsection{Based on the most significant window}
+Another approach is to define the direction of change for each cluster as that of the window with the strongest DB.
+This is useful when a log-fold change is required for each cluster, e.g., for plotting.
+In contrast, taking the average log-fold change across all windows in a cluster will understate the magnitude of DB.
+Identification of the most significant (i.e., ``best'') window is performed using the \code{getBestTest} function.
+This reports the index of the window with the lowest $p$-value in each cluster, as well as the associated statistics.
+
+<<>>=
+tab.best <- getBestTest(merged$id, results$table)
+head(tab.best)
+@
+
+It may also be useful to report the start location of the best window.
+This allows investigators to easily identify the DB subinterval within large clusters, or to narrow down the relevant sequence for motif discovery.
+
+<<>>=
+tabcom$best.logFC <- tab.best$logFC
+tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
+head(tabcom[,c("best.logFC", "best.start")])
+@
+
+The same approach can be applied to the overlaps between windows and pre-specified regions, using the \code{getBestOverlaps} wrapper function.
+This is demonstrated below for the broad gene body example.
+As with \code{combineOverlaps}, regions with no windows are assigned \code{NA} in the output table, but these are removed here to show some actual results.
+
+<<>>=
+tab.best.broad <- getBestOverlaps(olap, results$table)
+tabbroad$best.logFC <- tab.best.broad$logFC
+tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
+head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
+@
+
+Typically, the best window will only be used as a descriptive measure for each cluster.
+However, more statistical rigour is required if these windows are treated as the features of interest over which the error rate is to be controlled.
+A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
+This is necessary to account for the implicit multiple testing across all windows in each cluster.
+
+\section{Squeezing out more detection power}
+
+\subsection{Integrating results from multiple window sizes}
 \label{sec:bin_integrate}
-The sensitivity of the analysis to the choice of window size can be mitigated by testing a range of different widths.
-DB results from each width can be integrated by clustering adjacent windows together (even if they are of differing sizes), and combining $p$-values within each of the resulting clusters.
+Repeating the analysis with different window sizes may uncover new DB events at different resolutions.
+Multiple sets of DB results are integrated by clustering adjacent windows together (even if they differ in size) and combining $p$-values within each of the resulting clusters.
 The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
 Some filtering is performed to avoid excessive chaining in this demonstration.
 Corresponding tables of DB results should also be obtained (for brevity, mock results are used here).
@@ -1744,84 +1782,26 @@ In this manner, DB results from multiple window widths can be gathered together 
 Consolidation is most useful for histone marks and other analyses involving diffuse regions of enrichment.
 For such studies, the ideal window size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
 
-\section{Choosing a single representative window}
+\subsection{Weighting windows on abundance}
+Windows that are more likely to be DB can be upweighted to improve detection power.
+For example, in TF ChIP-seq data, the window of highest abundance within each enriched region probably contains the binding site.
+It is reasonable to assume that this window will also have the strongest DB.
+To improve power, the weight assigned to the most abundant window is increased relative to that of other windows in the same cluster.
+This means that the $p$-value of this window will have a greater influence on the final combined $p$-value.
 
-\subsection{Based on differential binding}
-In some cases, it may be necessary to also report the window in which the strongest DB is found.
-This information can be useful for identifying the change in binding within large clusters, or to narrow down the relevant sequence for motif discovery.
-Identification of the most significant (i.e., ``best'') window can be performed using the \code{getBestTest} function.
-This reports the index of the window with the lowest $p$-value in each cluster.
+Weights are computed in a manner to minimize conservativeness relative to the optimal unweighted approaches in each possible scenario. 
+If the strongest DB event is at the most abundant window, the weighted approach will yield a combined $p$-value that is no larger than twice the $p$-value of the most abundant window.
+(Here, the optimal approach would be to use the $p$-value of the most abundance window directly as a proxy for the $p$-value of the cluster.)
+If the strongest DB event is \emph{not} at the most abundant window, the weighted approach will yield a combined $p$-value that is no larger than twice the combined $p$-value without wweighting (which is optimal as all windows have equal probabilities of containing the strongest DB).
+All windows have non-zero weights, which ensures that any DB events in the other windows will still be considered when the $p$-values are combined.
 
-<<>>=
-tab.best <- getBestTest(merged$id, results$table)
-head(tab.best)
-@
-
-A common use of the \code{best} index is to obtain the log-fold change of the best window in each cluster.
-This value is useful as it focuses on the most DB interval within the cluster.
-In contrast, taking the average log-fold change across all windows in a cluster will understate the magnitude of DB.
-It may also be useful to report the start location of the best window.
-This allows investigators to easily identify the DB subinterval within large clusters.
-
-<<>>=
-tabcom$best.logFC <- tab.best$logFC
-tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
-head(tabcom[,c("best.logFC", "best.start")])
-@
-
-The same approach can be applied to the overlaps between windows and pre-specified regions, using the \code{getBestOverlaps} wrapper function.
-This is demonstrated below for the broad gene body example.
-As with \code{combineOverlaps}, regions with no windows are assigned \code{NA} in the output table, but these are removed here to show some actual results.
-
-<<>>=
-tab.best.broad <- getBestOverlaps(olap, results$table)
-tabbroad$best.logFC <- tab.best.broad$logFC
-tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
-head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
-@
-
-Typically, the best window will only be used as a descriptive measure for each cluster.
-However, more statistical rigour is required if these windows are treated as the features of interest over which the error rate is to be controlled.
-A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \code{PValue} in \code{tab.best}.
-This is necessary to account for the implicit multiple testing across all windows in each cluster.
-
-\subsection{Based on average abundance}
-Alternatively, the best window can be defined as the one with the highest average abundance in each cluster.
-This represents the window with the strongest binding for the target protein, though not necessarily the strongest DB.
-As the average abundance is (roughly) independent of the $p$-value, there is no need to correct for multiple testing within each cluster.
+The application of this weighting scheme is demonstrated in the example below.
+First, the \code{getBestTest} function with \code{by.pval=FALSE} is used to identify the most abundant window in each cluster.
+The \code{upweightSummits} function is then used to compute window-specific weights.
+These can be supplied to \code{combineTests} for consideration when computing combined $p$-values.
 
 <<>>=
 tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
-head(tab.ave)
-@
-
-For sharp binding events, it may be preferable to restrict the DB analysis to these windows.
-This will usually provide more power as it avoids the conservativeness of Simes' method.
-The use of the highest-abundance window will also favor detection of simple DB events, where DB occurs at the most strongly bound loci in each cluster.
-This may be preferable for some studies, given that complex DB events are often difficult to interpret.
-
-The obvious drawback is that information is lost when the analysis is restricted to a single window.
-Detection will fail for complex DB events, e.g., clusters of TF binding sites, spreading of diffuse marks.
-Loss of information also increases the sensitivity of the analysis to the clustering procedure.
-For example, a DB site will be ignored if it is clustered alongside a stronger non-DB site, as the window covering the latter will represent the cluster.
-
-A less formal approach is to simply report the log-fold change of the most abundant window in each cluster.
-This will indicate whether any DB is present at the strongest binding site within the corresponding genomic interval.
-If not, the DB event may be complex, e.g., involving multiple peaks or peaks that change in shape or position between conditions.
-These require more careful interpretation than simpler ``binary'' (i.e., on/off) changes.
-
-<<>>=
-tabcom$mab.logFC <- tab.ave$logFC # 'mab' stands for most abundant.
-@
-
-\subsection{Weighting windows on abundance}
-A more graduated approach uses the weighted version of Simes' method, where the window with the highest abundance is upweighted.
-In the example below, the weight assigned to the top window is increased relative to that of other windows in the same cluster.
-This means that the behavior of the top window will have a greater influence on the final combined $p$-value.
-That said, the other windows in the cluster still have unity weights.
-Any DB events in those windows will still be considered when the $p$-values are combined.
-
-<<>>=
 weights <- upweightSummit(merged$id, tab.ave$best)
 head(weights)
 tabcom.w <- combineTests(merged$id, results$table, weight=weights)
@@ -1840,30 +1820,14 @@ broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
 tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights) 
 @
 
-\section{Filtering after testing but before correction}
+\subsection{Filtering after testing but before correction}
 Most of the filters in Chapter~\ref{chap:filter} are applied before the statistical analysis.
 However, some of the approaches may be too aggressive, e.g., filtering to retain only local maxima, filtering based on pre-defined regions.
-In such cases, it may be preferable to apply one of the other, milder filters first.
+In such cases, it may be preferable to initially apply one of the other, milder filters.
 This ensures that sufficient windows are retained for stable normalization and/or EB shrinkage.
 The aggressive filters can then be applied after the statistics have been calculated.
 This is still beneficial as it removes irrelevant windows that would increase the severity of the BH correction.
 It may also reduce chaining effects during clustering.
-
-For example, say the user wants to focus on local maxima.
-Assume that the test statistics are computed from \code{filtered.data}, as generated with the mild \code{keep.simple} filter in Chapter~\ref{chap:filter}.
-These filtered windows are re-filtered using the \code{maxed} vector from Section~\ref{sec:localmax}, to identify those that are local maxima.
-The re-filtered windows and their corresponding test statistics can then be used for all FDR-controlling procedures described in this chapter.
-
-<<>>=
-keep.new <- maxed[keep.simple]
-refilt.data <- filtered.data[keep.new,]
-refilt.res <- results[keep.new,]
-@
-
-Any filter vector from Chapter~\ref{chap:filter} can be used in place of \code{maxed}, so long as it was generated with the original \code{data}.
-Generating the filter vectors with \code{data} instead of \code{filtered.data} is generally recommended, as it avoids any unforseen interactions between filters.
-In particular, the local maxima filter depends on the abundance of adjacent windows.
-It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
 
 \section{FDR control in difficult situations}
 
