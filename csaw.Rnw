@@ -1674,34 +1674,36 @@ merged.max <- mergeWindows(rowRanges(filtered.data), tol=1000L, max.width=5000L)
 summary(width(merged.max$region))
 @
 
-\subsection{Summarizing the direction of DB per cluster}
+\section{Summarizing the direction of DB per cluster}
 
-\subsubsection{Based on the contribution to the combined $p$-value}
+\subsection{Based on the contribution to the combined $p$-value}
+Summarizing the direction of DB for each cluster requires some care as the direction of DB can differ between constituent windows.
 The \code{direction} field returned by \code{combineTests} specifies which DB direction contributes to the combined $p$-value.
 If \code{"up"}, the combined $p$-value for this cluster is driven by $p$-values of windows with positive log-fold changes.
 If \code{"down"}, the combined $p$-value is driven by windows with negative log-fold changes.
 If \code{"mixed"}, windows with both positive and negative log-fold changes are involved.
-This allows the dominant DB in the cluster to be quickly summarized, as shown below for significant regions at a FDR threshold of 5\%.
+This allows the dominant DB in significant clusters to be quickly summarized, as shown below.
 
 <<>>=
 is.sig.region <- tabcom$FDR <= 0.05
 table(tabcom$direction[is.sig.region])
 @
 
-The same approach can be applied for the gene-based clusters.
-This requires some protection against the \code{NA} values for the promoters that contain no windows.
+The same approach is used with the output of \code{combineOverlaps} for gene-based clusters.
+This requires some protection against \code{NA} values for genes that contain no windows.
 
 <<>>=
 is.sig.gene <- tabcom$FDR <= 0.05
 table(tabbroad$direction[is.sig.gene])
 @
 
-Mixed clusters represent complex DB events involving changes in binding beyond simple increases or decreases in intensity.
-This includes regions with multiple DB peaks changing in opposite directions, or peaks that change in shape or position between conditions.
-Users should be aware that regions labelled as \code{"up"} or \code{"down"} may also be complex events,
-but are not labelled as such due to the fact that the significance calculations are dominated by windows changing in one direction.
+Mixed clusters represent complex DB events where the shape of the binding profile changes, i.e., not just a scaling increase/decrease to binding intensity.
+This includes regions with multiple peaks changing in opposite directions, or peaks that change in shape or position between conditions.
+Regions labelled as \code{"up"} or \code{"down"} may also correspond to complex DB events,
+but will not be labelled as \code{"mixed"} if the significance calculations are dominated by windows changing in only one direction.
+For rigorous identification of mixed clusters, users are advised to use the \code{mixedClusters} function instead of \code{combineTests}.
 
-\subsubsection{Based on the most significant window}
+\subsection{Based on the most significant window}
 Another approach is to define the direction of change for each cluster as that of the window with the strongest DB.
 This is useful when a log-fold change is required for each cluster, e.g., for plotting.
 In contrast, taking the average log-fold change across all windows in a cluster will understate the magnitude of DB.
@@ -1714,7 +1716,8 @@ head(tab.best)
 @
 
 It may also be useful to report the start location of the best window.
-This allows investigators to easily identify the DB subinterval within large clusters, or to narrow down the relevant sequence for motif discovery.
+This allows users to easily identify a relevant DB subinterval in large regions.
+For example, the sequence of the subinterval can be used for motif discovery.
 
 <<>>=
 tabcom$best.logFC <- tab.best$logFC
@@ -1746,7 +1749,7 @@ Repeating the analysis with different window sizes may uncover new DB events at 
 Multiple sets of DB results are integrated by clustering adjacent windows together (even if they differ in size) and combining $p$-values within each of the resulting clusters.
 The example below uses the H3 acetylation data from Chapter~\ref{chap:norm}.
 Some filtering is performed to avoid excessive chaining in this demonstration.
-Corresponding tables of DB results should also be obtained (for brevity, mock results are used here).
+Corresponding tables of DB results should also be obtained -- for brevity, mock results are used here.
 
 <<>>=
 ac.small <- windowCounts(ac.files, width=150L, spacing=100L, filter=25, param=param)
@@ -1797,8 +1800,7 @@ All windows have non-zero weights, which ensures that any DB events in the other
 
 The application of this weighting scheme is demonstrated in the example below.
 First, the \code{getBestTest} function with \code{by.pval=FALSE} is used to identify the most abundant window in each cluster.
-The \code{upweightSummits} function is then used to compute window-specific weights.
-These can be supplied to \code{combineTests} for consideration when computing combined $p$-values.
+Window-specific weights are then computed using the \code{upweightSummits} function, and supplied to \code{combineTests} to use in computing combined $p$-values.
 
 <<>>=
 tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
@@ -1822,10 +1824,10 @@ tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights)
 
 \subsection{Filtering after testing but before correction}
 Most of the filters in Chapter~\ref{chap:filter} are applied before the statistical analysis.
-However, some of the approaches may be too aggressive, e.g., filtering to retain only local maxima, filtering based on pre-defined regions.
+However, some of the approaches may be too aggressive, e.g., filtering to retain only local maxima or based on pre-defined regions.
 In such cases, it may be preferable to initially apply one of the other, milder filters.
 This ensures that sufficient windows are retained for stable normalization and/or EB shrinkage.
-The aggressive filters can then be applied after the statistics have been calculated.
+The aggressive filters can then be applied after the window-level statistics have been calculated, but before clustering into regions and calculation of cluster-level statistics.
 This is still beneficial as it removes irrelevant windows that would increase the severity of the BH correction.
 It may also reduce chaining effects during clustering.
 
