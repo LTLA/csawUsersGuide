@@ -1891,7 +1891,7 @@ mcols(merged$region) <- tabcom
 @
 
 <<echo=FALSE,results=hide>>=
-rm(ac.small, ac.large, refilt.data)
+rm(ac.small, ac.large)
 gc()
 @
 
