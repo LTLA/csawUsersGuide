@@ -244,8 +244,13 @@ This would reduce the posterior probability of the DB state for a site with a lo
 The argument for arbitrary resolution with the window width is akin to that when using a microscope. 
 Do you want to focus on the details or on the big picture? 
 For example, consider a cluster of DB regions separated by empty spaces.
-terms, one would classify this cluster as part of the same region, so you would use a large width to increase counts and power. 
+One could classify this cluster as part of the same region, so you would use a large width to increase counts and power. 
 However, you could equally define each region as being of interest in its own right.
+
+In the absence of any knowledge, the solution is to try multiple widths and to consolidate results.
+This is usually the case with broad marks where you need a large window, but you don't know exactly how large.
+With some knowledge (e.g., TF, sharp marks), it is better to just stick with a small window, with size motivated by the DNA:protein contact area.
+Otherwise, additional use of larger windows (which are underpowered for such markers) would lead to increased correction penalties during consolidation and loss of power. 
 
 I don't think using gargantuan widths to maximize power for very diffuse regions is a great idea. 
 Strange things happen at low abundances (e.g. correlations found during background normalization) which complicates validation.
