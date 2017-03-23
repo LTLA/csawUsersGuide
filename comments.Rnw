@@ -563,14 +563,27 @@ Then, only the DB sites that change in the expected direction should be retained
 This normalizes across the majority of the expected DB binding sites, sacrificing them in order to detect the top set of DB.
 For experiments with variable IP efficiency, this may still detect more sites than normalizing for composition bias.
 
-\subsubsection*{Caveats with non-linear methods}
+\subsubsection*{Some thoughts on non-linear normalization with NB-loess}
 
-The current implementation uses a fast approach, whereby all samples are compared to an average library.
+The current implementation of NB-loess uses a fast approach, whereby all samples are compared to an average library.
 This is valid as you're just using the average as a proxy between which libraries are compared.
-As the covariate is also the average count, you're effectively comparing the trend for each library to the same diagonal line.
-You don't need to worry about comparing each library to, e.g., the average of all other libraries.
+Fitting a trend to the "(log-count - average)" against "average" for each library is equivalent to fitting a trend to "log-count" against "average" and then subtracting "average" from the fitted value.
+However, subtraction of "average" cancels out between libraries anyway -- so, to save time, we just fit a trend to "log-count" against "average" in \code{normOffsets}.
+You don't need to worry about comparing each library to, e.g., the average of all other libraries, which gets complicated when you try to make the offsets comparable.
 
-However, there is a caveat with using the overall average as the covariate.
+The average count is more robust to zeroes than the A-value in conventional fast loess.
+A DB window with zero counts in samples for one condition will have a low A-value, possibly dropping below the range of covariates for non-DB windows.
+As a result, the assumption that most windows are non-DB at each covariate interval would be false.
+This is especially true after filtering such that the bulk of remaining non-DB windows are of relatively high abundance.
+(Not filtering at all would cause problems as the bulk of low-abundance windows would dominate the loess span calculations, as well as causing problems with discreteness.)
+The average count doesn't drop as quickly and cannot go below the supported range if you filtered on the average count in the first place.
+
+Of course, one could argue that the drop in the A-value is beneficial as high-abundance DB sites would be dragged down towards the majority of non-DB windows.
+This is true but less of a concern as we have filtered out low-abundance windows.
+There may or may not be non-DB support at high abundances, but there is definitely no support at low abundances after filtering.
+
+\subsubsection*{Caveats with using the overall average in non-linear methods}
+
 When you have DE, the concept of the overall average makes no sense.
 This means that the point will get misplaced and normalized in strange ways.
 Normally, this isn't a problem, as the correct normalization for DE genes isn't well defined.
@@ -599,7 +612,7 @@ tail(y.fast, 4)
 
 One might think to overcome this problem by using covariates computed in a pairwise manner.
 This fixes the first gene, but the second and third genes still have spurious DE.
-This is because the success of this procedure depends on the order with which the libraries are normalized.
+This is because the behaviour of this procedure depends on the order with which the libraries are normalized.
 In the first gene, the first two libraries are equalized first, which results in consistent behaviour for those two libraries across the remaining normalization steps.
 This is not the case for the second and third genes, where DE inflates the covariate in the first pairwise normalization.
 This distorts the normalized value and affects the outcome of all remaining normalization steps.
@@ -680,7 +693,7 @@ The key part of the spike-in procedure is that whatever spike-in you're using, i
 Moreover, the antibody must be able to recognise the target in both species (see Discussion of Bonhoure \textit{et al.}, 2014).
 This ensures that any differences in IP efficiency are reflected in the coverage of the spike-ins.
 Otherwise, it wouldn't provide any advantage over normalizing across background regions.
-This is fine for histone marks that tend to be uibiquitous across species, but it gets tougher if you're looking at specific proteins, e.g., transcription factors with species-specific epitopes.
+This is fine for histone marks that tend to be ubiquitous across species, but less so for specific proteins, e.g., transcription factors with species-specific epitopes.
 
 \subsection*{Comments on filtering}
 
