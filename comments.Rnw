@@ -108,11 +108,14 @@ With a new data set, it's generally a good strategy to do a \textit{de novo} ana
 If most of the peaks occur around the TSS or genes, then you can switch to an approach using pre-defined regions. 
 Otherwise, you'd be throwing out a lot of information. 
 I'm guessing over 90\% of reads would be lost if you stuck to TSS-based regions.
+
 While you might say that we are only interested in genic binding anyway, that's a narrow-minded view.
 You should first see what the data has to say before diving into assumptions like that, especially for uncharacterized proteins.
 There's also the issue of the difficulty in defining the location and width of the TSS and promoter.
 Improper definitions may result in loss of power if the binding site is missed or includes too much background.
-Besides, what's the harm? Worst is, you spend an hour or so looking at non-interesting regions. At best, you might be able to find something new and exciting.
+
+Besides, what's the harm? Worst is, you spend an hour or so looking at non-interesting regions. 
+At best, you might be able to find something new and exciting.
 
 \subsection*{Comments on counting}
 
@@ -538,7 +541,7 @@ This motivates the use of scaling normalization, even in the likely presence of 
 Note that each read is counted multiple times with windows instead of bins, though this isn't a real problem.
 The only thing to worry about is that it will effectively upweight high-abundance peaks which get caught by multiple windows, but everyone should have high abundances so it shouldn't matter.
 
-\subsubsection*{How to \textit{not} decide between normalization methods}
+\subsubsection*{How \textit{not} to decide between normalization methods}
 
 Just because a high-abundance mass at a non-zero M-value is discrete, doesn't mean it's caused by efficiency differences.
 You could imagine a consistent fold increase in the counts from a genuine increase in binding, if the protein level or deposition rate doubled in one condition.
@@ -546,13 +549,14 @@ Obviously, if you don't see a non-zero blob, then the argument is academic, as t
 
 You might also imagine that the presence of a high-abundance mass at a non-zero M-value between replicates would represent efficiency bias.
 This is true, but it doesn't mean that binding is constant between conditions.
-The variability might mask any DB, and absence of evidence is not evidence of absence.
+The variability might mask any DB, and absence of evidence is not evidence of absence, especially at low numbers of replicates.
 Eliminating the efficiency bias will compromise detection of systematic DB, so you'll have to pick the lesser of two evils.
-I suppose the exception is if you've enough replicates to get the true overall DB without being clouded by the variability, but that's rare for ChIP-seq data.
+If you've enough replicates, you could make reliable inferences about the true overall DB, but that's rare for ChIP-seq data.
 
 Conversely, the presence of a non-zero mass between conditions but not between replicates does not mean that efficiency bias is absent.
 While stochastic efficiency bias mightn't be generated between replicates, a systematic bias might be present between conditions.
 This may be caused by condition-specific factors, e.g., differences in nuclear shape, changes in cross-linking due to serum concentrations.
+The optimal sonication conditions are particularly dependent on the cell type, see PMC3541830 and PMC4151291.
 
 \subsubsection*{The lesser of two evils in normalization choice}
 
