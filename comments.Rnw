@@ -82,6 +82,86 @@ These need to be coerced to zeros, resulting in an excess of zeros that aren't e
 Using the zero-inflated NB would result in a fair amount of grief.
 Simply filtering out low-abundance windows won't remove all zeros, as you would retain windows with zeros where the other subtracted counts (e.g., for the replicate) are large due to variability for high raw counts.
 
+<<>>=
+baseline <- 50
+binding <- 50
+exp.type <- rep(c("ChIP", "Con", "ChIP", "Con"), each=2)
+group.no <- rep(c("A", "B"), each=4)
+groupings <- paste0(exp.type, group.no)
+nlibs <- length(groupings)
+
+mu.nodb <- rep(baseline, nlibs)
+mu.nodb[exp.type=="ChIP"] <- baseline+binding
+mu.db <- rep(baseline, nlibs)
+mu.db[exp.type=="ChIP" & group.no=="A"] <- baseline+binding
+
+P <- 1/0.1
+counts <- rbind(matrix(rnbinom(10000*nlibs, mu=mu.nodb, size=P), ncol=nlibs, byrow=TRUE),
+                matrix(rnbinom(10000*nlibs, mu=mu.db, size=P), ncol=nlibs, byrow=TRUE))
+ 
+#######################################                   
+# Running without subtraction
+
+g <- factor(groupings)
+design <- model.matrix(~0 + g)
+colnames(design) <- levels(g)
+
+y.d <- DGEList(counts, lib.size=rep(1e6, nlibs))
+y.d <- estimateDisp(y.d, design)
+fit.d <- glmQLFit(y.d, design, robust=TRUE)
+res.d <- glmQLFTest(fit.d, contrast=makeContrasts(ChIPA - ChIPB, levels=design))
+
+# Type I error controlled.
+is.null <- 1:10000
+nullp.d <- res.d$table$PValue[is.null]
+sum(nullp.d <= 0.01)/length(nullp.d) 
+sum(nullp.d <= 0.05)/length(nullp.d)
+summary(fit.d$dispersion)
+summary(fit.d$df.prior)
+    
+# Alternative p-values mostly below null p-values at the same threshold.
+altp.d <- res.d$table$PValue[-is.null]
+sum(altp.d <= 0.01)/length(altp.d)
+sum(altp.d <= 0.05)/length(altp.d)
+mean(findInterval(altp.d[altp.d <= 0.01], sort(nullp.d[nullp.d <= 0.01]))/sum(nullp.d <= 0.01))
+mean(findInterval(altp.d[altp.d <= 0.05], sort(nullp.d[nullp.d <= 0.05]))/sum(nullp.d <= 0.05))
+
+#######################################                   
+# Running with subtraction
+
+subcounts <- counts
+is.chip <- exp.type=="ChIP"
+is.A <- group.no=="A"
+subcounts[,is.chip & is.A] <- subcounts[,is.chip & is.A] - subcounts[,!is.chip & is.A]
+subcounts[,is.chip & !is.A] <- subcounts[,is.chip & !is.A] - subcounts[,!is.chip & !is.A]
+subcounts[subcounts < 0] <- 0
+subcounts <- subcounts[,is.chip]
+
+g2 <- factor(groupings[is.chip])
+design2 <- model.matrix(~0 + g2)
+colnames(design2) <- levels(g2)
+
+y.s <- DGEList(subcounts, lib.size=rep(1e6, length(g2)))
+y.s <- estimateDisp(y.s, design2)
+fit.s <- glmQLFit(y.s, design2, robust=TRUE)
+res.s <- glmQLFTest(fit.s, contrast=makeContrasts(ChIPA - ChIPB, levels=design2))
+
+# Way too conservative, due to inflation of variances.
+nullp.s <- res.s$table$PValue[is.null]
+sum(nullp.s <= 0.01)/length(nullp.s) 
+sum(nullp.s <= 0.05)/length(nullp.s)
+summary(fit.s$dispersion)
+summary(fit.s$df.prior)
+    
+# More alternative p-values above the null p-values.
+# (i.e., more false positives, if threshold is increased to offset conservativeness).
+altp.s <- res.s$table$PValue[-is.null]
+sum(altp.s <= 0.01)/length(altp.s)
+sum(altp.s <= 0.05)/length(altp.s)
+mean(findInterval(altp.s[altp.s <= 0.01], sort(nullp.s[nullp.s <= 0.01]))/sum(nullp.s <= 0.01))
+mean(findInterval(altp.s[altp.s <= 0.05], sort(nullp.s[nullp.s <= 0.05]))/sum(nullp.s <= 0.05))
+@
+
 The other approach is to do log-subtraction, where you include the controls as part of the model.
 You could then ask if log-fold change over the control is the same in the two conditions.
 This avoids the statistical problems with pure subtraction, but can result in loss of detection power.
