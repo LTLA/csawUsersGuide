@@ -16,7 +16,7 @@ simulator <- function(ngenes, genes.spiked, mu.back, mult, disp) {
     return(list(counts=cbind(x1, x2), factor=normed, spiked=spiked))
 }
 
-set.seed(10000)
+set.seed(1000)
 ngenes <- 10000
 
 #########################################################
@@ -28,15 +28,16 @@ lapply(1:3, FUN=function(i) {
 })
 
 lapply(1:3, FUN=function(i) {
-    x <- simulator(ngenes, 200, 10, 5, 0.05) # low count
+    x <- simulator(ngenes, 200, 10, 5, 0.05) # middle count
     calcNormFactors(x$counts)
 })
 
 lapply(1:3, FUN=function(i) {
-    x <- simulator(ngenes, 200, 50, 5, 0.05) # low count
+    x <- simulator(ngenes, 200, 50, 5, 0.05) # high count
     calcNormFactors(x$counts)
 })
 
+x <- simulator(ngenes, 200, 50, 5, 0.05) 
 c(1/sqrt(x$factor), sqrt(x$factor)) # Truth.
 
 #########################################################

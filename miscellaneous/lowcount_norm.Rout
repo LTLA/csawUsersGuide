@@ -36,7 +36,7 @@ Loading required package: limma
 +     return(list(counts=cbind(x1, x2), factor=normed, spiked=spiked))
 + }
 > 
-> set.seed(10000)
+> set.seed(1000)
 > ngenes <- 10000
 > 
 > #########################################################
@@ -47,43 +47,109 @@ Loading required package: limma
 +     calcNormFactors(x$counts)
 + })
 [[1]]
-[1] 0.9999076 1.0000924
+[1] 1.0013521 0.9986498
 
 [[2]]
-[1] 1.0591013 0.9441967
+[1] 1.0069616 0.9930865
 
 [[3]]
-[1] 1.0071070 0.9929432
+[1] 1.0052563 0.9947712
 
 > 
 > lapply(1:3, FUN=function(i) {
-+     x <- simulator(ngenes, 200, 10, 5, 0.05) # low count
++     x <- simulator(ngenes, 200, 10, 5, 0.05) # middle count
 +     calcNormFactors(x$counts)
 + })
 [[1]]
-[1] 1.0363763 0.9649005
+[1] 1.0291659 0.9716607
 
 [[2]]
-[1] 1.0338351 0.9672723
+[1] 1.029547 0.971301
 
 [[3]]
-[1] 1.0324567 0.9685636
+[1] 1.0341057 0.9670192
 
 > 
 > lapply(1:3, FUN=function(i) {
-+     x <- simulator(ngenes, 200, 50, 5, 0.05) # low count
++     x <- simulator(ngenes, 200, 50, 5, 0.05) # high count
 +     calcNormFactors(x$counts)
 + })
 [[1]]
-[1] 1.0347196 0.9664454
+[1] 1.0356454 0.9655815
 
 [[2]]
-[1] 1.033866 0.967243
+[1] 1.0345765 0.9665791
 
 [[3]]
-[1] 1.0346432 0.9665168
+[1] 1.0356693 0.9655591
 
 > 
+> x <- simulator(ngenes, 200, 50, 5, 0.05) 
 > c(1/sqrt(x$factor), sqrt(x$factor)) # Truth.
-Error: object 'x' not found
-Execution halted
+[1] 1.0392305 0.9622504
+> 
+> #########################################################
+> # No undersampling at all, just differences in library size.
+> # True values should be 1, 1.
+> 
+> lapply(1:3, FUN=function(i) {
++     x <- matrix(rnbinom(ngenes*2, mu=c(1, 5), size=20), nrow=ngenes, ncol=2, byrow=TRUE)
++     calcNormFactors(x)
++ })
+[[1]]
+[1] 1.229705 0.813203
+
+[[2]]
+[1] 1.2368873 0.8084811
+
+[[3]]
+[1] 1.2328770 0.8111109
+
+> 
+> lapply(1:3, FUN=function(i) {
++     x <- matrix(rnbinom(ngenes*2, mu=c(10, 50), size=20), nrow=ngenes, ncol=2, byrow=TRUE)
++     calcNormFactors(x)
++ })
+[[1]]
+[1] 0.9935526 1.0064892
+
+[[2]]
+[1] 0.9947951 1.0052322
+
+[[3]]
+[1] 0.9936823 1.0063579
+
+> 
+> #########################################################
+> # Wrapping up
+> 
+> sessionInfo()
+R version 3.4.0 Patched (2017-04-24 r72623)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 14.04.5 LTS
+
+Matrix products: default
+BLAS: /home/cri.camres.org/lun01/Software/R/R-3-4-branch_release/lib/libRblas.so
+LAPACK: /home/cri.camres.org/lun01/Software/R/R-3-4-branch_release/lib/libRlapack.so
+
+locale:
+ [1] LC_CTYPE=en_GB.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_GB.UTF-8        LC_COLLATE=en_GB.UTF-8    
+ [5] LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_GB.UTF-8   
+ [7] LC_PAPER=en_GB.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] edgeR_3.18.0 limma_3.32.1
+
+loaded via a namespace (and not attached):
+[1] compiler_3.4.0  grid_3.4.0      locfit_1.5-9.1  lattice_0.20-35
+> 
+> 
+> proc.time()
+   user  system elapsed 
+  0.804   0.016   0.819 
