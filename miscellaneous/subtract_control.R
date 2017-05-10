@@ -100,3 +100,7 @@ sum(nullp.b <= 0.05)/length(nullp.b)
 summary(fit.b$dispersion)
 summary(fit.b$df.prior)
 
+#######################################
+# Wrapping up
+
+sessionInfo()
