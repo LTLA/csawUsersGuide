@@ -71,96 +71,27 @@ In any case, these should form a minority of the detected regions in a successfu
 One could theoretically use control data to correct for chromatin state when searching for DB. 
 The most obvious is to subtract the control coverage from the ChIP coverage.
 The idea is to avoid detecting spurious DB due to changes in chromatin state.
-However, this obviously requires sequencing of a negative control sample for each condition, which might be substantially more costly (or not even possible for complex designs without a one-way layout).
-It also assumes that the controls are accurate estimators of background, which mightn't be the case, e.g., for inputs.
+However, this has a number of logistical and statistical issues.
 
-Other problems also occur when you have high ChIP and control coverage (where subtraction actually has an effect). 
-Subtraction will mess up the mean-variance relationship as the absolute size of the counts is lost.
-In particular, a small relative difference between libraries at large counts would be amplified in the subtracted counts, such that you'd get false positives (if between groups) or inflated variance (if within groups). 
-You could also end up with negative counts. 
-These need to be coerced to zeros, resulting in an excess of zeros that aren't easily handled by the NB model.
-Using the zero-inflated NB would result in a fair amount of grief.
-Simply filtering out low-abundance windows won't remove all zeros, as you would retain windows with zeros where the other subtracted counts (e.g., for the replicate) are large due to variability for high raw counts.
+\begin{itemize}
+\item It obviously requires sequencing of a negative control sample for each condition, which adds to cost.
+This may not even be possible for complex designs without a one-way layout.
 
-<<>>=
-baseline <- 50
-binding <- 50
-exp.type <- rep(c("ChIP", "Con", "ChIP", "Con"), each=2)
-group.no <- rep(c("A", "B"), each=4)
-groupings <- paste0(exp.type, group.no)
-nlibs <- length(groupings)
+\item It also assumes that the controls are accurate estimators of background, which mightn't be the case, e.g., for inputs.
 
-mu.nodb <- rep(baseline, nlibs)
-mu.nodb[exp.type=="ChIP"] <- baseline+binding
-mu.db <- rep(baseline, nlibs)
-mu.db[exp.type=="ChIP" & group.no=="A"] <- baseline+binding
+\item Subtraction will distort the mean-variance relationship as the absolute size of the counts is lost.
+This is most relevant when both ChIP and control coverage are high, where subtraction is meant to be most beneficial.
+In particular, a small relative difference between libraries at large counts would be amplified in the subtracted counts.
+This leads to false positives (if between groups) or inflated variance (if within groups). 
+Conservativeness seems to dominate, see the simulation in \verb!miscellaneous/subtract_control.R! for a demonstration.
 
-P <- 1/0.1
-counts <- rbind(matrix(rnbinom(10000*nlibs, mu=mu.nodb, size=P), ncol=nlibs, byrow=TRUE),
-                matrix(rnbinom(10000*nlibs, mu=mu.db, size=P), ncol=nlibs, byrow=TRUE))
- 
-#######################################                   
-# Running without subtraction
+\item Negative counts need to be coerced to zeros, resulting in an excess of zeros that aren't easily handled by the NB model.
+Using the zero-inflated NB model is difficult, while simply filtering out low-abundance windows post-subtraction is not the solution.
+This is because you would retain windows with zeros where the other subtracted counts (e.g., for the replicate) are large due to variability for high raw counts.
 
-g <- factor(groupings)
-design <- model.matrix(~0 + g)
-colnames(design) <- levels(g)
-
-y.d <- DGEList(counts, lib.size=rep(1e6, nlibs))
-y.d <- estimateDisp(y.d, design)
-fit.d <- glmQLFit(y.d, design, robust=TRUE)
-res.d <- glmQLFTest(fit.d, contrast=makeContrasts(ChIPA - ChIPB, levels=design))
-
-# Type I error controlled.
-is.null <- 1:10000
-nullp.d <- res.d$table$PValue[is.null]
-sum(nullp.d <= 0.01)/length(nullp.d) 
-sum(nullp.d <= 0.05)/length(nullp.d)
-summary(fit.d$dispersion)
-summary(fit.d$df.prior)
-    
-# Alternative p-values mostly below null p-values at the same threshold.
-altp.d <- res.d$table$PValue[-is.null]
-sum(altp.d <= 0.01)/length(altp.d)
-sum(altp.d <= 0.05)/length(altp.d)
-mean(findInterval(altp.d[altp.d <= 0.01], sort(nullp.d[nullp.d <= 0.01]))/sum(nullp.d <= 0.01))
-mean(findInterval(altp.d[altp.d <= 0.05], sort(nullp.d[nullp.d <= 0.05]))/sum(nullp.d <= 0.05))
-
-#######################################                   
-# Running with subtraction
-
-subcounts <- counts
-is.chip <- exp.type=="ChIP"
-is.A <- group.no=="A"
-subcounts[,is.chip & is.A] <- subcounts[,is.chip & is.A] - subcounts[,!is.chip & is.A]
-subcounts[,is.chip & !is.A] <- subcounts[,is.chip & !is.A] - subcounts[,!is.chip & !is.A]
-subcounts[subcounts < 0] <- 0
-subcounts <- subcounts[,is.chip]
-
-g2 <- factor(groupings[is.chip])
-design2 <- model.matrix(~0 + g2)
-colnames(design2) <- levels(g2)
-
-y.s <- DGEList(subcounts, lib.size=rep(1e6, length(g2)))
-y.s <- estimateDisp(y.s, design2)
-fit.s <- glmQLFit(y.s, design2, robust=TRUE)
-res.s <- glmQLFTest(fit.s, contrast=makeContrasts(ChIPA - ChIPB, levels=design2))
-
-# Way too conservative, due to inflation of variances.
-nullp.s <- res.s$table$PValue[is.null]
-sum(nullp.s <= 0.01)/length(nullp.s) 
-sum(nullp.s <= 0.05)/length(nullp.s)
-summary(fit.s$dispersion)
-summary(fit.s$df.prior)
-    
-# More alternative p-values above the null p-values.
-# (i.e., more false positives, if threshold is increased to offset conservativeness).
-altp.s <- res.s$table$PValue[-is.null]
-sum(altp.s <= 0.01)/length(altp.s)
-sum(altp.s <= 0.05)/length(altp.s)
-mean(findInterval(altp.s[altp.s <= 0.01], sort(nullp.s[nullp.s <= 0.01]))/sum(nullp.s <= 0.01))
-mean(findInterval(altp.s[altp.s <= 0.05], sort(nullp.s[nullp.s <= 0.05]))/sum(nullp.s <= 0.05))
-@
+\item In practice, other high-abundance regions will buffer any damage to the variance and EB statistics.
+However, this would result in more false positives if variance inflation is prevented.
+\end{itemize}
 
 The other approach is to do log-subtraction, where you include the controls as part of the model.
 You could then ask if log-fold change over the control is the same in the two conditions.
@@ -179,8 +110,7 @@ This is biologically sensible but will not be detected if the latter cancels out
 So, in short, it is difficult to rigorously adjust for changes in chromatin state.
 I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
 Protection is generally provided by filtering, as most changes in state should be depleted after the IP step (unlike, e.g., DNase-seq).
-Of course, if there are likely to be extreme changes, then control correction may be necessary. 
-Subtraction may be okay if there aren't a lot of regions with high control coverage, as the other high-abundance regions will buffer any damage to the variance and EB statistics (though, if those regions are rare, then there mightn't be much point in correcting anyway; you might also get more false positives if variance inflation is prevented).
+Of course, if there are likely to be extreme changes, then control correction may be the lesser of two evils. 
 
 \subsubsection*{Justifying the \textit{de novo} focus}
 

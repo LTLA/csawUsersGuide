@@ -1,0 +1,160 @@
+
+R version 3.4.0 Patched (2017-04-24 r72623) -- "You Stupid Darkness"
+Copyright (C) 2017 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # This script performs a simulation to demonstrate the effects of subtracting
+> # control counts from ChIP counts in a simple case with equal baseline coverage.
+> 
+> library(edgeR)
+Loading required package: limma
+> set.seed(1000)
+> 
+> baseline <- 50
+> binding <- 50
+> exp.type <- rep(c("ChIP", "Con", "ChIP", "Con"), each=2)
+> group.no <- rep(c("A", "B"), each=4)
+> groupings <- paste0(exp.type, group.no)
+> nlibs <- length(groupings)
+> 
+> mu.nodb <- rep(baseline, nlibs)
+> mu.nodb[exp.type=="ChIP"] <- baseline+binding
+> mu.db <- rep(baseline, nlibs)
+> mu.db[exp.type=="ChIP" & group.no=="A"] <- baseline+binding
+> 
+> P <- 1/0.1
+> counts <- rbind(matrix(rnbinom(10000*nlibs, mu=mu.nodb, size=P), ncol=nlibs, byrow=TRUE),
++                 matrix(rnbinom(10000*nlibs, mu=mu.db, size=P), ncol=nlibs, byrow=TRUE))
+>  
+> #######################################                   
+> # Running without subtraction
+> 
+> g <- factor(groupings)
+> design <- model.matrix(~0 + g)
+> colnames(design) <- levels(g)
+> 
+> y.d <- DGEList(counts, lib.size=rep(1e6, nlibs))
+> y.d <- estimateDisp(y.d, design)
+> fit.d <- glmQLFit(y.d, design, robust=TRUE)
+> res.d <- glmQLFTest(fit.d, contrast=makeContrasts(ChIPA - ChIPB, levels=design))
+> 
+> # Type I error controlled.
+> is.null <- 1:10000
+> nullp.d <- res.d$table$PValue[is.null]
+> sum(nullp.d <= 0.01)/length(nullp.d) 
+[1] 0.0098
+> sum(nullp.d <= 0.05)/length(nullp.d)
+[1] 0.0459
+> summary(fit.d$dispersion)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+0.09733 0.09822 0.09960 0.09923 0.10008 0.10071 
+> summary(fit.d$df.prior)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  551.7   569.4   569.4   569.3   569.4   569.4 
+>     
+> # Alternative p-values mostly below null p-values at the same threshold.
+> altp.d <- res.d$table$PValue[-is.null]
+> sum(altp.d <= 0.01)/length(altp.d)
+[1] 0.2739
+> sum(altp.d <= 0.05)/length(altp.d)
+[1] 0.5176
+> mean(findInterval(altp.d[altp.d <= 0.01], sort(nullp.d[nullp.d <= 0.01]))/sum(nullp.d <= 0.01))
+[1] 0.3258749
+> mean(findInterval(altp.d[altp.d <= 0.05], sort(nullp.d[nullp.d <= 0.05]))/sum(nullp.d <= 0.05))
+[1] 0.280052
+> 
+> #######################################                   
+> # Running with subtraction
+> 
+> subcounts <- counts
+> is.chip <- exp.type=="ChIP"
+> is.A <- group.no=="A"
+> subcounts[,is.chip & is.A] <- subcounts[,is.chip & is.A] - subcounts[,!is.chip & is.A]
+> subcounts[,is.chip & !is.A] <- subcounts[,is.chip & !is.A] - subcounts[,!is.chip & !is.A]
+> subcounts[subcounts < 0] <- 0
+> subcounts <- subcounts[,is.chip]
+> 
+> g2 <- factor(groupings[is.chip])
+> design2 <- model.matrix(~0 + g2)
+> colnames(design2) <- levels(g2)
+> 
+> y.s <- DGEList(subcounts, lib.size=rep(1e6, length(g2)))
+> y.s <- estimateDisp(y.s, design2)
+Warning message:
+Zero sample variances detected, have been offset away from zero 
+> fit.s <- glmQLFit(y.s, design2, robust=TRUE)
+Warning message:
+18 very small variances detected, have been offset away from zero 
+> res.s <- glmQLFTest(fit.s, contrast=makeContrasts(ChIPA - ChIPB, levels=design2))
+> 
+> # Way too conservative, due to inflation of variances.
+> nullp.s <- res.s$table$PValue[is.null]
+> sum(nullp.s <= 0.01)/length(nullp.s) 
+[1] 0.0016
+> sum(nullp.s <= 0.05)/length(nullp.s)
+[1] 0.0153
+> summary(fit.s$dispersion)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.5194  0.9881  1.4736  1.5486  1.9523  3.6892 
+> summary(fit.s$df.prior)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  3.630   3.630   3.630   3.713   3.847   3.847 
+>     
+> # More alternative p-values above the null p-values.
+> # (i.e., more false positives, if threshold is increased to offset conservativeness).
+> altp.s <- res.s$table$PValue[-is.null]
+> sum(altp.s <= 0.01)/length(altp.s)
+[1] 0.028
+> sum(altp.s <= 0.05)/length(altp.s)
+[1] 0.203
+> mean(findInterval(altp.s[altp.s <= 0.01], sort(nullp.s[nullp.s <= 0.01]))/sum(nullp.s <= 0.01))
+[1] 0.5236607
+> mean(findInterval(altp.s[altp.s <= 0.05], sort(nullp.s[nullp.s <= 0.05]))/sum(nullp.s <= 0.05))
+[1] 0.4220516
+> 
+> #######################################
+> # Buffering with lots of entries that are high-abundance and did not require much subtraction.
+> 
+> others <- 1001:nrow(subcounts)
+> bufcounts <- subcounts
+> bufcounts[others,] <- matrix(rnbinom(length(others)*ncol(subcounts), mu=binding, size=P), length(others))
+> 
+> y.b <- DGEList(bufcounts, lib.size=rep(1e6, length(g2)))
+> y.b <- estimateDisp(y.b, design2)
+Warning message:
+Zero sample variances detected, have been offset away from zero 
+> fit.b <- glmQLFit(y.b, design2, robust=TRUE)
+Warning message:
+9 very small variances detected, have been offset away from zero 
+> res.b <- glmQLFTest(fit.b, contrast=makeContrasts(ChIPA - ChIPB, levels=design2))
+> 
+> nullp.b <- res.b$table$PValue[-others]
+> sum(nullp.b <= 0.01)/length(nullp.b) 
+[1] 0.072
+> sum(nullp.b <= 0.05)/length(nullp.b)
+[1] 0.135
+> summary(fit.b$dispersion)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.1116  0.1131  0.1171  0.1221  0.1237  0.6110 
+> summary(fit.b$df.prior)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.3314 35.1764 35.1764 34.0255 35.1764 35.1764 
+> 
+> 
+> proc.time()
+   user  system elapsed 
+ 12.784   0.048  12.827 
