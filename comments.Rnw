@@ -77,7 +77,9 @@ However, this has a number of logistical and statistical issues.
 \item It obviously requires sequencing of a negative control sample for each condition, which adds to cost.
 This may not even be possible for complex designs without a one-way layout.
 
-\item It assumes that the controls are accurate estimators of background, which mightn't be the case, e.g., for inputs.
+\item It assumes that the controls are accurate estimators of background, which mightn't be the case.
+Inputs are particularly troublesome as you don't do any pulldown, which gives you something similar to DNase-seq profiles.
+In contrast, the pulldown and washes in an actual ChIP library would presumably remove a lot of the signal in open chromatin.
 
 \item Subtraction will distort the mean-variance relationship as the absolute size of the counts is lost.
 This is most relevant when both ChIP and control coverage are high, where subtraction is meant to be most beneficial.
@@ -98,8 +100,9 @@ You could then ask if log-fold change over the control is the same in the two co
 This avoids the statistical problems with pure subtraction, but can result in loss of detection power.
 For example, consider a case where both ChIP and control coverage increases two-fold. 
 This would not be detected after log-correction, as the fold change cancels out.
-However, there is DB here if you assume an additive model, e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the other condition, resulting in $x$ against $2x$ binding between conditions.
-This seems to be most problematic when DB coincides with changes in chromatin accessibility.
+However, there is DB here if you assume an additive model for the raw coverage, 
+e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the other condition, resulting in $x$ against $2x$ binding between conditions.
+This loss of power would be most problematic when DB coincides with changes in chromatin accessibility.
 This is biologically sensible but will not be detected if the latter cancels out the former (personal comm. from Gordon, Mike Love).
 
 % The ideal solution would be to switch to an identity-link GLM.
@@ -109,7 +112,7 @@ This is biologically sensible but will not be detected if the latter cancels out
  
 So, in short, it is difficult to rigorously adjust for changes in chromatin state.
 I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
-Protection is generally provided by filtering, as most changes in state should be depleted after the IP step (unlike, e.g., DNase-seq).
+Protection is generally provided by filtering, as most changes in state should be depleted after the IP step.
 Of course, if there are likely to be extreme changes, then control correction may be the lesser of two evils. 
 
 \subsubsection*{Justifying the \textit{de novo} focus}
@@ -440,38 +443,26 @@ var(log(rnbinom(1000, mu=20, size=100)/rnbinom(1000, mu=20, size=100)))
 \item M-values are not defined when zero counts are around.
 Currently, these are removed, which is suboptimal as it results in loss of information when you have a non-zero count paired with a zero count. 
 The non-zero count can provide some evidence for undersampling (e.g. lots of [1, 0] pairs probably indicate undersampling). 
-Conversely, smaller libraries with no undersampling will have more zeroes that get implicitly trimmed, resulting in spurious differences.
+Conversely, smaller libraries with no undersampling will have more zeroes that get implicitly trimmed.
+This truncates just one side of the fold change distribution prior to the actual trimming, which yields a biased estimate of the normalization factor.  
 
-\begin{itemize}
-\item Adding an pseudo-count doesn't help as the M-value will change dramatically with the value of the pseudo-count when the counts are small.
+\item The solutions to zeroes are worse than the problem itself.
+Adding an pseudo-count doesn't help as the M-value will change dramatically with the value of the pseudo-count when the counts are small.
 This is because the choice of offset is a massive contributor to the magnitude of the resulting fold change, and thus determines where that FC is placed in the distribution.
-
-\item Zero counts can only be overcome by incorporating a probability distribution to model its frequency. 
+Zero counts can only be overcome by incorporating a probability distribution to model its frequency. 
 However, this results in more pain due to the need to estimate distribution parameters and the possible lack of robustness to violation of the distributional assumptions.
-\end{itemize}
 
 \item Discreteness reduces the accuracy of the normalization factor estimate -see \verb!lowcount_norm.R! for a demonstration.
 This is due to reduced precision of trimming when you have blocks of genes at a particular M-value.
 The trimmed mean also probably ceases to be an unbiased estimator of the true mean for non-symmetric distributions.
-
 \end{itemize} 
 
-
-As to the choice of bin size, if you have libraries of similar size, you could just throw in a bunch of bin sizes and take the most extreme (i.e. different from 1) factors that you can find.
-This leverages off the fact that both too large and too small bins will underestimate the magnitude of the logarithm of the scaling factor; so, the most extreme intermediate is probably correct. 
-In particular, zero counts should cause underestimation because the undersampled library should have more zero counts paired with non-zero counts in the other library. 
-Thus, removal of zero counts is effectively removing evidence for undersampling. 
-However, this falls apart when the library sizes are dramatically different:
-
-<<echo=FALSE,eval=FALSE>>=
-calcNormFactors(cbind(rnbinom(1000, mu=2, size=100), rnbinom(1000, mu=10, size=100)))
-@
-
-There actually isn't any undersampling but that doesn't stop us from producing an aggressive normalization estimate. 
-I think it's because you only get a zero count when the smaller library is unlucky enough to get a low value. 
-If you remove them, you're nibbling on just one side of the fold change distribution prior to the actual trimming. 
-This means that you end up  getting a biased estimate of the normalization factor.  
-So, we can't just rely on picking the biggest of the bunch anymore, particularly when the library sizes are hugely different.
+If you have libraries of similar size, you \emph{could} just throw in a bunch of bin sizes and take the most extreme (i.e. different from 1) factors that you can find.
+This is based on the fact that bins that are too large or too small will underestimate the magnitude of the logarithm of the scaling factor.
+If bins are too large, inclusion of many DB regions squeezes the estimates towards unity, as the DB offsets the undersampling in adjacent regions.
+If bins are too small, there will be more zero counts in the undersampled library; these are evidence for undersampling but get removed, shifting the estimate towards unity.
+Under this reasoning, the most extreme intermediate is most likely to be closest to the true values.
+However, this falls apart when the library sizes are different, as small bins will overestimate the normalization factor (see \verb!lowcount_norm.R!).
 
 \subsubsection*{Handling the bias of the TMM method}
 Here I shall list the assorted failures in my attempts to truly solve this problem for low counts.
