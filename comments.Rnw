@@ -1045,9 +1045,9 @@ However, this depends on obtaining a good upper bound on the number of false pos
 If the number of detected windows is low and/or they are correlated, sampling stochasticity will affect the precision of the upper bound.
 There are also some theoretical issues with multiplying expected and observed values, which probably become pertinent when precision decreases.
 
-A similar problem is encountered with \code{empiricalFDR}.
-In this case, an estimate of the number of false positives is obtained by looking at the number of rejections in the wrong direction.
-This exploits the fact that the sign is independent of significance under the equality null, so the p-value distribution of false positives in each direction should be equal.
+A similar problem is encountered with \code{empiricalFDR}, where the number of false positives is estimated from the number of rejections in the wrong direction.
+This exploits the fact that the sign is independent of significance under the equality null, such that the distribution of p-values in each direction should be equal.
+Thus, at any given threshold, the number of rejections in the wrong direction should be the same as the number of rejections (false positives) in the right direction.
 However, this estimate will not be precise if there are not many rejections, especially at low $p$-value thresholds.
 The accuracy of the estimate also assumes that there are no condition-specific artifacts that bias rejections in one direction or another.
 This is possible if the negative control does not capture the same type of false positives that are present in the ChIP sample.
