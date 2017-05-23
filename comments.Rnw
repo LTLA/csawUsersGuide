@@ -574,6 +574,13 @@ This is especially true after filtering such that the bulk of remaining non-DB w
 (Not filtering at all would cause problems as the bulk of low-abundance windows would dominate the loess span calculations, as well as causing problems with discreteness.)
 The average count doesn't drop as quickly and cannot go below the supported range if you filtered on the average count in the first place.
 
+Another way to look at it is to consider a 2-vs-2 design, in which the counts are zero in one group.
+Computing the A-value would be equivalent to taking the square root of the non-zero binding intensity.
+In contrast, computing the log-average count would be equivalent to halving the non-zero binding intensity.
+For coverage greater than 2, the result of the latter will always be larger than that of the former.
+This reasoning also explains why you can't just add a prior count;
+it is easy to show that the prior required to bring it up to the filter threshold would be comparable to the threshold itself, thus distorting the trend fit.
+
 Of course, one could argue that the drop in the A-value is beneficial as high-abundance DB sites would be dragged down towards the majority of non-DB windows.
 This is true but less of a concern as we have filtered out low-abundance windows.
 There may or may not be non-DB support at high abundances, but there is definitely no support at low abundances after filtering.
