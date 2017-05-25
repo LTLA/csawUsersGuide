@@ -581,6 +581,13 @@ This is especially true after filtering such that the bulk of remaining non-DB w
 (Not filtering at all would cause problems as the bulk of low-abundance windows would dominate the loess span calculations, as well as causing problems with discreteness.)
 The average count doesn't drop as quickly and cannot go below the supported range if you filtered on the average count in the first place.
 
+Another way to look at it is to consider a 2-vs-2 design, in which the counts are zero in one group.
+Computing the A-value would be equivalent to taking the square root of the non-zero binding intensity.
+In contrast, computing the log-average count would be equivalent to halving the non-zero binding intensity.
+For coverage greater than 2, the result of the latter will always be larger than that of the former.
+This reasoning also explains why you can't just add a prior count;
+it is easy to show that the prior required to bring it up to the filter threshold would be comparable to the threshold itself, thus distorting the trend fit.
+
 Of course, one could argue that the drop in the A-value is beneficial as high-abundance DB sites would be dragged down towards the majority of non-DB windows.
 This is true but less of a concern as we have filtered out low-abundance windows.
 There may or may not be non-DB support at high abundances, but there is definitely no support at low abundances after filtering.
@@ -1052,9 +1059,9 @@ However, this depends on obtaining a good upper bound on the number of false pos
 If the number of detected windows is low and/or they are correlated, sampling stochasticity will affect the precision of the upper bound.
 There are also some theoretical issues with multiplying expected and observed values, which probably become pertinent when precision decreases.
 
-A similar problem is encountered with \code{empiricalFDR}.
-In this case, an estimate of the number of false positives is obtained by looking at the number of rejections in the wrong direction.
-This exploits the fact that the sign is independent of significance under the equality null, so the p-value distribution of false positives in each direction should be equal.
+A similar problem is encountered with \code{empiricalFDR}, where the number of false positives is estimated from the number of rejections in the wrong direction.
+This exploits the fact that the sign is independent of significance under the equality null, such that the distribution of p-values in each direction should be equal.
+Thus, at any given threshold, the number of rejections in the wrong direction should be the same as the number of rejections (false positives) in the right direction.
 However, this estimate will not be precise if there are not many rejections, especially at low $p$-value thresholds.
 The accuracy of the estimate also assumes that there are no condition-specific artifacts that bias rejections in one direction or another.
 This is possible if the negative control does not capture the same type of false positives that are present in the ChIP sample.
