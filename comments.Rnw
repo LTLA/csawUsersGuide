@@ -222,7 +222,7 @@ In other words, we're interested in differential binding rather than absolute en
 Which is okay in other cases as you get a boost in power from larger counts (though you can twiddle the width to deal with that - and then you get into parameter dogfights).
 
 All in all, clustering will give higher counts and better performance for clusters where the DB status is homogenous throughout the cluster. 
-(That said, clustering will not guarantee that the DB status is homogenous i
+(That said, clustering will not guarantee that the DB status is homogenous inside the cluster
     -- you could still suboptimally detect clusters involving shifting, so it's not correct to say that you're using clustering to focus on homogenous changes. 
     The only way to guarantee homogeneity would be to do IUTs on all windows throughout the regions.)
 For more complex events, clustering will probably be suboptimal.
@@ -239,12 +239,19 @@ In addition, the behaviour of the subpeak identification algorithm behaves may n
 We might as well make our lives simpler and use windows directly.
 
 % One might propose to call peaks in each condition, and then do a setdiff on the genomic intervals between conditions.
-% This would get the unique (and shared) subintervals, which you could then count over.
+% This would get the unique (and shared) subintervals, which you could then count over for actual testing.
 % However, this has some technical problems, e.g., how large does the interval have to be for it to be considered?
 % Some threshold is required, as ambiguity in the boundaries will result in spurious ``unique'' subintervals for identical peaks.
 % Moreover, there are a number of statistical problems, not least of which is the fact that you're defining condition-specific intervals.
 % This will surely lead to an inflated false positive rate during testing.
-% You could do the same thing with libraries (being blind to the condition), but then you'll get an inflated variance if intervals are unique to one replicate.
+%
+% You could do the same thing with libraries (being blind to the condition), where you select for intervals present in at least N replicates.
+% N needs to be chosen so that it is no larger than the smallest group, otherwise you would lose power to detect DB.
+% However, under the null, there is no reason for the detected intervals to be in the same group, thus inflating the variance of the counts.
+% This will propagate to other genomic regions if empirical Bayes shrinkage is strong, thus reducing power to detect genuine DB.
+% You will also enrich for false positives where the "at least N" peaks all belong in one condition, though power is probably reduced enough to avoid liberalness.
+% (The exception is if genuinely DB regions are present and drag down the common variance towards the true value, as they are not skewed by the filter.
+% This will result in detection of more of these false positives.)
 
 While I'm here, I might as well note some drawbacks with hidden Markov models.
 HMMs are great for describing the correlations between states, and for using information across the genome to improve inferences.
