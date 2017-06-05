@@ -926,6 +926,19 @@ As a result, the variability in the dispersions will be increased.
 There mightn't be a large increase in the dispersions themselves due to a stochastic batch effect, as not all features will be heavily affected by the batch to cause a substantial increase in the fitted trend or the common estimate.
 However, small prior d.f. can result in almost as much damage as large dispersions, so watch out.
 
+\subsubsection*{Choosing the number of replicates}
+ChIP-seq is pretty troublesome, so it seems that the most logistically feasible choice is to go with two replicates in each group.
+Three per group would probably be preferable, as it gives us an idea of which sample to toss out if one of them goes wrong.
+We \textit{could} go on to do more replicates, but I don't think this is a good use of time and money.
+At best, with many replicates, you'll end up detecting everything as DB with small effect sizes, and most of these would be uninteresting and/or hard to validate.
+At worst, you'll end up with a pile of batch effects or efficiency biases due to logistical issues. 
+
+There may be an argument for doing many replicates if you expect the effect size to be small.
+However, most applications deal with fairly large effect sizes for at least a number of genomic regions.
+Moreover, the regions with the largest effect sizes are likely to be most interesting, or at least, most strongly prioritized.
+This means that there often isn't a great deal of incentive to spend money to improve power at the lower ranks.
+As long as there are good candidate regions to follow up -- \textit{and you do follow them up!} -- a small number of replicates is fine.
+
 \subsection*{Comments about FDR control}
 
 \subsubsection*{Algorithm for splitting large clusters}
@@ -1105,6 +1118,14 @@ Generating the filter vectors with \code{data} instead of \code{filtered.data} i
 In particular, the local maxima filter depends on the abundance of adjacent windows.
 It may behave incorrectly if it is applied after another filter that removes high-abundance windows.
 
+\subsubsection*{Cherry-picking regions from the DB list}
+A common use of the DB list is to scroll down the list and pick interesting regions (e.g., around particular genes) based on domain expertise.
+In theory, we should use the local FDR to provide control for arbitrary selections of regions from the DB list.
+However, this is difficult as it requires knowledge of the distribution of p-values under the alternative.
+
+As long as the selection is evenly spread or skewed towards lower p-values, the FDR across the selection should still be controlled below the specified threshold.
+This is likely if we assume that the domain knowledge is reasonable, because regions involved in affected processes should be near the top of the list.
+(And if they're not, the domain knowledge is probably wrong, and they should be looking at the top-ranking DB regions instead.)
 
 
 \end{document}
