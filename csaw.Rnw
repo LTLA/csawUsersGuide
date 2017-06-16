@@ -1180,16 +1180,20 @@ filtered.data$norm.factors <- normfacs
 
 \section{Scaling normalization with spike-in chromatin}
 Several studies have used spike-in chromatin for scaling normalization of ChIP-seq data \citep{bonhoure2014quantifying,orlando2014quantitative}.
-Briefly, chromatin or whole cells from a different species is added to each of the samples of interest at the start of the ChIP-seq protocol.
-The mixture is processed and sequenced in the usual manner, and the coverage of the spiked-in foreign chromatin is quantified in each library.
-The quantity of foreign chromatin added per cell should be constant in each sample, so the library size-adjusted coverage of the foreign genome should also be the same between libraries.
+Briefly, a constant amount of chromatin from a different species is added to each sample at the start of the ChIP-seq protocol.
+The mixture is processed and sequenced in the usual manner, using an antibody that can bind epitopes of interest from both species.
+The coverage of the spiked-in foreign chromatin is then quantified in each library.
+As the quantity of foreign chromatin should be constant in each sample, the coverage of the foreign genome should also be the same between libraries.
 Any difference in spike-in coverage between libraries represents some technical bias that should be removed by scaling.
 
 This normalization strategy can be implemented in \pkgname{} with some work.
-Assume that the \code{spike.data} object contains the counts for all spike-in regions in each library (constructed by, say, running \code{regionCounts} on the BAM files obtained after aligning reads to the foreign genome).
-Normalization factors can be computed by applying the TMM method on these counts, but only after setting the library size to the total number of reads mapped to the \textit{endogenous} genome in each sample.
+Assuming that the reference includes appropriate sequences from the foreign genome, coverage can be quantified across genomic windows with \code{windowCounts}.
+Filtering is performed to select for high-abundance windows in the foreign genome (see Section~\ref{sec:eff_norm}), yielding counts for all enriched spike-in regions.
+(The filtered object is named \code{spike.data} in the code below.)
+Normalization factors are computed by applying the TMM method on these counts.
+This aims to identify the fold-change in enrichment between samples that is attributable to technical effects.
+Note that the library sizes should be set to the total number of reads mapped to the \textit{endogenous} genome in each sample.
 This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
-% Otherwise, if the total number of spike-in reads was used as the library size, the expected factors would be equal to unity for all samples.
 
 <<echo=FALSE, results=hide>>=
 spike.data <- data
@@ -1200,13 +1204,13 @@ spike.facs <- normOffsets(spike.data, lib.sizes=data$totals)
 @
 
 The spike-in approach does not distinguish between composition and efficiency biases.
-Instead, it uses the differences in spike-in coverage to empirically measure and remove the net bias between libraries.
+Instead, it uses the fold-differences in spike-in coverage to empirically measure and remove the net bias between libraries.
 This avoids the need for assumptions regarding the origin of any systematic differences between libraries.
-That said, spike-in normalization involves some (possibly strong) assumptions of its own.
-For example, the same quantity of spike-in chromatin per cell is assumed to be added in each sample.
-This requires accurate quantitation of the number of cells in each sample, followed by precise addition of small spike-in quantities.
-In addition, the behaviour of the spike-in chromatin is assumed to be the same as that of the endogenous chromatin throughout the ChIP-seq protocol.
-Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-ins. 
+That said, spike-in normalization involves some strong assumptions of its own.
+For example, the same ratio of spike-in chromatin to endogenous chromatin is assumed to be present in each sample.
+This requires accurate quantitation of the chromatin in each sample, followed by precise addition of small spike-in quantities.
+Furthermore, the spike-in chromatin is assumed to behave in the same manner as endogenous chromatin throughout the ChIP-seq protocol.
+Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-in chromatin.
 
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
