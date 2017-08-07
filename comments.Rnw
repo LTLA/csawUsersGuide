@@ -80,6 +80,9 @@ This may not even be possible for complex designs without a one-way layout.
 \item It assumes that the controls are accurate estimators of background, which mightn't be the case.
 Inputs are particularly troublesome as you don't do any pulldown, which gives you something similar to DNase-seq profiles.
 In contrast, the pulldown and washes in an actual ChIP library would presumably remove a lot of the signal in open chromatin.
+It is also difficult to imagine that the input profile would not be affected by various IP biases, especially in relation to histone density and fragment length.
+I am comfortable with using inputs for direct comparisons to ChIP samples, where I can accept that the log-fold change may not be accurate but is in the right direction.
+I am less comfortable with using inputs for correction, where inaccuracies in the log-fold changes may lead to spurious DB.
 
 \item Subtraction will distort the mean-variance relationship as the absolute size of the counts is lost.
 This is most relevant when both ChIP and control coverage are high, where subtraction is meant to be most beneficial.
