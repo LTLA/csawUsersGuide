@@ -138,6 +138,20 @@ mean(res.m$table$PValue[which(keep.m) %in% is.null] <= 0.01)
 plotAlpha(res.m$table$PValue[which(keep.m) %in% is.null])
 ```
 
+# Caveats with the mean filter
+
+The sample mean is approxiamtely independent of the dispersion estimate and p-value for Poisson and NB-distributed counts.
+However, this only applies to a single distribution.
+If you have a mixture of NB distributions with different dispersions but the same mean, applying a stringent mean filter will select for higher dispersions.
+This is because high-dispersion features are more likely to achieve large sample means. 
+The result is to encourage inflation of the dispersion estimate.
+
+In practice, this is not much of an issue.
+For ChIP-seq data, the prior degrees of freedom is usually quite high such that there is not much variability in the dispersions.
+For RNA-seq data, the filter boundary is not dense so the specifics of filtering doesn't matter.
+The same effect is present in the other filters anyway (in addition to their poor performance on the constant dispersion case),
+    as high dispersions make it more likely to get one or two peaks above the threshold.
+
 # Wrapping up
 
 ```{r}
