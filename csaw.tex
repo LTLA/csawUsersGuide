@@ -52,7 +52,7 @@
 % Set to change date for document, not compile date.
 \date{First edition 15 August 2012\\
 \vspace{6pt}
-Last revised 9 January 2017}
+Last revised 16 June 2017}
 
 % Removing the bibliography title so it shows up in the contents.
 \makeatletter
@@ -724,9 +724,10 @@ Thus, an \code{ext} list should only specified for datasets that exhibit large d
 \section{Choosing an appropriate window size}
 The coverage profile around potential binding sites can be obtained with the \code{profileSites} function.
 Here, the binding sites are defined by taking high-abundance 50 bp windows and identifying those that are locally maximal using \code{findMaxima}.
-For each selected window, \code{profileSites} records the coverage across the flanking regions as a function of the distance from the edge of the window.
-This is divided by the count for the window itself to obtain a relative coverage, based on the specification of \code{weight}.
-The values are then averaged across all windows to obtain an aggregated coverage profile for each library.
+(Potential duplicates ignored by using \code{dedup.on} during read extraction, to reduce the impact of read stacks on the constructed profile.)
+For each selected window, \code{profileSites} records the coverage across the flanking regions as a function of the distance from the start of the window.
+This is normalized by dividing by the maximum coverage across the interval for each window.
+Coverage values are then averaged across all windows to obtain an aggregated profile for each library.
 
 \begin{Schunk}
 \begin{Sinput}
@@ -737,7 +738,7 @@ The values are then averaged across all windows to obtain an aggregated coverage
 +     rwsms <- rowSums(assay(windowed))
 +     maxed <- findMaxima(rowRanges(windowed), range=1000, metric=rwsms)
 +     collected[[curbam]] <- profileSites(curbam, rowRanges(windowed)[maxed], 
-+         param=dedup.on, weight=1/rwsms[maxed])
++         param=dedup.on, normalize="max")
 + }
 > xranged <- as.integer(names(collected[[1]]))
 > plot(xranged, collected[[1]], type="l", col="blue", xlim=c(-1000, 1000), lwd=2, 
@@ -1450,16 +1451,20 @@ This is because the former is of interest in the actual DB analysis.
 
 \section{Scaling normalization with spike-in chromatin}
 Several studies have used spike-in chromatin for scaling normalization of ChIP-seq data \citep{bonhoure2014quantifying,orlando2014quantitative}.
-Briefly, chromatin or whole cells from a different species is added to each of the samples of interest at the start of the ChIP-seq protocol.
-The mixture is processed and sequenced in the usual manner, and the coverage of the spiked-in foreign chromatin is quantified in each library.
-The quantity of foreign chromatin added per cell should be constant in each sample, so the library size-adjusted coverage of the foreign genome should also be the same between libraries.
+Briefly, a constant amount of chromatin from a different species is added to each sample at the start of the ChIP-seq protocol.
+The mixture is processed and sequenced in the usual manner, using an antibody that can bind epitopes of interest from both species.
+The coverage of the spiked-in foreign chromatin is then quantified in each library.
+As the quantity of foreign chromatin should be constant in each sample, the coverage of the foreign genome should also be the same between libraries.
 Any difference in spike-in coverage between libraries represents some technical bias that should be removed by scaling.
 
 This normalization strategy can be implemented in \pkgname{} with some work.
-Assume that the \code{spike.data} object contains the counts for all spike-in regions in each library (constructed by, say, running \code{regionCounts} on the BAM files obtained after aligning reads to the foreign genome).
-Normalization factors can be computed by applying the TMM method on these counts, but only after setting the library size to the total number of reads mapped to the \textit{endogenous} genome in each sample.
+Assuming that the reference includes appropriate sequences from the foreign genome, coverage can be quantified across genomic windows with \code{windowCounts}.
+Filtering is performed to select for high-abundance windows in the foreign genome (see Section~\ref{sec:eff_norm}), yielding counts for all enriched spike-in regions.
+(The filtered object is named \code{spike.data} in the code below.)
+Normalization factors are computed by applying the TMM method on these counts.
+This aims to identify the fold-change in enrichment between samples that is attributable to technical effects.
+Note that the library sizes should be set to the total number of reads mapped to the \textit{endogenous} genome in each sample.
 This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
-% Otherwise, if the total number of spike-in reads was used as the library size, the expected factors would be equal to unity for all samples.
 
 
 \begin{Schunk}
@@ -1469,13 +1474,13 @@ This ensures that the computed factors will yield effective library sizes that a
 \end{Schunk}
 
 The spike-in approach does not distinguish between composition and efficiency biases.
-Instead, it uses the differences in spike-in coverage to empirically measure and remove the net bias between libraries.
+Instead, it uses the fold-differences in spike-in coverage to empirically measure and remove the net bias between libraries.
 This avoids the need for assumptions regarding the origin of any systematic differences between libraries.
-That said, spike-in normalization involves some (possibly strong) assumptions of its own.
-For example, the same quantity of spike-in chromatin per cell is assumed to be added in each sample.
-This requires accurate quantitation of the number of cells in each sample, followed by precise addition of small spike-in quantities.
-In addition, the behaviour of the spike-in chromatin is assumed to be the same as that of the endogenous chromatin throughout the ChIP-seq protocol.
-Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-ins. 
+That said, spike-in normalization involves some strong assumptions of its own.
+For example, the same ratio of spike-in chromatin to endogenous chromatin is assumed to be present in each sample.
+This requires accurate quantitation of the chromatin in each sample, followed by precise addition of small spike-in quantities.
+Furthermore, the spike-in chromatin is assumed to behave in the same manner as endogenous chromatin throughout the ChIP-seq protocol.
+Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-in chromatin.
 
 \section{Dealing with trended biases}
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
@@ -2737,9 +2742,13 @@ These commands are stored in a Bash file, accessible by running:
 > sessionInfo()
 \end{Sinput}
 \begin{Soutput}
-R Under development (unstable) (2016-10-20 r71540)
+R version 3.4.0 Patched (2017-04-28 r72639)
 Platform: x86_64-pc-linux-gnu (64-bit)
 Running under: CentOS release 6.4 (Final)
+
+Matrix products: default
+BLAS: /wehisan/home/allstaff/a/alun/Software/R/R-3-4-branch_devel/lib/libRblas.so
+LAPACK: /wehisan/home/allstaff/a/alun/Software/R/R-3-4-branch_devel/lib/libRlapack.so
 
 locale:
  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
@@ -2754,62 +2763,67 @@ attached base packages:
  [8] datasets  methods   base     
 
 other attached packages:
- [1] Gviz_1.19.3                             
- [2] rtracklayer_1.35.6                      
- [3] org.Mm.eg.db_3.4.0                      
+ [1] Gviz_1.21.1                             
+ [2] rtracklayer_1.37.2                      
+ [3] org.Mm.eg.db_3.4.1                      
  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.0
- [5] GenomicFeatures_1.27.10                 
- [6] AnnotationDbi_1.37.4                    
- [7] edgeR_3.17.5                            
- [8] limma_3.31.19                           
- [9] csaw_1.9.8                              
-[10] BiocParallel_1.9.5                      
-[11] SummarizedExperiment_1.5.7              
-[12] DelayedArray_0.1.7                      
-[13] matrixStats_0.51.0                      
-[14] Biobase_2.35.1                          
-[15] GenomicRanges_1.27.23                   
-[16] GenomeInfoDb_1.11.9                     
-[17] IRanges_2.9.19                          
-[18] S4Vectors_0.13.15                       
-[19] BiocGenerics_0.21.3                     
+ [5] GenomicFeatures_1.29.6                  
+ [6] AnnotationDbi_1.39.1                    
+ [7] edgeR_3.19.1                            
+ [8] limma_3.33.3                            
+ [9] csaw_1.11.1                             
+[10] BiocParallel_1.11.2                     
+[11] SummarizedExperiment_1.7.5              
+[12] DelayedArray_0.3.16                     
+[13] matrixStats_0.52.2                      
+[14] Biobase_2.37.2                          
+[15] GenomicRanges_1.29.6                    
+[16] GenomeInfoDb_1.13.4                     
+[17] IRanges_2.11.5                          
+[18] S4Vectors_0.15.4                        
+[19] BiocGenerics_0.23.0                     
 
 loaded via a namespace (and not attached):
- [1] httr_1.2.1                    AnnotationHub_2.7.14         
- [3] splines_3.4.0                 shiny_1.0.0                  
- [5] Formula_1.2-1                 assertthat_0.1               
- [7] interactiveDisplayBase_1.13.0 statmod_1.4.29               
- [9] latticeExtra_0.6-28           BSgenome_1.43.7              
-[11] GenomeInfoDbData_0.99.0       Rsamtools_1.27.13            
-[13] yaml_2.1.14                   RSQLite_1.1-2                
-[15] backports_1.0.5               lattice_0.20-34              
-[17] biovizBase_1.23.2             digest_0.6.12                
-[19] RColorBrewer_1.1-2            XVector_0.15.2               
-[21] checkmate_1.8.2               colorspace_1.3-2             
-[23] httpuv_1.3.3                  htmltools_0.3.5              
-[25] Matrix_1.2-8                  plyr_1.8.4                   
-[27] XML_3.98-1.5                  biomaRt_2.31.4               
-[29] zlibbioc_1.21.0               xtable_1.8-2                 
-[31] scales_0.4.1                  htmlTable_1.9                
-[33] tibble_1.2                    ggplot2_2.2.1                
-[35] nnet_7.3-12                   lazyeval_0.2.0               
-[37] mime_0.5                      survival_2.41-2              
-[39] magrittr_1.5                  memoise_1.0.0                
-[41] foreign_0.8-67                BiocInstaller_1.25.3         
-[43] tools_3.4.0                   data.table_1.10.4            
-[45] stringr_1.2.0                 Rhtslib_1.7.0                
-[47] munsell_0.4.3                 locfit_1.5-9.1               
-[49] cluster_2.0.6                 ensembldb_1.99.12            
-[51] Biostrings_2.43.4             RCurl_1.95-4.8               
-[53] dichromat_2.0-0               VariantAnnotation_1.21.17    
-[55] htmlwidgets_0.8               bitops_1.0-6                 
-[57] base64enc_0.1-3               gtable_0.2.0                 
-[59] DBI_0.6                       R6_2.2.0                     
-[61] GenomicAlignments_1.11.12     gridExtra_2.2.1              
-[63] knitr_1.15.1                  Hmisc_4.0-2                  
-[65] ProtGenerics_1.7.0            KernSmooth_2.23-15           
-[67] stringi_1.1.2                 Rcpp_0.12.10                 
-[69] rpart_4.1-10                  acepack_1.4.1                
+ [1] ProtGenerics_1.9.0            bitops_1.0-6                 
+ [3] bit64_0.9-7                   RColorBrewer_1.1-2           
+ [5] progress_1.1.2                httr_1.2.1                   
+ [7] tools_3.4.0                   backports_1.1.0              
+ [9] R6_2.2.2                      rpart_4.1-11                 
+[11] KernSmooth_2.23-15            Hmisc_4.0-3                  
+[13] DBI_0.7                       lazyeval_0.2.0               
+[15] colorspace_1.3-2              nnet_7.3-12                  
+[17] gridExtra_2.2.1               prettyunits_1.0.2            
+[19] bit_1.1-12                    curl_2.6                     
+[21] compiler_3.4.0                htmlTable_1.9                
+[23] scales_0.4.1                  checkmate_1.8.2              
+[25] stringr_1.2.0                 digest_0.6.12                
+[27] Rsamtools_1.29.0              foreign_0.8-69               
+[29] XVector_0.17.0                base64enc_0.1-3              
+[31] dichromat_2.0-0               pkgconfig_2.0.1              
+[33] htmltools_0.3.6               ensembldb_2.1.10             
+[35] BSgenome_1.45.1               htmlwidgets_0.8              
+[37] rlang_0.1.1                   RSQLite_2.0                  
+[39] BiocInstaller_1.27.2          shiny_1.0.3                  
+[41] acepack_1.4.1                 VariantAnnotation_1.23.4     
+[43] RCurl_1.95-4.8                magrittr_1.5                 
+[45] GenomeInfoDbData_0.99.1       Formula_1.2-1                
+[47] Matrix_1.2-10                 Rcpp_0.12.11                 
+[49] munsell_0.4.3                 stringi_1.1.5                
+[51] yaml_2.1.14                   zlibbioc_1.23.0              
+[53] plyr_1.8.4                    AnnotationHub_2.9.5          
+[55] blob_1.1.0                    lattice_0.20-35              
+[57] Biostrings_2.45.2             splines_3.4.0                
+[59] locfit_1.5-9.1                knitr_1.16                   
+[61] biomaRt_2.33.3                XML_3.98-1.9                 
+[63] biovizBase_1.25.1             latticeExtra_0.6-28          
+[65] data.table_1.10.4             httpuv_1.3.3                 
+[67] gtable_0.2.0                  assertthat_0.2.0             
+[69] ggplot2_2.2.1                 mime_0.5                     
+[71] xtable_1.8-2                  AnnotationFilter_1.1.2       
+[73] survival_2.41-3               tibble_1.3.3                 
+[75] GenomicAlignments_1.13.2      memoise_1.1.0                
+[77] cluster_2.0.6                 statmod_1.4.30               
+[79] Rhtslib_1.9.1                 interactiveDisplayBase_1.15.0
 \end{Soutput}
 \end{Schunk}
 
