@@ -1,6 +1,7 @@
 ---
 title: TMM normalization with low counts
 author: Aaron Lun
+date: 19 August 2017
 output: 
    html_document:
      fig.caption: false
@@ -8,7 +9,7 @@ output:
 
 ```{r, echo=FALSE}
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
-knitr::opts_chunk$set(fig.path="figures-peak/")
+knitr::opts_chunk$set(fig.path="figures-lowtmm/")
 ```
 
 # Background 
