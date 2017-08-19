@@ -1,0 +1,142 @@
+---
+title: Anticonservativeness in peak selection strategies
+author: Aaron Lun
+output: 
+   html_document:
+     fig.caption: false
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(fig.path="figures-peak/")
+```
+
+# Background 
+
+This simulation shows that ad hoc peak selection strategies not only result in conservatives (as shown in the NAR 2014 paper), but also loss of type I error control.
+Consider an experimental design with two replicates in each of two conditions.
+
+```{r}
+group <- rep(c("A", "B"), each=2)
+nlibs <- length(group)
+design <- model.matrix(~group)
+```
+
+We'll simulate some counts where 10% of the sites are DB.
+
+```{r}
+library(edgeR)
+set.seed(90000)
+P <- 1/0.1
+nsites <- 1e5
+is.null <- seq_len(nsites)
+counts <- rbind(matrix(rnbinom(nsites*nlibs, mu=50, size=P), ncol=nlibs, byrow=TRUE),
+                matrix(rnbinom(nsites*0.1*nlibs, mu=c(100, 100, 0, 0), size=P), ncol=nlibs, byrow=TRUE))
+```
+
+We'll also set up a function to assess type I error control.
+
+```{r}
+plotAlpha <- function(pvals, ylab="Observed/specified", xlab="Specified", xlim=NULL, ...) {
+    exp <- (seq_along(pvals) - 0.5)/length(pvals)
+    n <- findInterval(exp, sort(pvals))
+    obs <- n/length(pvals)
+    if (is.null(xlim)) { # Stable at 20 observations.
+        xlim <- c(exp[which(n >= 20)[1]], 1)
+    }
+    plot(exp, obs/exp, log="xy", xlim=xlim, ...)
+}
+```
+
+
+# Applying the "at least 2" filter
+
+Let's see what happens when we apply the "at least two" filter to retain the top proportion of sites.
+
+```{r}
+top.al2 <- apply(counts, 1, FUN=function(x) { sort(x)[nlibs-1] })
+keep.al2 <- length(top.al2) - rank(top.al2, ties.method="random") +1 <= 20000
+sum(which(keep.al2) %in% is.null)
+```
+
+Running these counts through _edgeR_, using standardized library sizes.
+There is some inflation, but the presence of correct dispersion estimates for the DB sites keeps the dispersion low.
+
+```{r}
+y.al2 <- DGEList(counts[keep.al2,], lib.size=rep(1e6, nlibs))
+y.al2 <- estimateDisp(y.al2, design)
+y.al2$common.dispersion
+```
+
+We observe loss of type I error control at low _p_-values.
+This is because the dispersion inflation is minimized _and_ the "at least two" filter selects for spurious DB sites.
+
+```{r}
+fit.al2 <- glmQLFit(y.al2, design, robust=TRUE)
+res.al2 <- glmQLFTest(fit.al2)
+plotAlpha(res.al2$table$PValue[which(keep.al2) %in% is.null])
+```
+
+# Applying a union filter.
+
+Repeating the dose with a union filter.
+Here we retain fewer sites, which ensures that the DB percentage in the retained set is higher (see below).
+
+```{r}
+top.u <- apply(counts, 1, FUN=function(x) { max(x) })
+keep.u <- length(top.u) - rank(top.u, ties.method="random") +1 <= 5000
+sum(which(keep.u) %in% is.null)
+```
+
+Running these counts through _edgeR_.
+The higher DB percentage keeps the dispersion inflation low.
+
+```{r}
+y.u <- DGEList(counts[keep.u,], lib.size=rep(1e6, nlibs))
+y.u <- estimateDisp(y.u, design)
+y.u$common.dispersion
+```
+
+Testing again results in the loss of type I error control.
+Normally, the union approach enriches outliers and inflates the dispersion.
+However, enough DB sites ensures that the inflation is minimized, encouraging spurious rejection of the null.
+
+```{r}
+fit.u <- glmQLFit(y.u, design, robust=TRUE)
+res.u <- glmQLFTest(fit.u)
+plotAlpha(res.u$table$PValue[which(keep.u) %in% is.null])
+```
+
+# Applying the mean filter
+
+Now, to demonstrate the correct way of doing it, we use a filter on the mean count.
+
+```{r}
+top.m <- rowMeans(counts)
+keep.m <- length(top.m) - rank(top.m, ties.method="random") +1 <= 10000
+sum(which(keep.m) %in% is.null)
+```
+
+Running these counts through _edgeR_.
+The higher DB percentage keeps the dispersion inflation low.
+
+```{r}
+y.m <- DGEList(counts[keep.m,], lib.size=rep(1e6, nlibs))
+y.m <- estimateDisp(y.m, design)
+y.m$common.dispersion
+```
+
+Testing indicates that type I error control is mostly maintained.
+
+```{r}
+fit.m <- glmQLFit(y.m, design, robust=TRUE)
+res.m <- glmQLFTest(fit.m)
+plotAlpha(res.m$table$PValue[which(keep.m) %in% is.null])
+```
+
+# Wrapping up
+
+```{r}
+sessionInfo()
+```
+
