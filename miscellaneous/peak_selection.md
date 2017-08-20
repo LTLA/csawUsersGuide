@@ -4,14 +4,17 @@ author: Aaron Lun
 date: 19 August 2017
 output: 
    html_document:
-     fig.caption: false
+     fig_caption: false
 ---
 
 
 
 # Background 
 
-This simulation shows that ad hoc peak selection strategies not only result in conservatives (as shown in the NAR 2014 paper), but also loss of type I error control.
+The 2014 NAR paper (https://doi.org/10.1093/nar/gku351) showed that many _ad hoc_ peak selection strategies result in conservativeness.
+One could consider erring on the side of conservativeness to be acceptable, especially if more DB sites pass the filter.
+However, this simulation demonstrates that the same strategies can also result in loss of type I error control.
+The possibility of anticonservativeness means that any increased detection from _ad hoc_ strategies cannot be trusted.
 Consider an experimental design with two replicates in each of two conditions.
 
 
@@ -28,10 +31,11 @@ We'll simulate some counts where 10% of the sites are DB.
 library(edgeR)
 set.seed(90000)
 P <- 1/0.1
-nsites <- 1e5
-is.null <- seq_len(nsites)
-counts <- rbind(matrix(rnbinom(nsites*nlibs, mu=50, size=P), ncol=nlibs, byrow=TRUE),
-                matrix(rnbinom(nsites*0.1*nlibs, mu=c(100, 100, 0, 0), size=P), ncol=nlibs, byrow=TRUE))
+n.sites <- 1e5
+db.sites <- n.sites*0.1
+is.null <- seq_len(n.sites)
+counts <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P), ncol=nlibs, byrow=TRUE),
+                matrix(rnbinom(db.sites*nlibs, mu=c(100, 100, 0, 0), size=P), ncol=nlibs, byrow=TRUE))
 ```
 
 We'll also set up a function to assess type I error control.
@@ -49,7 +53,6 @@ plotAlpha <- function(pvals, ylab="Observed/specified", xlab="Specified", xlim=N
 }
 ```
 
-
 # Applying the "at least 2" filter
 
 Let's see what happens when we apply the "at least two" filter to retain the top proportion of sites.
@@ -58,11 +61,12 @@ Let's see what happens when we apply the "at least two" filter to retain the top
 ```r
 top.al2 <- apply(counts, 1, FUN=function(x) { sort(x)[nlibs-1] })
 keep.al2 <- length(top.al2) - rank(top.al2, ties.method="random") +1 <= 20000
-sum(which(keep.al2) %in% is.null)
+summary(which(keep.al2) %in% is.null)
 ```
 
 ```
-## [1] 12729
+##    Mode   FALSE    TRUE 
+## logical    7271   12729
 ```
 
 Running these counts through _edgeR_, using standardized library sizes.
@@ -108,11 +112,12 @@ Here we retain fewer sites, which ensures that the DB percentage in the retained
 ```r
 top.u <- apply(counts, 1, FUN=function(x) { max(x) })
 keep.u <- length(top.u) - rank(top.u, ties.method="random") +1 <= 5000
-sum(which(keep.u) %in% is.null)
+summary(which(keep.u) %in% is.null)
 ```
 
 ```
-## [1] 410
+##    Mode   FALSE    TRUE 
+## logical    4590     410
 ```
 
 Running these counts through _edgeR_.
@@ -158,11 +163,12 @@ Now, to demonstrate the correct way of doing it, we use a filter on the mean cou
 ```r
 top.m <- rowMeans(counts)
 keep.m <- length(top.m) - rank(top.m, ties.method="random") +1 <= 10000
-sum(which(keep.m) %in% is.null)
+summary(which(keep.m) %in% is.null)
 ```
 
 ```
-## [1] 8468
+##    Mode   FALSE    TRUE 
+## logical    1532    8468
 ```
 
 Running these counts through _edgeR_.
@@ -198,6 +204,105 @@ plotAlpha(res.m$table$PValue[which(keep.m) %in% is.null])
 
 ![plot of chunk unnamed-chunk-13](figures-peak/unnamed-chunk-13-1.png)
 
+# Using the mean filter with variable dispersions
+
+The sample mean is approxiamtely independent of the dispersion estimate and p-value for Poisson and NB-distributed counts.
+However, this only applies to a single distribution.
+Consider a mixture of NB distributions with different dispersions but the same mean.
+
+
+```r
+set.seed(100000)
+P.n <- rchisq(n.sites, df=10)
+P.db <- rchisq(db.sites, df=10)
+counts <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P.n), ncol=nlibs, byrow=TRUE),
+                matrix(rnbinom(db.sites*nlibs, mu=c(100, 100, 0, 0), size=P.db), ncol=nlibs, byrow=TRUE))
+```
+
+Running on all the sites doesn't cause any issues other than some anticonservativeness at low _p_-values.
+This is relatively modest and acceptable given that the inverse-chi-squared distribution for the NB dispersions only mimics the true QL model.
+(In contrast, the _ad hoc_ filters were tested on purely NB counts, so they should not have any problems.)
+
+
+```r
+y.all <- DGEList(counts, lib.size=rep(1e6, nlibs))
+y.all <- estimateDisp(y.all, design)
+y.all$common.dispersion
+```
+
+```
+## [1] 0.1234853
+```
+
+```r
+fit.all <- glmQLFit(y.all, design, robust=TRUE)
+res.all <- glmQLFTest(fit.all)
+mean(res.all$table$PValue[is.null] <= 0.01)
+```
+
+```
+## [1] 0.01121
+```
+
+```r
+plotAlpha(res.all$table$PValue[is.null])
+```
+
+![plot of chunk unnamed-chunk-15](figures-peak/unnamed-chunk-15-1.png)
+
+However, applying a stringent mean filter will select for higher dispersions.
+This is because high-dispersion features are more likely to achieve large sample means. 
+The result is to encourage inflation of the dispersion estimate.
+
+
+```r
+top.m2 <- rowMeans(counts)
+keep.m2 <- length(top.m2) - rank(top.m2, ties.method="random") +1 <= 1000
+summary(which(keep.m2) %in% is.null)
+```
+
+```
+##    Mode   FALSE    TRUE 
+## logical     289     711
+```
+
+```r
+y.m2 <- DGEList(counts[keep.m2,], lib.size=rep(1e6, nlibs))
+y.m2 <- estimateDisp(y.m2, design)
+y.m2$common.dispersion
+```
+
+```
+## [1] 0.1907132
+```
+
+Funnily enough, this doesn't actually hurt the type I error rate.
+This is possibly because the same issue affects both DB and non-DB sites, i.e., DB sites with high dispersions will be similarly preferred.
+This ensures that there is no enrichment for low-dispersion DB sites to suppress the variance inflation and lead to anticonservativeness.
+
+
+```r
+fit.m2 <- glmQLFit(y.m2, design, robust=TRUE)
+res.m2 <- glmQLFTest(fit.m2)
+mean(res.m2$table$PValue[which(keep.m2) %in% is.null] <= 0.01)
+```
+
+```
+## [1] 0.0140647
+```
+
+```r
+plotAlpha(res.m2$table$PValue[which(keep.m2) %in% is.null])
+```
+
+![plot of chunk unnamed-chunk-17](figures-peak/unnamed-chunk-17-1.png)
+
+In practice, this is not much of an issue.
+For ChIP-seq data, the prior degrees of freedom is usually quite high such that there is not much variability in the dispersions.
+For RNA-seq data, the filter boundary is not dense so the specifics of filtering doesn't matter.
+The same effect is present in the other filters anyway (in addition to their poor performance on the constant dispersion case),
+    as high dispersions make it more likely to get one or two peaks above the threshold.
+
 # Wrapping up
 
 
@@ -229,10 +334,9 @@ sessionInfo()
 ## [1] edgeR_3.19.3 limma_3.33.7
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_0.12.12    locfit_1.5-9.1  lattice_0.20-35 rprojroot_1.2  
-##  [5] digest_0.6.12   grid_3.4.0      backports_1.1.0 magrittr_1.5   
-##  [9] evaluate_0.10.1 highr_0.6       stringi_1.1.5   rmarkdown_1.6  
-## [13] splines_3.4.0   statmod_1.4.30  tools_3.4.0     stringr_1.2.0  
-## [17] yaml_2.1.14     compiler_3.4.0  htmltools_0.3.6 knitr_1.17
+##  [1] compiler_3.4.0  magrittr_1.5    tools_3.4.0     splines_3.4.0  
+##  [5] stringi_1.1.5   highr_0.6       grid_3.4.0      locfit_1.5-9.1 
+##  [9] knitr_1.17      stringr_1.2.0   statmod_1.4.30  lattice_0.20-35
+## [13] evaluate_0.10.1
 ```
 
