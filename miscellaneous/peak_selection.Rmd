@@ -60,7 +60,8 @@ Let's see what happens when we apply the "at least two" filter to retain the top
 ```{r}
 top.al2 <- apply(counts, 1, FUN=function(x) { sort(x)[nlibs-1] })
 keep.al2 <- length(top.al2) - rank(top.al2, ties.method="random") +1 <= 20000
-summary(which(keep.al2) %in% is.null)
+null.al2 <- which(keep.al2) %in% is.null
+summary(null.al2)
 ```
 
 Running these counts through _edgeR_, using standardized library sizes.
@@ -78,9 +79,24 @@ This is because the dispersion inflation is minimized _and_ the "at least two" f
 ```{r}
 fit.al2 <- glmQLFit(y.al2, design, robust=TRUE)
 res.al2 <- glmQLFTest(fit.al2)
-mean(res.al2$table$PValue[which(keep.al2) %in% is.null] <= 0.001)
-plotAlpha(res.al2$table$PValue[which(keep.al2) %in% is.null])
+mean(res.al2$table$PValue[null.al2] <= 0.001)
+plotAlpha(res.al2$table$PValue[null.al2])
 ```
+
+One could argue that this is not a problem in practice, because the enrichment for DB sites ensures that FDR control is still preserved.
+In the most extreme case, if you enrich for enough DB sites, even complete loss of type I error control among the true nulls will not breach the FDR threshold.
+However, this assumes that you have enough power to detect all of the DB sites.
+This is true in this particular simulation, where the DB is very strong - try setting `mu=c(70, 70, 30, 30)` for comparison.
+
+```{r}
+sig <- p.adjust(res.al2$table$PValue, method="BH") <= 0.05
+table(sig, null.al2)
+sum(sig & null.al2)/sum(sig)
+```
+
+There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between the two conditions.
+For example, in an experimental design with multiple groups, you could add DB sites in the third group.
+These would negate variance inflation but not contribute DB sites to the contrast between the first two groups.
 
 # Applying a union filter.
 
@@ -90,7 +106,8 @@ Here we retain fewer sites, which ensures that the DB percentage in the retained
 ```{r}
 top.u <- apply(counts, 1, FUN=function(x) { max(x) })
 keep.u <- length(top.u) - rank(top.u, ties.method="random") +1 <= 5000
-summary(which(keep.u) %in% is.null)
+null.u <- which(keep.u) %in% is.null
+summary(null.u)
 ```
 
 Running these counts through _edgeR_.
@@ -109,8 +126,8 @@ However, enough DB sites ensures that the inflation is minimized, encouraging sp
 ```{r}
 fit.u <- glmQLFit(y.u, design, robust=TRUE)
 res.u <- glmQLFTest(fit.u)
-mean(res.u$table$PValue[which(keep.u) %in% is.null] <= 0.05)
-plotAlpha(res.u$table$PValue[which(keep.u) %in% is.null])
+mean(res.u$table$PValue[null.u] <= 0.05)
+plotAlpha(res.u$table$PValue[null.u])
 ```
 
 # Applying the mean filter
@@ -120,7 +137,8 @@ Now, to demonstrate the correct way of doing it, we use a filter on the mean cou
 ```{r}
 top.m <- rowMeans(counts)
 keep.m <- length(top.m) - rank(top.m, ties.method="random") +1 <= 10000
-summary(which(keep.m) %in% is.null)
+null.m <- which(keep.m) %in% is.null
+summary(null.m)
 ```
 
 Running these counts through _edgeR_.
@@ -137,8 +155,8 @@ Testing indicates that type I error control is mostly maintained.
 ```{r}
 fit.m <- glmQLFit(y.m, design, robust=TRUE)
 res.m <- glmQLFTest(fit.m)
-mean(res.m$table$PValue[which(keep.m) %in% is.null] <= 0.01)
-plotAlpha(res.m$table$PValue[which(keep.m) %in% is.null])
+mean(res.m$table$PValue[null.m] <= 0.01)
+plotAlpha(res.m$table$PValue[null.m])
 ```
 
 # Using the mean filter with variable dispersions

@@ -61,7 +61,8 @@ Let's see what happens when we apply the "at least two" filter to retain the top
 ```r
 top.al2 <- apply(counts, 1, FUN=function(x) { sort(x)[nlibs-1] })
 keep.al2 <- length(top.al2) - rank(top.al2, ties.method="random") +1 <= 20000
-summary(which(keep.al2) %in% is.null)
+null.al2 <- which(keep.al2) %in% is.null
+summary(null.al2)
 ```
 
 ```
@@ -90,7 +91,7 @@ This is because the dispersion inflation is minimized _and_ the "at least two" f
 ```r
 fit.al2 <- glmQLFit(y.al2, design, robust=TRUE)
 res.al2 <- glmQLFTest(fit.al2)
-mean(res.al2$table$PValue[which(keep.al2) %in% is.null] <= 0.001)
+mean(res.al2$table$PValue[null.al2] <= 0.001)
 ```
 
 ```
@@ -98,10 +99,40 @@ mean(res.al2$table$PValue[which(keep.al2) %in% is.null] <= 0.001)
 ```
 
 ```r
-plotAlpha(res.al2$table$PValue[which(keep.al2) %in% is.null])
+plotAlpha(res.al2$table$PValue[null.al2])
 ```
 
 ![plot of chunk unnamed-chunk-7](figures-peak/unnamed-chunk-7-1.png)
+
+One could argue that this is not a problem in practice, because the enrichment for DB sites ensures that FDR control is still preserved.
+In the most extreme case, if you enrich for enough DB sites, even complete loss of type I error control among the true nulls will not breach the FDR threshold.
+However, this assumes that you have enough power to detect all of the DB sites.
+This is true in this particular simulation, where the DB is very strong - try setting `mu=c(70, 70, 30, 30)` for comparison.
+
+
+```r
+sig <- p.adjust(res.al2$table$PValue, method="BH") <= 0.05
+table(sig, null.al2)
+```
+
+```
+##        null.al2
+## sig     FALSE  TRUE
+##   FALSE     0 12353
+##   TRUE   7271   376
+```
+
+```r
+sum(sig & null.al2)/sum(sig)
+```
+
+```
+## [1] 0.04916961
+```
+
+There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between the two conditions.
+For example, in an experimental design with multiple groups, you could add DB sites in the third group.
+These would negate variance inflation but not contribute DB sites to the contrast between the first two groups.
 
 # Applying a union filter.
 
@@ -112,7 +143,8 @@ Here we retain fewer sites, which ensures that the DB percentage in the retained
 ```r
 top.u <- apply(counts, 1, FUN=function(x) { max(x) })
 keep.u <- length(top.u) - rank(top.u, ties.method="random") +1 <= 5000
-summary(which(keep.u) %in% is.null)
+null.u <- which(keep.u) %in% is.null
+summary(null.u)
 ```
 
 ```
@@ -142,7 +174,7 @@ However, enough DB sites ensures that the inflation is minimized, encouraging sp
 ```r
 fit.u <- glmQLFit(y.u, design, robust=TRUE)
 res.u <- glmQLFTest(fit.u)
-mean(res.u$table$PValue[which(keep.u) %in% is.null] <= 0.05)
+mean(res.u$table$PValue[null.u] <= 0.05)
 ```
 
 ```
@@ -150,10 +182,10 @@ mean(res.u$table$PValue[which(keep.u) %in% is.null] <= 0.05)
 ```
 
 ```r
-plotAlpha(res.u$table$PValue[which(keep.u) %in% is.null])
+plotAlpha(res.u$table$PValue[null.u])
 ```
 
-![plot of chunk unnamed-chunk-10](figures-peak/unnamed-chunk-10-1.png)
+![plot of chunk unnamed-chunk-11](figures-peak/unnamed-chunk-11-1.png)
 
 # Applying the mean filter
 
@@ -163,7 +195,8 @@ Now, to demonstrate the correct way of doing it, we use a filter on the mean cou
 ```r
 top.m <- rowMeans(counts)
 keep.m <- length(top.m) - rank(top.m, ties.method="random") +1 <= 10000
-summary(which(keep.m) %in% is.null)
+null.m <- which(keep.m) %in% is.null
+summary(null.m)
 ```
 
 ```
@@ -191,7 +224,7 @@ Testing indicates that type I error control is mostly maintained.
 ```r
 fit.m <- glmQLFit(y.m, design, robust=TRUE)
 res.m <- glmQLFTest(fit.m)
-mean(res.m$table$PValue[which(keep.m) %in% is.null] <= 0.01)
+mean(res.m$table$PValue[null.m] <= 0.01)
 ```
 
 ```
@@ -199,10 +232,10 @@ mean(res.m$table$PValue[which(keep.m) %in% is.null] <= 0.01)
 ```
 
 ```r
-plotAlpha(res.m$table$PValue[which(keep.m) %in% is.null])
+plotAlpha(res.m$table$PValue[null.m])
 ```
 
-![plot of chunk unnamed-chunk-13](figures-peak/unnamed-chunk-13-1.png)
+![plot of chunk unnamed-chunk-14](figures-peak/unnamed-chunk-14-1.png)
 
 # Using the mean filter with variable dispersions
 
@@ -248,7 +281,7 @@ mean(res.all$table$PValue[is.null] <= 0.01)
 plotAlpha(res.all$table$PValue[is.null])
 ```
 
-![plot of chunk unnamed-chunk-15](figures-peak/unnamed-chunk-15-1.png)
+![plot of chunk unnamed-chunk-16](figures-peak/unnamed-chunk-16-1.png)
 
 However, applying a stringent mean filter will select for higher dispersions.
 This is because high-dispersion features are more likely to achieve large sample means. 
@@ -295,7 +328,7 @@ mean(res.m2$table$PValue[which(keep.m2) %in% is.null] <= 0.01)
 plotAlpha(res.m2$table$PValue[which(keep.m2) %in% is.null])
 ```
 
-![plot of chunk unnamed-chunk-17](figures-peak/unnamed-chunk-17-1.png)
+![plot of chunk unnamed-chunk-18](figures-peak/unnamed-chunk-18-1.png)
 
 In practice, this is not much of an issue.
 For ChIP-seq data, the prior degrees of freedom is usually quite high such that there is not much variability in the dispersions.
