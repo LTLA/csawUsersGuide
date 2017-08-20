@@ -83,28 +83,13 @@ mean(res.al2$table$PValue[null.al2] <= 0.001)
 plotAlpha(res.al2$table$PValue[null.al2])
 ```
 
-One could argue that this is not a problem in practice, because the enrichment for DB sites ensures that FDR control is still preserved.
-In the most extreme case, if you enrich for enough DB sites, even complete loss of type I error control among the true nulls will not breach the FDR threshold.
-However, this assumes that you have enough power to detect all of the DB sites.
-This is true in this particular simulation, where the DB is very strong - try setting `mu=c(70, 70, 30, 30)` for comparison.
-
-```{r}
-sig <- p.adjust(res.al2$table$PValue, method="BH") <= 0.05
-table(sig, null.al2)
-sum(sig & null.al2)/sum(sig)
-```
-
-There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between the two conditions.
-For example, in an experimental design with multiple groups, you could add DB sites in the third group.
-These would negate variance inflation but not contribute DB sites to the contrast between the first two groups.
-
 # Applying a union filter.
 
 Repeating the dose with a union filter.
 Here we retain fewer sites, which ensures that the DB percentage in the retained set is higher (see below).
 
 ```{r}
-top.u <- apply(counts, 1, FUN=function(x) { max(x) })
+top.u <- apply(counts, 1, FUN=max)
 keep.u <- length(top.u) - rank(top.u, ties.method="random") +1 <= 5000
 null.u <- which(keep.u) %in% is.null
 summary(null.u)
@@ -159,6 +144,64 @@ mean(res.m$table$PValue[null.m] <= 0.01)
 plotAlpha(res.m$table$PValue[null.m])
 ```
 
+# Saving _ad hoc_ filters with FDR control
+
+One could argue that anticonservativeness with _ad hoc_ filters is not a problem in practice, because the enrichment for DB sites ensures that FDR control is still preserved.
+If you enrich for enough DB sites, even complete loss of type I error control among the true nulls will not breach the FDR threshold.
+However, this assumes that you have enough power to detect all of the DB sites.
+This is true in this particular simulation, where the DB is very strong:
+
+```{r}
+sig <- p.adjust(res.al2$table$PValue, method="BH") <= 0.05
+sum(sig & null.al2)/sum(sig)
+```
+
+Reducing the power results in loss of FDR control, as expected:
+
+```{r}
+set.seed(80)
+counts2 <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P), ncol=nlibs, byrow=TRUE),
+    matrix(rnbinom(db.sites*nlibs, mu=c(70, 70, 30, 30), size=P), ncol=nlibs, byrow=TRUE))
+top.al2.2 <- apply(counts2, 1, FUN=function(x) { sort(x)[nlibs-1] })
+keep.al2.2 <- length(top.al2.2) - rank(top.al2.2, ties.method="random") +1 <= 20000
+null.al2.2 <- which(keep.al2.2) %in% is.null
+y.al2.2 <- DGEList(counts2[keep.al2.2,], lib.size=rep(1e6, nlibs))
+y.al2.2 <- estimateDisp(y.al2.2, design)
+fit.al2.2 <- glmQLFit(y.al2.2, design, robust=TRUE)
+res.al2.2 <- glmQLFTest(fit.al2.2, coef=2)
+sig <- p.adjust(res.al2.2$table$PValue, method="BH") <= 0.05
+sum(sig & null.al2.2)/sum(sig)
+```
+
+There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between two conditions.
+For example, in an experimental design with multiple groups, you could add DB sites in the third group.
+
+```{r}
+set.seed(1000)
+group.z <- rep(LETTERS[1:3], each=2)
+nlibs.z <- length(group.z)
+design.z <- model.matrix(~group.z)
+counts.z <- rbind(
+    matrix(rnbinom(n.sites*nlibs.z, mu=50, size=P), ncol=nlibs.z, byrow=TRUE),
+    matrix(rnbinom(db.sites*nlibs.z, mu=rep(c(25, 100), c(4, 2)), size=P), ncol=nlibs.z, byrow=TRUE)
+    )
+```
+
+Loss of error control is subsequently observed with the "at least 2" filter.
+This is because variance inflation is negated, without contributing any DB sites to the contrast between the first two groups (thus rendering the FDR irrelevant).
+
+```{r}
+top.al2.z <- apply(counts.z, 1, FUN=function(x) { sort(x)[nlibs.z-1] })
+keep.al2.z <- length(top.al2.z) - rank(top.al2.z, ties.method="random") +1 <= 10000
+summary(which(keep.al2.z) <= n.sites)
+y.al2.z <- DGEList(counts.z[keep.al2.z,], lib.size=rep(1e6, nlibs.z))
+y.al2.z <- estimateDisp(y.al2.z, design.z)
+y.al2.z$common.dispersion
+fit.al2.z <- glmQLFit(y.al2.z, design.z, robust=TRUE)
+res.al2.z <- glmQLFTest(fit.al2.z, coef=2)
+plotAlpha(res.al2.z$table$PValue)
+```
+
 # Using the mean filter with variable dispersions
 
 The sample mean is approxiamtely independent of the dispersion estimate and p-value for Poisson and NB-distributed counts.
@@ -169,8 +212,8 @@ Consider a mixture of NB distributions with different dispersions but the same m
 set.seed(100000)
 P.n <- rchisq(n.sites, df=10)
 P.db <- rchisq(db.sites, df=10)
-counts <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P.n), ncol=nlibs, byrow=TRUE),
-                matrix(rnbinom(db.sites*nlibs, mu=c(100, 100, 0, 0), size=P.db), ncol=nlibs, byrow=TRUE))
+counts.x <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P.n), ncol=nlibs, byrow=TRUE),
+    matrix(rnbinom(db.sites*nlibs, mu=c(100, 100, 0, 0), size=P.db), ncol=nlibs, byrow=TRUE))
 ```
 
 Running on all the sites doesn't cause any issues other than some anticonservativeness at low _p_-values.
@@ -178,7 +221,7 @@ This is relatively modest and acceptable given that the inverse-chi-squared dist
 (In contrast, the _ad hoc_ filters were tested on purely NB counts, so they should not have any problems.)
 
 ```{r}
-y.all <- DGEList(counts, lib.size=rep(1e6, nlibs))
+y.all <- DGEList(counts.x, lib.size=rep(1e6, nlibs))
 y.all <- estimateDisp(y.all, design)
 y.all$common.dispersion
 fit.all <- glmQLFit(y.all, design, robust=TRUE)
@@ -192,10 +235,10 @@ This is because high-dispersion features are more likely to achieve large sample
 The result is to encourage inflation of the dispersion estimate.
 
 ```{r}
-top.m2 <- rowMeans(counts)
+top.m2 <- rowMeans(counts.x)
 keep.m2 <- length(top.m2) - rank(top.m2, ties.method="random") +1 <= 1000
 summary(which(keep.m2) %in% is.null)
-y.m2 <- DGEList(counts[keep.m2,], lib.size=rep(1e6, nlibs))
+y.m2 <- DGEList(counts.x[keep.m2,], lib.size=rep(1e6, nlibs))
 y.m2 <- estimateDisp(y.m2, design)
 y.m2$common.dispersion
 ```
