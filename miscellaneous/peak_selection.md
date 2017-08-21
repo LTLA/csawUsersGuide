@@ -12,9 +12,12 @@ output:
 # Background 
 
 The 2014 NAR paper (https://doi.org/10.1093/nar/gku351) showed that many _ad hoc_ peak selection strategies result in conservativeness.
-One could consider erring on the side of conservativeness to be acceptable, especially if more DB sites pass the filter.
-However, this simulation demonstrates that the same strategies can also result in loss of type I error control.
+One could consider erring on the side of conservativeness to be acceptable, especially if more DB sites can pass the filter.
+However, this document demonstrates that the same strategies can also result in loss of type I error control.
 The possibility of anticonservativeness means that any increased detection from _ad hoc_ strategies cannot be trusted.
+
+# Setting up the experimental design
+
 Consider an experimental design with two replicates in each of two conditions.
 
 
@@ -24,18 +27,37 @@ nlibs <- length(group)
 design <- model.matrix(~group)
 ```
 
-We'll simulate some counts where 10% of the sites are DB.
+We set up a simulator for a count matrix where a certain proportion (10% by default) of the sites are DB.
+Note that the grand mean for DB and non-DB sites are the same, otherwise the filtering problem would be trivial.
+
+
+```r
+simulateCounts <- function(nlibs, n.sites=1e5, prop.db=0.1, 
+                           dispfun=function(x) { 0.1 }, 
+                           n.mu=50, db.mu=rep(c(100, 0), each=2)) {
+    P.n <- 1/dispfun(n.sites)
+    db.sites <- n.sites*prop.db
+    P.db <- 1/dispfun(db.sites)
+    is.null <- seq_len(n.sites)
+    counts <- rbind(matrix(rnbinom(n.sites*nlibs, mu=n.mu, size=P.n), ncol=nlibs, byrow=TRUE),
+        matrix(rnbinom(db.sites*nlibs, mu=db.mu, size=P.db), ncol=nlibs, byrow=TRUE))
+    return(list(counts=counts, null=is.null))
+}
+```
+
+We set up a function to perform the differential analysis with _edgeR_ to obtain _p_-values.
+We use equal library sizes here, assuming that normalization has already been performed to correct for composition biases.
 
 
 ```r
 library(edgeR)
-set.seed(90000)
-P <- 1/0.1
-n.sites <- 1e5
-db.sites <- n.sites*0.1
-is.null <- seq_len(n.sites)
-counts <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P), ncol=nlibs, byrow=TRUE),
-                matrix(rnbinom(db.sites*nlibs, mu=c(100, 100, 0, 0), size=P), ncol=nlibs, byrow=TRUE))
+detectDiff <- function(counts, design, coef=ncol(design), lib.size=rep(1e6, ncol(counts))) {
+    y <- DGEList(counts, lib.size=lib.size)
+    y <- estimateDisp(y, design)
+    fit <- glmQLFit(y, design, robust=TRUE)
+    res <- glmQLFTest(fit, coef=coef)
+    return(list(common.dispersion=y$common.dispersion, PValue=res$table$PValue))
+}
 ```
 
 We'll also set up a function to assess type I error control.
@@ -43,45 +65,73 @@ We'll also set up a function to assess type I error control.
 
 ```r
 plotAlpha <- function(pvals, ylab="Observed/specified", xlab="Specified", xlim=NULL, ...) {
-    exp <- (seq_along(pvals) - 0.5)/length(pvals)
-    n <- findInterval(exp, sort(pvals))
-    obs <- n/length(pvals)
-    if (is.null(xlim)) { # Stable at 20 observations.
-        xlim <- c(exp[which(n >= 20)[1]], 1)
+    for (i in seq_along(pvals)) { 
+        cur.p <- pvals[[i]]
+        exp <- (seq_along(cur.p) - 0.5)/length(cur.p)
+        n <- findInterval(exp, sort(cur.p))
+        obs <- n/length(cur.p)
+        if (is.null(xlim)) { # Stable at 20 observations.
+            xlim <- c(exp[which(n >= 20)[1]], 1)
+        }
+        if (i==1L) {
+            plot(exp, obs/exp, log="xy", xlim=xlim, type="l", ...)
+        } else {
+            lines(exp, obs/exp, ...)
+        }
     }
-    plot(exp, obs/exp, log="xy", xlim=xlim, ...)
 }
 ```
 
 # Applying the "at least 2" filter
 
 Let's see what happens when we apply the "at least two" filter to retain the top proportion of sites.
+First we set up a filtering function.
 
 
 ```r
-top.al2 <- apply(counts, 1, FUN=function(x) { sort(x)[nlibs-1] })
-keep.al2 <- length(top.al2) - rank(top.al2, ties.method="random") +1 <= 20000
-null.al2 <- which(keep.al2) %in% is.null
-summary(null.al2)
+set.seed(10001)
+AL2Filter <- function(counts) { 
+    top.al2 <- apply(counts, 1, FUN=function(x) { sort(x, decreasing=TRUE)[2] })
+    rank(-top.al2, ties.method="random")
+}
 ```
 
-```
-##    Mode   FALSE    TRUE 
-## logical    7271   12729
-```
-
-Running these counts through _edgeR_, using standardized library sizes.
-There is some inflation, but the presence of correct dispersion estimates for the DB sites keeps the dispersion low.
+Now we run through repeated simulations and collect the results.
 
 
 ```r
-y.al2 <- DGEList(counts[keep.al2,], lib.size=rep(1e6, nlibs))
-y.al2 <- estimateDisp(y.al2, design)
-y.al2$common.dispersion
+retained <- dispersions <- numeric(10)
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design))
+    keep <- AL2Filter(out$counts) <= 20000
+    kept.null <- which(keep) %in% out$null
+    retained[it] <- sum(kept.null)
+    res <- detectDiff(out$counts[keep,], design)
+    dispersions[it] <- res$common.dispersion
+    null.p[[it]] <- res$PValue[kept.null]
+}
+```
+
+There is some inflation, but the presence of correct dispersion estimates for the DB sites keeps the common dispersion low.
+
+
+```r
+summary(retained)
 ```
 
 ```
-## [1] 0.1138291
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   12730   12764   12819   12797   12824   12838
+```
+
+```r
+summary(dispersions)
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  0.1140  0.1150  0.1159  0.1157  0.1165  0.1170
 ```
 
 We observe loss of type I error control at low _p_-values.
@@ -89,50 +139,19 @@ This is because the dispersion inflation is minimized _and_ the "at least two" f
 
 
 ```r
-fit.al2 <- glmQLFit(y.al2, design, robust=TRUE)
-res.al2 <- glmQLFTest(fit.al2)
-mean(res.al2$table$PValue[null.al2] <= 0.001)
+summary(sapply(null.p, FUN=function(x) { mean(x <= 1e-3) }))
 ```
 
 ```
-## [1] 0.003456674
-```
-
-```r
-plotAlpha(res.al2$table$PValue[null.al2])
-```
-
-![plot of chunk unnamed-chunk-7](figures-peak/unnamed-chunk-7-1.png)
-
-One could argue that this is not a problem in practice, because the enrichment for DB sites ensures that FDR control is still preserved.
-In the most extreme case, if you enrich for enough DB sites, even complete loss of type I error control among the true nulls will not breach the FDR threshold.
-However, this assumes that you have enough power to detect all of the DB sites.
-This is true in this particular simulation, where the DB is very strong - try setting `mu=c(70, 70, 30, 30)` for comparison.
-
-
-```r
-sig <- p.adjust(res.al2$table$PValue, method="BH") <= 0.05
-table(sig, null.al2)
-```
-
-```
-##        null.al2
-## sig     FALSE  TRUE
-##   FALSE     0 12353
-##   TRUE   7271   376
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+## 0.002260 0.002920 0.003284 0.003298 0.003729 0.004057
 ```
 
 ```r
-sum(sig & null.al2)/sum(sig)
+plotAlpha(null.p)
 ```
 
-```
-## [1] 0.04916961
-```
-
-There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between the two conditions.
-For example, in an experimental design with multiple groups, you could add DB sites in the third group.
-These would negate variance inflation but not contribute DB sites to the contrast between the first two groups.
+![plot of chunk unnamed-chunk-9](figures-peak/unnamed-chunk-9-1.png)
 
 # Applying a union filter.
 
@@ -141,29 +160,50 @@ Here we retain fewer sites, which ensures that the DB percentage in the retained
 
 
 ```r
-top.u <- apply(counts, 1, FUN=function(x) { max(x) })
-keep.u <- length(top.u) - rank(top.u, ties.method="random") +1 <= 5000
-null.u <- which(keep.u) %in% is.null
-summary(null.u)
+set.seed(20002)
+UnionFilter <- function(counts) {
+    top.u <- apply(counts, 1, FUN=max)
+    rank(-top.u, ties.method="random") 
+}
 ```
 
-```
-##    Mode   FALSE    TRUE 
-## logical    4590     410
-```
-
-Running these counts through _edgeR_.
-The higher DB percentage keeps the dispersion inflation low.
+Now we run through repeated simulations and collect the results.
+We use a more stringent filter to obtain a higher DB percentage, which keeps the dispersion inflation low.
 
 
 ```r
-y.u <- DGEList(counts[keep.u,], lib.size=rep(1e6, nlibs))
-y.u <- estimateDisp(y.u, design)
-y.u$common.dispersion
+retained <- dispersions <- numeric(10)
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design))
+    keep <- UnionFilter(out$counts) <= 5000
+    kept.null <- which(keep) %in% out$null
+    retained[it] <- sum(kept.null)
+    res <- detectDiff(out$counts[keep,], design)
+    dispersions[it] <- res$common.dispersion
+    null.p[[it]] <- res$PValue[kept.null]
+}
+```
+
+Some inflation occurs, but all in all, the dispersions are kept reasonably low.
+
+
+```r
+summary(retained)
 ```
 
 ```
-## [1] 0.1630225
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   388.0   440.8   448.5   443.1   454.8   473.0
+```
+
+```r
+summary(dispersions)
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  0.1666  0.1686  0.1691  0.1696  0.1711  0.1724
 ```
 
 Testing again results in the loss of type I error control.
@@ -172,20 +212,19 @@ However, enough DB sites ensures that the inflation is minimized, encouraging sp
 
 
 ```r
-fit.u <- glmQLFit(y.u, design, robust=TRUE)
-res.u <- glmQLFTest(fit.u)
-mean(res.u$table$PValue[null.u] <= 0.05)
+summary(sapply(null.p, FUN=function(x) { mean(x <= 1e-2) }))
 ```
 
 ```
-## [1] 0.1731707
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+## 0.01418 0.01770 0.02385 0.02235 0.02559 0.02908
 ```
 
 ```r
-plotAlpha(res.u$table$PValue[null.u])
+plotAlpha(null.p)
 ```
 
-![plot of chunk unnamed-chunk-11](figures-peak/unnamed-chunk-11-1.png)
+![plot of chunk unnamed-chunk-13](figures-peak/unnamed-chunk-13-1.png)
 
 # Applying the mean filter
 
@@ -193,95 +232,162 @@ Now, to demonstrate the correct way of doing it, we use a filter on the mean cou
 
 
 ```r
-top.m <- rowMeans(counts)
-keep.m <- length(top.m) - rank(top.m, ties.method="random") +1 <= 10000
-null.m <- which(keep.m) %in% is.null
-summary(null.m)
-```
-
-```
-##    Mode   FALSE    TRUE 
-## logical    1532    8468
+set.seed(30003)
+MeanFilter <- function(counts) { 
+    top.m <- rowMeans(counts)
+    rank(-top.m, ties.method="random")
+}
 ```
 
 Running these counts through _edgeR_.
-The higher DB percentage keeps the dispersion inflation low.
 
 
 ```r
-y.m <- DGEList(counts[keep.m,], lib.size=rep(1e6, nlibs))
-y.m <- estimateDisp(y.m, design)
-y.m$common.dispersion
+retained <- dispersions <- numeric(10)
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design))
+    keep <- MeanFilter(out$counts) <= 10000
+    kept.null <- which(keep) %in% out$null
+    retained[it] <- sum(kept.null)
+    res <- detectDiff(out$counts[keep,], design)
+    dispersions[it] <- res$common.dispersion
+    null.p[[it]] <- res$PValue[kept.null]
+}
+```
+
+Dispersions are equal to their expected value.
+
+
+```r
+summary(retained)
 ```
 
 ```
-## [1] 0.0979567
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##    8479    8494    8509    8515    8537    8554
+```
+
+```r
+summary(dispersions)
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+## 0.09713 0.09754 0.09917 0.09898 0.10021 0.10100
 ```
 
 Testing indicates that type I error control is mostly maintained.
 
 
 ```r
-fit.m <- glmQLFit(y.m, design, robust=TRUE)
-res.m <- glmQLFTest(fit.m)
-mean(res.m$table$PValue[null.m] <= 0.01)
+summary(sapply(null.p, FUN=function(x) { mean(x <= 1e-2) }))
 ```
 
 ```
-## [1] 0.01121871
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+## 0.007963 0.008709 0.009973 0.009548 0.010281 0.010653
 ```
 
 ```r
-plotAlpha(res.m$table$PValue[null.m])
+plotAlpha(null.p, ylim=c(0.5, 2))
 ```
 
-![plot of chunk unnamed-chunk-14](figures-peak/unnamed-chunk-14-1.png)
+![plot of chunk unnamed-chunk-17](figures-peak/unnamed-chunk-17-1.png)
+
+# Saving _ad hoc_ filters with FDR control
+
+One could argue that anticonservativeness with _ad hoc_ filters is not a problem in practice, because the enrichment for DB sites ensures that FDR control is still preserved.
+If you enrich for enough DB sites, even complete loss of type I error control among the true nulls will not breach the FDR threshold.
+However, this assumes that you have enough power to detect all of the DB sites.
+If you don't have enough power, FDR control is lost:
+
+
+```r
+set.seed(40004)
+out <- simulateCounts(nrow(design), db.mu=c(70, 70, 30, 30))
+keep <- AL2Filter(out$counts) <= 20000
+res <- detectDiff(out$counts[keep,], design)
+sig <- p.adjust(res$PValue, method="BH") <= 0.05
+sum(sig & which(keep) %in% out$null)/sum(sig)
+```
+
+```
+## [1] 0.08518296
+```
+
+There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between two conditions.
+For example, consider a situation where you have libraries of different size, with all the larger libraries falling into one condition. 
+
+
+```r
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design), n.mu=rep(c(50, 100), each=2), prop.db=0)
+    keep <- AL2Filter(out$counts) <= 20000
+    kept.null <- which(keep) %in% out$null
+    res <- detectDiff(out$counts[keep,], design, lib.size=c(1e6, 1e6, 2e6, 2e6))
+    null.p[[it]] <- res$PValue[kept.null]
+}
+```
+
+Loss of error control is subsequently observed with the "at least 2" filter.
+This is because peak calling will favour detection of peaks in the larger libraries, resulting in enrichment for spuriously DB sites.
+FDR control is irrelevant here as there are no DB sites to the contrast between the first two groups.
+
+
+```r
+plotAlpha(null.p)
+```
+
+![plot of chunk unnamed-chunk-20](figures-peak/unnamed-chunk-20-1.png)
 
 # Using the mean filter with variable dispersions
 
 The sample mean is approxiamtely independent of the dispersion estimate and p-value for Poisson and NB-distributed counts.
 However, this only applies to a single distribution.
-Consider a mixture of NB distributions with different dispersions but the same mean.
+Consider a mixture of NB distributions with different dispersions following an inverse-chi-squared distribution but the same mean.
 
 
 ```r
-set.seed(100000)
-P.n <- rchisq(n.sites, df=10)
-P.db <- rchisq(db.sites, df=10)
-counts <- rbind(matrix(rnbinom(n.sites*nlibs, mu=50, size=P.n), ncol=nlibs, byrow=TRUE),
-                matrix(rnbinom(db.sites*nlibs, mu=c(100, 100, 0, 0), size=P.db), ncol=nlibs, byrow=TRUE))
+set.seed(50005)
+PFUN <- function(n) { 1/rchisq(n, df=10) }
+mean(PFUN(10000))
 ```
 
-Running on all the sites doesn't cause any issues other than some anticonservativeness at low _p_-values.
+```
+## [1] 0.1229193
+```
+
+Running on a randomly selected subset of sites (i.e., completely unbiased filtering) doesn't cause any issues other than some anticonservativeness at low _p_-values.
 This is relatively modest and acceptable given that the inverse-chi-squared distribution for the NB dispersions only mimics the true QL model.
 (In contrast, the _ad hoc_ filters were tested on purely NB counts, so they should not have any problems.)
 
 
 ```r
-y.all <- DGEList(counts, lib.size=rep(1e6, nlibs))
-y.all <- estimateDisp(y.all, design)
-y.all$common.dispersion
+dispersions <- numeric(10)
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design), dispfun=PFUN)
+    keep <- sample(nrow(out$counts), 1000)
+    kept.null <- keep %in% out$null
+    res <- detectDiff(out$counts[keep,], design)
+    dispersions[it] <- res$common.dispersion
+    null.p[[it]] <- res$PValue[kept.null]
+}
+summary(dispersions)
 ```
 
 ```
-## [1] 0.1234853
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  0.1163  0.1183  0.1207  0.1215  0.1247  0.1289
 ```
 
 ```r
-fit.all <- glmQLFit(y.all, design, robust=TRUE)
-res.all <- glmQLFTest(fit.all)
-mean(res.all$table$PValue[is.null] <= 0.01)
+plotAlpha(null.p, ylim=c(0.5, 2))
 ```
 
-```
-## [1] 0.01121
-```
-
-```r
-plotAlpha(res.all$table$PValue[is.null])
-```
-
-![plot of chunk unnamed-chunk-16](figures-peak/unnamed-chunk-16-1.png)
+![plot of chunk unnamed-chunk-22](figures-peak/unnamed-chunk-22-1.png)
 
 However, applying a stringent mean filter will select for higher dispersions.
 This is because high-dispersion features are more likely to achieve large sample means. 
@@ -289,24 +395,22 @@ The result is to encourage inflation of the dispersion estimate.
 
 
 ```r
-top.m2 <- rowMeans(counts)
-keep.m2 <- length(top.m2) - rank(top.m2, ties.method="random") +1 <= 1000
-summary(which(keep.m2) %in% is.null)
+dispersions <- numeric(10)
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design), dispfun=PFUN)
+    keep <- MeanFilter(out$counts) <= 1000
+    kept.null <- which(keep) %in% out$null
+    res <- detectDiff(out$counts[keep,], design)
+    dispersions[it] <- res$common.dispersion
+    null.p[[it]] <- res$PValue[kept.null]
+}
+summary(dispersions)
 ```
 
 ```
-##    Mode   FALSE    TRUE 
-## logical     289     711
-```
-
-```r
-y.m2 <- DGEList(counts[keep.m2,], lib.size=rep(1e6, nlibs))
-y.m2 <- estimateDisp(y.m2, design)
-y.m2$common.dispersion
-```
-
-```
-## [1] 0.1907132
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  0.1798  0.1906  0.1922  0.1917  0.1945  0.1967
 ```
 
 Funnily enough, this doesn't actually hurt the type I error rate.
@@ -315,20 +419,10 @@ This ensures that there is no enrichment for low-dispersion DB sites to suppress
 
 
 ```r
-fit.m2 <- glmQLFit(y.m2, design, robust=TRUE)
-res.m2 <- glmQLFTest(fit.m2)
-mean(res.m2$table$PValue[which(keep.m2) %in% is.null] <= 0.01)
+plotAlpha(null.p, ylim=c(0.5, 2))
 ```
 
-```
-## [1] 0.0140647
-```
-
-```r
-plotAlpha(res.m2$table$PValue[which(keep.m2) %in% is.null])
-```
-
-![plot of chunk unnamed-chunk-18](figures-peak/unnamed-chunk-18-1.png)
+![plot of chunk unnamed-chunk-24](figures-peak/unnamed-chunk-24-1.png)
 
 In practice, this is not much of an issue.
 For ChIP-seq data, the prior degrees of freedom is usually quite high such that there is not much variability in the dispersions.
