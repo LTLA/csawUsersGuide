@@ -317,26 +317,40 @@ sum(sig & which(keep) %in% out$null)/sum(sig)
 ```
 
 There are also other ways of mitigating the variance inflation that don't involve introducing DB sites between two conditions.
-For example, consider a situation where you have libraries of different size, with all the larger libraries falling into one condition. 
-
-
-```r
-null.p <- vector("list", 10)
-for (it in 1:10) {
-    out <- simulateCounts(nrow(design), n.mu=rep(c(50, 100), each=2), prop.db=0)
-    keep <- AL2Filter(out$counts) <= 20000
-    kept.null <- which(keep) %in% out$null
-    res <- detectDiff(out$counts[keep,], design, lib.size=c(1e6, 1e6, 2e6, 2e6))
-    null.p[[it]] <- res$PValue[kept.null]
-}
-```
-
-Loss of error control is subsequently observed with the "at least 2" filter.
-This is because peak calling will favour detection of peaks in the larger libraries, resulting in enrichment for spuriously DB sites.
+For example, if an orthogonal batch effect increases binding in some sites, those sites will get preferentially enriched by an "at least 2" filter.
+This will suppress the dispersion inflation in the other sites and encourage loss of type I error control.
 FDR control is irrelevant here as there are no DB sites to the contrast between the first two groups.
 
 
 ```r
+design.b <- model.matrix(~c(0,1,0,1)+c(0,0,1,1))
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design.b), db.mu=rep(c(20, 80), 2)) # not really DB.
+    keep <- AL2Filter(out$counts) <= 10000
+    res <- detectDiff(out$counts[keep,], design.b)
+    null.p[[it]] <- res$PValue # look at all p-values, as all nulls are true.
+}
+plotAlpha(null.p)
+```
+
+![plot of chunk unnamed-chunk-19](figures-peak/unnamed-chunk-19-1.png)
+
+Alternatively, you could imagine a situation with three groups, and DB sites in the third group can suppress dispersion inflation.
+This is done without contributing differences to the contrast between first two groups.
+
+
+```r
+group.3 <- factor(rep(LETTERS[1:3], each=2))
+design.3 <- model.matrix(~group.3)
+null.p <- vector("list", 10)
+for (it in 1:10) {
+    out <- simulateCounts(nrow(design.3), db.mu=rep(c(25, 100), c(4, 2))) # not really DB.
+    keep <- AL2Filter(out$counts) <= 10000
+    kept.null <- which(keep) %in% out$null
+    res <- detectDiff(out$counts[keep,], design.3, coef=2)
+    null.p[[it]] <- res$PValue # look at all p-values, as all nulls are true.
+}
 plotAlpha(null.p)
 ```
 
