@@ -1,0 +1,181 @@
+---
+title: Subtracting input counts from ChIP samples
+author: Aaron Lun
+date: 19 August 2017
+output: 
+   html_document:
+     fig_caption: false
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(fig.path="figures-subtract/")
+```
+
+# Background
+
+This script performs a simulation to demonstrate the effects of subtracting control counts from ChIP counts in a simple case with equal baseline coverage.
+We set up a simulation with two ChIP replicates in each of two groups and matching input samples.
+
+```{r}
+exp.type <- rep(c("ChIP", "Con", "ChIP", "Con"), each=2)
+group.no <- rep(c("A", "B"), each=4)
+groupings <- paste0(exp.type, group.no)
+nlibs <- length(groupings)
+```
+
+We generate the mean vectors for DB and non-DB sites.
+The background is the same between groups in all cases, and the only difference is that there is genuine binding in group A for DB sites.
+
+```{r}
+library(edgeR)
+baseline <- 50
+binding <- 50
+mu.nodb <- rep(baseline, nlibs)
+mu.nodb[exp.type=="ChIP"] <- baseline+binding
+mu.db <- rep(baseline, nlibs)
+mu.db[exp.type=="ChIP" & group.no=="A"] <- baseline+binding
+```
+
+Simulating counts, with an equal number of DB and non-DB sites:
+
+```{r}
+set.seed(1000)
+P <- 1/0.1
+is.null <- 1:10000
+counts <- rbind(matrix(rnbinom(10000*nlibs, mu=mu.nodb, size=P), ncol=nlibs, byrow=TRUE),
+                matrix(rnbinom(10000*nlibs, mu=mu.db, size=P), ncol=nlibs, byrow=TRUE))
+```
+
+# Running without subtraction
+
+As a control, we do a vanilla analysis between the two groups directly.
+
+```{r}
+g <- factor(groupings)
+design <- model.matrix(~0 + g)
+colnames(design) <- levels(g)
+```
+
+Using _edgeR_:
+
+```{r}
+y.d <- DGEList(counts, lib.size=rep(1e6, nlibs))
+y.d <- estimateDisp(y.d, design)
+fit.d <- glmQLFit(y.d, design, robust=TRUE)
+res.d <- glmQLFTest(fit.d, contrast=makeContrasts(ChIPA - ChIPB, levels=design))
+summary(y.d$trended.dispersion)
+```
+
+You can see that type I error is controlled for the true nulls.
+
+```{r}
+nullp.d <- res.d$table$PValue[is.null]
+sum(nullp.d <= 0.01)/length(nullp.d) 
+sum(nullp.d <= 0.05)/length(nullp.d)
+```
+    
+At the same thresholds, there are more DB sites that get detected than non-DB sites.
+This indicates that power is good.
+
+```{r}
+altp.d <- res.d$table$PValue[-is.null]
+sum(altp.d <= 0.01)/length(altp.d)
+sum(altp.d <= 0.05)/length(altp.d)
+```
+
+# Running with subtraction
+
+Now seeing what happens if we subtract counts before testing.
+
+```{r}
+subcounts <- counts
+is.chip <- exp.type=="ChIP"
+is.A <- group.no=="A"
+subcounts[,is.chip & is.A] <- subcounts[,is.chip & is.A] - subcounts[,!is.chip & is.A]
+subcounts[,is.chip & !is.A] <- subcounts[,is.chip & !is.A] - subcounts[,!is.chip & !is.A]
+subcounts[subcounts < 0] <- 0
+subcounts <- subcounts[,is.chip]
+```
+
+Setting up the new design matrix.
+
+```{r}
+g2 <- factor(groupings[is.chip])
+design2 <- model.matrix(~0 + g2)
+colnames(design2) <- levels(g2)
+```
+
+Running through _edgeR_:
+
+```{r}
+y.s <- DGEList(subcounts, lib.size=rep(1e6, length(g2)))
+y.s <- estimateDisp(y.s, design2)
+fit.s <- glmQLFit(y.s, design2, robust=TRUE)
+res.s <- glmQLFTest(fit.s, contrast=makeContrasts(ChIPA - ChIPB, levels=design2))
+summary(y.s$trended.dispersion)
+```
+
+The results are now way too conservative, due to inflation of the dispersions.
+
+```{r}
+nullp.s <- res.s$table$PValue[is.null]
+sum(nullp.s <= 0.01)/length(nullp.s) 
+sum(nullp.s <= 0.05)/length(nullp.s)
+```
+
+We see a concomitant reduction in power relative to the no-subtraction case.
+
+```{r}
+altp.s <- res.s$table$PValue[-is.null]
+sum(altp.s <= 0.01)/length(altp.s)
+sum(altp.s <= 0.05)/length(altp.s)
+```
+
+Can the conservativeness upon subtraction be offset by simply increasing the threshold (notwithstanding the loss of interpretability of the error rates)?
+No, based on AUC curves.
+
+```{r}
+thresholds <- 1:100/1000
+tp.s <- findInterval(thresholds, sort(altp.s))/length(altp.s)
+fp.s <- findInterval(thresholds, sort(nullp.s))/length(nullp.s)
+tp.d <- findInterval(thresholds, sort(altp.d))/length(altp.d)
+fp.d <- findInterval(thresholds, sort(nullp.d))/length(nullp.d)
+plot(fp.s, tp.s, col="red", type="l", xlab="FPR", ylab="TPR", 
+    xlim=c(0, 0.1), ylim=c(0, 1))
+lines(fp.d, tp.d, col="blue")
+```
+
+# Anticonservativeness with buffering
+
+Buffering with lots of entries that are high-abundance and did not require much subtraction.
+
+```{r}
+others <- 1001:nrow(subcounts)
+bufcounts <- subcounts
+bufcounts[others,] <- matrix(rnbinom(length(others)*ncol(subcounts), mu=binding, size=P), length(others))
+```
+
+Running these through _edgeR_:
+
+```{r}
+y.b <- DGEList(bufcounts, lib.size=rep(1e6, length(g2)))
+y.b <- estimateDisp(y.b, design2)
+fit.b <- glmQLFit(y.b, design2, robust=TRUE)
+res.b <- glmQLFTest(fit.b, contrast=makeContrasts(ChIPA - ChIPB, levels=design2))
+summary(y.b$trended.dispersion)
+```
+
+We see loss of type I error control, because the buffering removes the protection from variance inflation.
+
+```{r}
+nullp.b <- res.b$table$PValue[-others]
+sum(nullp.b <= 0.01)/length(nullp.b) 
+sum(nullp.b <= 0.05)/length(nullp.b)
+```
+
+# Wrapping up
+
+```{r}
+sessionInfo()
+```
