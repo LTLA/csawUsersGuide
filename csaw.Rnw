@@ -2107,11 +2107,7 @@ Any technical replicates were merged together using  \code{samtools merge} to fo
 Indexing was performed using \code{samtools index}.
 
 If all relevant SRA files have been obtained, a set of explicit commands can be used to produce each BAM file.
-These commands are stored in a Bash file, accessible by running:
-
-<<results=hide>>=
-system.file("doc", "sra2bam.sh", package = "csaw")
-@
+These commands are stored in a Bash file named \code{sra2bam.sh} at \url{https://github.com/LTLA/csawUsersGuide}.
 
 \section{Session information}
 <<>>=
