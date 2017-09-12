@@ -663,7 +663,12 @@ for (ref in 1:3) {
 @
 
 In short, there's no obvious solution to this problem.
+To resolve it, you would need to know the true abundance for each observation in order to estimate the offset from the most appropriate point in the trend.
+However, we wouldn't need to normalize if we knew this!
 I'm going to stick with the what I've got right now, as it's easy to use and understand. 
+
+Additionally, if we consider efficiency bias to be the cause of the trend, then abundance is effectively assumed to be proportional to binding intensity.
+This is probably true in general, but deviations from this relationship will reduce the accuracy of normalization.
 
 \subsubsection*{Dealing with other biases}
 

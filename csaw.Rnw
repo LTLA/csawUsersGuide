@@ -159,11 +159,11 @@ data <- data[keep,]
 \item Calculating normalization factors.
 <<>>=
 binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-normfacs <- normOffsets(binned)
+data <- normOffsets(binned, se.out=data)
 @
 \item Identifying DB windows.
 <<>>=
-y <- asDGEList(data, norm.factors=normfacs)
+y <- asDGEList(data)
 y <- estimateDisp(y, design)
 fit <- glmQLFit(y, design, robust=TRUE)
 results <- glmQLFTest(fit)
@@ -993,15 +993,16 @@ Differences in the magnitude of suppression between libraries can lead to spurio
 Scaling by library size fails to correct for this as composition biases can still occur in libraries of the same size. 
 
 To remove composition biases in \pkgname{}, reads are counted in large bins and the counts are used for normalization with the \code{normOffsets} wrapper function.
-This uses the trimmed mean of M-values (TMM) method \citep{oshlack2010} to correct for any sytematic fold change in the coverage of the bins. 
-The assumption here is that most bins represent non-DB background regions so any consistent difference across bins must be spurious.
+This uses the trimmed mean of M-values (TMM) method \citep{oshlack2010} to correct for any systematic fold change in the coverage of the bins. 
+The assumption here is that most bins represent non-DB background regions, so any consistent difference across bins must be technical bias.
 
 <<>>=
 binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-normfacs <- normOffsets(binned)
-normfacs
+filtered.data <- normOffsets(binned, se.out=filtered.data)
+filtered.data$norm.factors
 @
 
+\paragraph{What does the TMM procedure do?}
 The TMM method trims away putative DB bins (i.e., those with extreme M-values) and computes normalization factors from the remainder to use in \edger{}. 
 The size of each library is scaled by the corresponding factor to obtain an effective library size for modelling. 
 A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the (effective) library size will be smaller. 
@@ -1017,29 +1018,38 @@ If any DB regions should survive trimming, upweighting them would be counterprod
 % are so negligble in quantity compared to the background regions, it doesn't
 % really matter too much, so long as weighting isn't in play.
 
-\subsection{Choosing a bin size}
+\paragraph{Why are large bins used?}
 By definition, read coverage is low for background regions. 
 This can result in a large number of zero counts and undefined M-values when reads are counted into small windows. 
 Adding a prior count is only a superficial solution as the chosen prior will have undue influence on the estimate of the normalization factor when many counts are low. 
-The variance of the fold change distribution is also higher for low counts. 
-This reduces the effectiveness of the trimming procedure during normalization. 
+The variance of the fold change distribution is also higher for low counts, which reduces the effectiveness of the trimming procedure during normalization. 
 These problems can be overcome by using large bins to increase the size of the counts prior to TMM normalization. 
+The normalization factors computed from the bin-level counts are then applied to the window-level counts, which is permissible \emph{as long as the library sizes are the same}.
 
-Of course, this strategy requires the user to supply a bin size. 
+\paragraph{What is \code{normOffsets} actually doing?}
+The \code{normOffsets} call computes normalization factors from \code{binned} and returns a modified version of \code{filtered.data}.
+This ensures that they are attached to the counts on which they should be used, simplifying data management in complex analyses.
+Here, the normalization factors are stored alongside the \textit{window} counts, despite being computed from the binned counts.
+This is because the former is of interest in the actual DB analysis.
+
+\subsection{Choosing a bin size}
+The binned TMM strategy described above requires the user to supply a bin size. 
 If the bins are too large, background and enriched regions will be included in the same bin. 
 This makes it difficult to trim away bins corresponding to enriched regions.
 On the other hand, the counts will be too low if the bins are too small.
 Testing multiple bin sizes is recommended to ensure that the estimates are robust to any changes. 
-A value of 10 kbp is suitable for most datasets.
+A value of 10 kbp is usually suitable for most datasets.
 
 <<>>=
 demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
-normOffsets(demo)
+normOffsets(demo, se.out=FALSE)
 demo <- windowCounts(bam.files, bin=TRUE, width=15000, param=param)
-normOffsets(demo)
+normOffsets(demo, se.out=FALSE)
 @
 
-These factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
+We use \code{se.out=FALSE} to instruct \code{normOffsets} to return the normalization factors directly.
+This is more convenient than returning a \code{RangedSummarizedExperiment} object and extracting the normalization factors with \code{\$norm.factors}.
+Here, the factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
 See Section~\ref{sec:eff_norm_ma} for some examples with greater bias.
 
 \subsection{Visualizing normalization efforts with MA plots}
@@ -1080,41 +1090,70 @@ for (i in 1:(length(bam.files)-1)) {
 \label{sec:eff_norm}
 
 \subsection{Using the TMM method on high-abundance regions}
-Efficiency biases are commonly observed in ChIP-seq data. 
-This refers to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
+\label{data:norm}
+
+Efficiency biases in ChIP-seq data refer to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
 These technical differences are not biologically interesting and must be removed. 
 This can be achieved by assuming that high-abundance windows contain binding sites. 
-In the examples below, reads are counted into 150 bp windows for histone mark data.
-High-abundance windows are chosen using a global filtering approach described in Section~\ref{sec:global_filter}. 
-The TMM method can then be applied to eliminate systematic differences across those windows.
+Consider the following H3K4me3 data set, where reads are counted into 150 bp windows.
 
-<<>>=
+<<>>=    
 me.files <- c("h3k4me3_mat.bam", "h3k4me3_pro.bam")
 me.demo <- windowCounts(me.files, width=150, param=param)
+@
+
+High-abundance windows are chosen using a global filtering approach described in Section~\ref{sec:global_filter}. 
+Here, the binned counts in \code{me.bin} are only used for defining the background abundance, \emph{not} for computing normalization factors.
+
+<<>>=
 me.bin <- windowCounts(me.files, bin=TRUE, width=10000, param=param) 
 keep <- filterWindows(me.demo, me.bin, type="global")$filter > log2(3)
-me.eff <- normOffsets(me.demo[keep,])
+filtered.me <- me.demo[keep,]
+@
+
+The TMM method can then be applied to eliminate systematic differences across those windows.
+This also assumes that most binding sites in the genome are not DB.
+Thus, any systematic differences in coverage among the high-abundance windows must be caused by differences in IP efficiency between libraries or some other technical issue.
+Scaling by the normalization factors will subseqeuently remove these bises between libraries. 
+
+<<>>=
+filtered.me <- normOffsets(filtered.me, se.out=TRUE)
+me.eff <- filtered.me$norm.factors
 me.eff
+@
+
+The above process seems rather involved, but this is only because we need to work our way through counting and normalization for a new data set.
+Only \code{normOffsets} is actually performing the normalization step.
+We set \code{se.out=TRUE} so that the normalization factors are stored alongside the window counts for use in the downstream \edger{} analysis.
+As a demonstration, we repeat this procedure on another data set involving H3 acetylation.
+
+<<>>=
 ac.files <- c("h3ac.bam", "h3ac_2.bam")
 ac.demo <- windowCounts(ac.files, width=150, param=param)
 ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
 keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
-ac.eff <- normOffsets(ac.demo[keep,])
+filtered.ac <- ac.demo[keep,]
+filtered.ac <- normOffsets(filtered.ac, se.out=TRUE)
 ac.eff
 @
-\label{data:norm}
 
-This method also assumes that most binding sites in the genome are not DB.
-Thus, any systematic differences in coverage among the high-abundance windows must be caused by differences in IP efficiency between libraries or some other technical issue.
-However, genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
-Also, care is required when filtering prior to normalization.
-Retaining too many windows will include background regions, while retaining too few will result in unstable estimates.
-See Chapter~\ref{chap:filter} for more details.
-
-Note that TMM normalization is performed on window counts instead of bin counts.
-This is possible as the former should be large enough after filtering and retention of high-abundance candidates (Chapter~\ref{chap:filter}).
+\paragraph{Why are we using windows now, not bins?}
+Unlike with composition biases, normalization for efficiency biases is performed on window counts instead of bin counts.
+This is possible as the former should be large enough after filtering and retention of high-abundance windows.
 Direct use of the windows also ensures that there is no systematic difference in the counts between libraries during DB testing.
-In practice, the estimated normalization factors are usually robust to the choice of window or bin size. 
+In general, the estimated normalization factors are usually robust to the choice of window size. 
+
+\paragraph{What happens to genuine biological differences?}
+Normalization for efficiency biases assumes that most binding sites are not DB.
+Genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
+In such cases, it is safer to normalize for composition biases -- see Section~\ref{sec:normchoice} for a discussion of the choice between normalization methods.
+
+\paragraph{How does the choice of filter affect the normalization?}
+Retaining too many windows will include background regions, which will obviously interfere with calculation of normalization factors from binding sites.
+Moreover, the computed factors will not be applicable to the background regions as they are not subject to any efficiency biases in the first place.
+Attempting to use the factors on windows from background regions will result in incorrect normalization and misleading log-fold changes.
+Thus, it is usually better to err on the side of caution and filter more aggressively to ensure that background regions are not retained in downstream analyses.
+Obviously, though, retaining too few windows will result in unstable estimates.
 
 \subsection{Checking normalization with MA plots}
 \label{sec:eff_norm_ma}
@@ -1125,9 +1164,9 @@ This is useful as the behavior of the entire genome can be examined, rather than
 It also allows calculation of and comparison to the factors for composition bias.
 
 <<>>=
-me.comp <- normOffsets(me.bin)
+me.comp <- normOffsets(me.bin, se.out=FALSE)
 me.comp
-ac.comp <- normOffsets(ac.bin)
+ac.comp <- normOffsets(ac.bin, se.out=FALSE)
 ac.comp
 @
 
@@ -1157,6 +1196,7 @@ for (main in c("H3K4me3", "H3ac")) {
 \end{center}
 
 \section{Choosing between normalization strategies}
+\label{sec:normchoice}
 The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of factors will ultimately be used.
 The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
 If so, composition bias should be removed to preserve the assumed DB.
@@ -1167,16 +1207,7 @@ For the main NF-YA example, there is no expectation of constant binding between 
 Thus, normalization factors will be computed to remove composition biases.
 This ensures that any genuine systematic changes in binding will still be picked up.
 In general, normalization for composition bias is a good starting point for any analysis.
-This can be considered as the ``default'' unless there is evidence for a confounding efficiency bias.
-
-Once chosen, the appropriate normalization factors can be stored inside the relevant \code{RangedSummarizedExperiment} object.
-This ensures that they are attached to the counts on which they should be used, simplifying data management in complex analyses.
-Here, the normalization factors are stored alongside the \textit{window} counts, despite being computed from the binned counts.
-This is because the former is of interest in the actual DB analysis.
-
-<<>>=
-filtered.data$norm.factors <- normfacs
-@
+This can be considered as the ``default'' strategy unless there is evidence for a confounding efficiency bias.
 
 \section{Scaling normalization with spike-in chromatin}
 Several studies have used spike-in chromatin for scaling normalization of ChIP-seq data \citep{bonhoure2014quantifying,orlando2014quantitative}.
@@ -1200,7 +1231,7 @@ spike.data <- data
 @
 
 <<>>=
-spike.facs <- normOffsets(spike.data, lib.sizes=data$totals)
+data.spnorm <- normOffsets(spike.data, lib.sizes=data$totals, se.out=data)
 @
 
 The spike-in approach does not distinguish between composition and efficiency biases.
@@ -1213,6 +1244,7 @@ Furthermore, the spike-in chromatin is assumed to behave in the same manner as e
 Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-in chromatin.
 
 \section{Dealing with trended biases}
+
 In more extreme cases, the bias may vary with the average abundance to form a trend. 
 One possible explanation is that changes in IP efficiency will have little effect at low-abundance background regions and more effect at high-abundance binding sites. 
 Thus, the magnitude of the bias between libraries will change with abundance. 
@@ -1223,26 +1255,20 @@ One such implementation is provided in \code{normOffsets} by setting \code{type=
 This is based on the fast loess algorithm \citep{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This offset matrix can then be directly used in \edger{}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
-Filtering prior to normalization is strongly recommended, to avoid inaccuracies in loess fitting at low abundances.
-
-The example below operates on the filtered counts for 2 kbp windows.
-This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
-Obviously, users should pick a more appropriate value for their analysis.
+We demonstrate this procedure below, using filtered counts for 2 kbp windows in the H3 acetylation data set.
 
 <<>>=
 ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
 filtered <- filterWindows(ac.demo2, ac.bin, type="global")
 keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
-ac.off <- normOffsets(ac.demo2, type="loess")
+ac.demo2 <- normOffsets(ac.demo2, type="loess")
+ac.off <- assay(ac.demo2, "offset")
 head(ac.off)
 @
 
 MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. 
-In addition, any filter statistic for the windows should be based on the average abundance from \code{aveLogCPM}.
-An average abundance threshold will act as a clean vertical cutoff in the plots below. 
-Spurious trends that might affect normalization will not be introduced at the filter boundary. 
 
 <<eval=FALSE,keep.source=true,label=trendplot1>>=
 abval <- filtered$abundances[keep]
@@ -1273,26 +1299,28 @@ par(mfrow=c(1,2))
 @
 \end{center}
 
-Similar to the normalization factors, the offsets can be stored in the \code{RangedSummarizedExperiment} object containing the counts of interest.
-This is done by adding the offset matrix as an extra entry in the \code{assays} slot.
-Any operations like subsetting that are applied to modify the count matrix will also be applied to the offsets, allowing for synchronised processing.
+\paragraph{Where is the offset matrix stored?}
+By default, the offsets are stored in the \code{RangedSummarizedExperiment} object as an extra entry in the \code{assays} slot.
+Any operations like subsetting that are applied to modify the object will also be applied to the offsets, allowing for synchronised processing.
 The counts of interest should be the same as those used to compute the offsets, given that each offset represents the amount of normalization required for a corresponding count.
 
-<<>>=
-assays(ac.demo2)$offset <- ac.off
-@
+If the offsets are available, they will generally override the normalization factors from the scaling methods in the downstream \edger{} analysis.
 
-Note that all non-linear methods assume that most bins/windows are not DB at each abundance. 
-This is a stronger assumption than that for scaling methods, which only require a non-DB majority across all features.
-Removal of the trend may not be appropriate if it represents some genuine biological phenomenon, e.g., involving changes in overall binding. 
-In addition, the computed offsets are not compatible with the normalization factors from the scaling methods.
-Only one of these sets of values will ultimately be used by \edger{}.
+\paragraph{What's the relationship with normalizing for efficiency bias?}
+Loess normalization of trended biases is quite similar to scaling normalization for efficiency biases in Section~\ref{sec:eff_norm}.
+Both methods assume a non-DB majority across features, and will not be appropriate if there is a change in overall binding.
+Loess normalization involves a slightly stronger assumption of non-DB at each abundance, not just across all bound regions.
+This is necessary to remove trended biases but may also discard genuine changes, such as a subset of DB sites at very high abundances.
 
-% I could iterate here, whereby I recompute the average abundance using the offsets.
-% Now, I'm not sure whether this would be any better or worse. 
-% On a practical level, though, the aveLogCPM calls in later functions do not use offset data.
-% So, you want to make sure you're removing the trend with respect to the average abundance that'll be used later on.
-% That's why I don't bother to iterate.
+\paragraph{Why do we need to filter?}
+Filtering prior to normalization is strongly recommended to avoid inaccuracies in loess fitting at low abundances.
+Any filter statistic for the windows should be based on the average abundance from \code{aveLogCPM}, such as those calculated using \code{filteWdinows}
+An average abundance threshold will act as a clean vertical cutoff in the MA plots above. 
+This avoids introducing spurious trends at the filter boundary that might affect normalization.
+
+\paragraph{Why are we using 2 kbp windows?}
+This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
+Obviously, users should pick a more appropriate value for their analysis.
 
 \section{A word on other biases}
 No normalization is performed to adjust for differences in mappability or sequencability between different regions of the genome. 
@@ -1308,7 +1336,7 @@ Detection power may be lost if this is not true.
 For example, differences in the GC content distribution can be driven by technical bias as well as biology, e.g., when protein binding is associated with a specific GC composition.
 
 <<results=hide,echo=FALSE>>=
-rm(demo, ac.demo, ac.bin, me.demo, me.bin, ac.demo2, filtered, keep, adjc)
+rm(demo, ac.demo, filtered.ac, ac.bin, me.demo, filtered.me, me.bin, ac.demo2, filtered, keep, adjc)
 gc()
 @
 
@@ -1340,15 +1368,11 @@ The choice of \edger{} is primarily motivated by its performance relative to som
 This author's desire to increase his h-index may also be a factor \citep{chen2014}.
 
 \subsection{Setting up the data}
-A \code{DGEList} object is first constructed from the count matrix, library sizes and normalization factors.
-Here, the \code{normfacs} vector from TMM normalization of background bins is used to remove composition bias. 
-If an offset matrix was computed, it can be assigned to \code{y} using the \code{scaleOffset} function and will be used instead of normalization factors in various \edger{} functions.
-(If this normalization information was already stored in the \code{RangedSummarizedExperiment} object -- see Chapter~\ref{chap:norm} -- it will automatically be extracted and used to construct the \code{DGEList} object.
-In such cases, manual specification of \code{norm.factors=} is not strictly necessary, but is still shown below for pedagogical purposes.
-See \code{?asDGEList} for details.)
+A \code{DGEList} object is first constructed from the count matrix in \code{filtered.data}.
+If normalization factors or offsets are present in the \code{RangedSummarizedExperiment} object -- see Chapter~\ref{chap:norm} -- they will automatically be extracted and used to construct the \code{DGEList} object.
 
 <<>>=
-y <- asDGEList(filtered.data, norm.factors=normfacs)
+y <- asDGEList(filtered.data)
 @
 
 The experimental design is described by a design matrix. 
