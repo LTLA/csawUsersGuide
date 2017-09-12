@@ -1023,8 +1023,11 @@ By definition, read coverage is low for background regions.
 This can result in a large number of zero counts and undefined M-values when reads are counted into small windows. 
 Adding a prior count is only a superficial solution as the chosen prior will have undue influence on the estimate of the normalization factor when many counts are low. 
 The variance of the fold change distribution is also higher for low counts, which reduces the effectiveness of the trimming procedure during normalization. 
+
 These problems can be overcome by using large bins to increase the size of the counts prior to TMM normalization. 
-The normalization factors computed from the bin-level counts are then applied to the window-level counts, which is permissible \emph{as long as the library sizes are the same}.
+The normalization factors computed from the bin-level counts are then applied to the window-level counts of interest.
+This is valid \emph{provided that the library sizes are the same between the two sets of counts}, as the factors are interpreted with respect to the library sizes.
+With \pkgname{}, separate calls to \code{windowCounts} with the same \code{readParam} object will always yield the same library sizes in \code{totals}.
 
 \paragraph{What is \code{normOffsets} actually doing?}
 The \code{normOffsets} call computes normalization factors from \code{binned} and returns a modified version of \code{filtered.data}.
@@ -1214,29 +1217,38 @@ Several studies have used spike-in chromatin for scaling normalization of ChIP-s
 Briefly, a constant amount of chromatin from a different species is added to each sample at the start of the ChIP-seq protocol.
 The mixture is processed and sequenced in the usual manner, using an antibody that can bind epitopes of interest from both species.
 The coverage of the spiked-in foreign chromatin is then quantified in each library.
-As the quantity of foreign chromatin should be constant in each sample, the coverage of the foreign genome should also be the same between libraries.
-Any difference in spike-in coverage between libraries represents some technical bias that should be removed by scaling.
+As the quantity of foreign chromatin should be constant in each sample, the coverage of binding sites on the foreign genome should also be the same between libraries.
+Any difference in coverage between libraries represents some technical bias that should be removed by scaling.
 
 This normalization strategy can be implemented in \pkgname{} with some work.
-Assuming that the reference includes appropriate sequences from the foreign genome, coverage can be quantified across genomic windows with \code{windowCounts}.
+Assuming that the reference genome includes appropriate sequences from the foreign genome, coverage is quantified across genomic windows with \code{windowCounts}.
 Filtering is performed to select for high-abundance windows in the foreign genome (see Section~\ref{sec:eff_norm}), yielding counts for all enriched spike-in regions.
 (The filtered object is named \code{spike.data} in the code below.)
-Normalization factors are computed by applying the TMM method on these counts.
-This aims to identify the fold-change in enrichment between samples that is attributable to technical effects.
-Note that the library sizes should be set to the total number of reads mapped to the \textit{endogenous} genome in each sample.
-This ensures that the computed factors will yield effective library sizes that are relevant to the final analysis on the endogenous regions.
+Normalization factors are computed by applying the TMM method on these counts via \code{normOffsets}.
+This aims to identify the fold-change in coverage between samples that is attributable to technical effects.
 
 <<echo=FALSE, results=hide>>=
 spike.data <- data
+endog.data <- data
 @
 
 <<>>=
-data.spnorm <- normOffsets(spike.data, lib.sizes=data$totals, se.out=data)
+endog.data <- normOffsets(spike.data, se.out=endog.data)
 @
 
+\paragraph{What is the \code{normOffsets} call doing?}
+The spike-in normalization factors are computed using high-abundance regions in \code{spike.data}, and returned in a modified copy of \code{endog.data}.
+The new \code{endog.data} can then be used for further analysis of the endogenous windows.
+The normalization factors can also be extracted from \code{endog.data\$norm.factors}, as previously described.
+We assume that the library sizes in \code{totals} are the same between \code{spike.data} and \code{endog.data}, 
+which should be the case if they were formed by subsetting the output of a single \code{windowCounts} call.
+This ensures that the normalization factors computed from the spike-in windows are applicable to the endogenous windows.
+
+\paragraph{How does this compare to the other scaling methods?}
 The spike-in approach does not distinguish between composition and efficiency biases.
 Instead, it uses the fold-differences in spike-in coverage to empirically measure and remove the net bias between libraries.
 This avoids the need for assumptions regarding the origin of any systematic differences between libraries.
+
 That said, spike-in normalization involves some strong assumptions of its own.
 For example, the same ratio of spike-in chromatin to endogenous chromatin is assumed to be present in each sample.
 This requires accurate quantitation of the chromatin in each sample, followed by precise addition of small spike-in quantities.
