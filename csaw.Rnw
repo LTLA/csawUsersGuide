@@ -871,14 +871,14 @@ chip <- in.demo[,1:4]
 control <- in.demo[,5]
 @
 
-Some additional work is required to account for composition biases (see Section~\ref{sec:compo_norm}).
-These are likely to be present when comparing ChIP to negative control samples.
-A simple strategy for normalization involves counting reads into large bins, as shown below.
+Some additional work is required to account for composition biases that are likely to be present when comparing ChIP to negative control samples (see Section~\ref{sec:compo_norm}).
+A simple strategy for normalization involves counting reads into large bins, which are used in \code{scaleControlFilter} to compute a normalization factor.
 
 <<>>=
 in.binned <- windowCounts(c(bam.files, "input.bam"), bin=TRUE, width=10000, param=param)
 chip.binned <- in.binned[,1:4]
 control.binned <- in.binned[,5]
+scale.info <- scaleControlFilter(chip.binned, control.binned)
 @
 
 The \code{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
@@ -887,11 +887,10 @@ This protects against inflated log-fold changes when the count for the window in
 Note that the global and local background estimates require less protection (\code{prior.count} of 2) as they are derived from larger bins with more counts.
 
 <<>>=
-filter.stat <- filterWindows(chip, control, type="control", prior.count=5,
-    norm.fac=list(chip.binned, control.binned))
+filter.stat <- filterWindows(chip, control, type="control", 
+    prior.count=5, scale.info=scale.info)
 @
 
-The binned counts are also supplied as a list to the \code{norm.fac} argument, where the first and second elements contain the counts for the ChIP and control samples, respectively.
 The log-fold enrichment of the ChIP sample over the control is then computed for each window, after normalizing for composition bias with the binned counts.
 The example below requires a 3-fold or greater increase in abundance over the control to retain each window.
 
