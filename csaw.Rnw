@@ -8,8 +8,11 @@ BiocStyle::latex()
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
 %% also: \bioctitle{Title used for both header and title page}
 %% or... \title{Title used for both header and title page}
-\author{Aaron Lun \\
-Walter and Eliza Hall Institute of Medical Research}
+\author[1,2]{Aaron T. L. Lun}
+\author[1,3]{Gordon K. Smyth}
+\affil[1]{The Walter and Eliza Hall Institute of Medical Research, Melbourne, Australia}
+\affil[2]{Department of Medical Biology, The University of Melbourne, Melbourne, Australia}
+\affil[3]{Department of Mathematics and Statistics, The University of Melbourne, Melbourne, Australia}
 
 \usepackage{framed,color}
 \newenvironment{combox}
@@ -1208,7 +1211,7 @@ Any abundance-dependent trend in the M-values should be eliminated.
 par(mfrow=c(1,2))
 
 # MA plot without normalization.
-ac.y <- asDGEList(as.demo2)
+ac.y <- asDGEList(ac.demo2)
 adjc <- cpm(ac.y, log=TRUE)
 abval <- aveLogCPM(ac.y)
 mval <- adjc[,1]-adjc[,2]
@@ -1893,8 +1896,9 @@ The bimodality score at each base position is defined as the minimum of the rati
 A high score is only possible if both ratios are large, i.e., strand bimodality is present.
 
 <<>>=
-expanded <- suppressWarnings(resize(merged$region, fix="center", 
-                                    width=width(merged$region)+50))
+spacing <- metadata(data)$spacing
+expanded <- resize(merged$region, fix="center", 
+                   width=width(merged$region)+spacing)
 sbm.score <- checkBimodality(bam.files, expanded, width=frag.len)
 head(sbm.score)
 @
