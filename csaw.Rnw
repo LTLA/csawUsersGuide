@@ -1071,7 +1071,8 @@ This indicates that undersampling has been identified and corrected.
 <<eval=FALSE,label=normplot>>=
 par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
 adj.counts <- cpm(asDGEList(binned), log=TRUE)
-for (i in 1:(length(bam.files)-1)) {
+normfacs <- filtered.data$norm.factors
+for (i in seq_len(length(bam.files)-1)) {
     cur.x <- adj.counts[,1]
     cur.y <- adj.counts[,1+i]
     smoothScatter(x=(cur.x+cur.y)/2+6*log2(10), y=cur.x-cur.y,
@@ -1136,6 +1137,7 @@ ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
 keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
 filtered.ac <- ac.demo[keep,]
 filtered.ac <- normOffsets(filtered.ac, se.out=TRUE)
+ac.eff <- filtered.ac$norm.factors
 ac.eff
 @
 
@@ -1180,8 +1182,15 @@ This also induces composition bias, leading to a non-zero M-value for the backgr
 <<eval=FALSE,label=methplot,strip.white=false>>=
 par(mfrow=c(1,2))
 for (main in c("H3K4me3", "H3ac")) { 
-    if (main=="H3K4me3") { bins <- me.bin; comp <- me.comp; eff <- me.eff }
-    else { bins <- ac.bin; comp <- ac.comp; eff <- ac.eff }
+    if (main=="H3K4me3") { 
+        bins <- me.bin
+        comp <- me.comp
+        eff <- me.eff 
+    } else { 
+        bins <- ac.bin
+        comp <- ac.comp
+        eff <- ac.eff 
+    }
     adjc <- cpm(asDGEList(bins), log=TRUE)
     smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
         xlab="A", ylab="M", main=main)
@@ -1273,7 +1282,7 @@ ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
 filtered <- filterWindows(ac.demo2, ac.bin, type="global")
 keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
-ac.demo2 <- normOffsets(ac.demo2, type="loess")
+ac.demo2 <- normOffsets(ac.demo2, type="loess", se.out=TRUE)
 ac.off <- assay(ac.demo2, "offset")
 head(ac.off)
 @
@@ -1282,13 +1291,14 @@ MA plots can be examined to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated. 
 
 <<eval=FALSE,keep.source=true,label=trendplot1>>=
-abval <- filtered$abundances[keep]
-o <- order(abval)
-adjc <- cpm(asDGEList(ac.demo2), log=TRUE)
+ac.y <- asDGEList(as.demo2)
+adjc <- cpm(ac.y, log=TRUE)
+abval <- aveLogCPM(ac.y)
 mval <- adjc[,1]-adjc[,2]
 fit <- loessFit(x=abval, y=mval)
 smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
    main="Raw", ylim=c(-2,2), xlim=c(0, 7))
+o <- order(abval)
 lines(abval[o], fit$fitted[o], col="red")
 @
 <<eval=FALSE,keep.source=true,label=trendplot2>>=
@@ -1296,8 +1306,8 @@ lines(abval[o], fit$fitted[o], col="red")
 re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
 mval <- re.adjc[,1]-re.adjc[,2]
 fit <- loessFit(x=abval, y=mval)
-smoothScatter(abval, re.adjc[,1]-re.adjc[,2], ylab="M", 
-   xlab="Average logCPM", main="Normalized", ylim=c(-2,2), xlim=c(0, 7))
+smoothScatter(abval, re.adjc[,1]-re.adjc[,2], ylab="M", xlab="Average logCPM", 
+    main="Normalized", ylim=c(-2,2), xlim=c(0, 7))
 lines(abval[o], fit$fitted[o], col="red")
 @
 
@@ -1311,7 +1321,7 @@ par(mfrow=c(1,2))
 \end{center}
 
 \paragraph{Where is the offset matrix stored?}
-By default, the offsets are stored in the \code{RangedSummarizedExperiment} object as an extra entry in the \code{assays} slot.
+When \code{se.out=TRUE}, the offsets are stored in the \code{RangedSummarizedExperiment} object as an extra entry in the \code{assays} slot.
 Any operations like subsetting that are applied to modify the object will also be applied to the offsets, allowing for synchronised processing.
 The counts of interest should be the same as those used to compute the offsets, given that each offset represents the amount of normalization required for a corresponding count.
 
