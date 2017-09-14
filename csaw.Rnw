@@ -450,7 +450,7 @@ Poor IP efficiency will result in a smaller or absent peak as bimodality is less
 Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation.
 However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g., H3K27 trimethylation).
 
-<<histone_ccf>>=
+<<histone_ccf, fig.asp=1>>=
 n <- 1000
 h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
 h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
@@ -778,9 +778,10 @@ scale.info <- scaleControlFilter(chip.binned, control.binned)
 @
 
 The \Rfunction{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
-A larger \Rcode{prior.count} of 5 is used to compute the average abundance.
+This uses \Robject{scale.info} to adjust for composition biases between ChIP and control sampes.
+A larger \Rcode{prior.count} of 5 is also used to compute the average abundance.
 This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
-Note that the global and local background estimates require less protection (\Rcode{prior.count=2}, by default) as they are derived from larger bins with more counts.
+By comparison, the global and local background estimates require less protection (\Rcode{prior.count=2}, by default) as they are derived from larger bins with more counts.
 
 <<>>=
 filter.stat <- filterWindows(chip, control, type="control", prior.count=5, 
@@ -960,7 +961,7 @@ This indicates that undersampling has been identified and corrected.
 % bins should still be free of binding, though (8000/260000 bins, based on 
 % those that overlap globally filtered windows in Chapter 4).
 
-<<normplot, fig.width=8, fig.height=3>>=
+<<normplot, fig.wide=TRUE, fig.asp=3>>=
 par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
 adj.counts <- cpm(asDGEList(binned), log=TRUE)
 normfacs <- filtered.data$norm.factors
@@ -1063,7 +1064,7 @@ The normalization factors from removal of composition bias (dashed) pass through
 A non-zero M-value location for the high A-value cloud represents a systematic difference between libraries for the bound regions, either due to genuine DB or variable IP efficiency. 
 This also induces composition bias, leading to a non-zero M-value for the background cloud.
 
-<<methplot,fig.width1=0, fig.height=5>>=
+<<methplot, fig.wide=TRUE, fig.asp=2>>=
 par(mfrow=c(1,2))
 for (main in c("H3K4me3", "H3ac")) { 
     if (main=="H3K4me3") { 
@@ -1184,7 +1185,7 @@ We examine the MA plots to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated after applying the offsets to the log-counts.
 This is done by subtraction, though note that the offsets are base $e$ while most log-values in \Biocpkg{edgeR} are reported as base 2.
 
-<<trendplot1, figt.width=10, fig.height=5>>=
+<<trendplot, fig.wide=TRUE, fig.asp=2>>=
 par(mfrow=c(1,2))
 
 # MA plot without normalization.
@@ -1307,8 +1308,7 @@ These plots can also be used to decide whether the fitted trend is appropriate.
 Sudden irregulaties may be indicative of an underlying structure in the data which cannot be modelled with the mean-dispersion trend. 
 Discrete patterns in the raw dispersions are indicative of low counts and suggest that more aggressive filtering is required.
 
-<<shrinkx,fig.width=10,fig.height=5>>=
-par(mfrow=c(1,2))
+<<dispplot, fig.asp=1>>=
 o <- order(y$AveLogCPM)
 plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
      ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
@@ -1324,7 +1324,7 @@ Filtering of low-abundance regions (as described in Chapter~\ref{chap:filter}) p
 Users can compare raw and filtered results to see whether it makes any difference.
 Filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
-<<rmchecker>>=
+<<rmchecker, fig.asp=1>>=
 relevant <- rowSums(assay(data)) >= 20 # weaker filtering than 'filtered.data'
 yo <- asDGEList(data[relevant], norm.factors=normfacs)
 yo <- estimateDisp(yo, design)
@@ -1413,7 +1413,7 @@ A small top set visualizes the most extreme differences whereas a large set visu
 Checking a range of \Rcode{top} values may be useful when the scope of DB is unknown.
 Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
 
-<<mds>>=
+<<mds, fig.wide=TRUE, fig.asp=1>>=
 par(mfrow=c(2,2), mar=c(5,4,2,2))
 adj.counts <- cpm(y, log=TRUE)
 for (top in c(100, 500, 1000, 5000)) {
@@ -1920,7 +1920,7 @@ The blue and red tracks represent the coverage on the forward and reverse strand
 Strong strand bimodality is consistent with a genuine TF binding site.
 For paired-end data, coverage can be similarly plotted for fragments, i.e., proper read pairs.
 
-<<regionplot>>=
+<<regionplot, fig.wide=TRUE, fig.asp=0.5>>=
 require(Gviz)
 collected <- vector("list", length(bam.files))
 for (i in seq_along(bam.files)) { 
