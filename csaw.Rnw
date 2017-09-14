@@ -155,22 +155,23 @@ At this point, all we need are the \Robject{bam.files} that we defined in the in
 \end{combox}
 
 \section{Types of input data}
-Sorted and indexed BAM (i.e., binary SAM) files are required as input into the read counting functions in \Biocpkg{csaw}. 
-Sorting should be performed on the genomic position of the mapped read.
-For a given BAM file named \file{xxx.bam}, the corresponding index file should be named as \file{xxx.bam.bai} such that both files are in the same directory. 
-Users should be aware that the sensibility of the supplied index is not checked prior to counting. 
+Sorted and indexed BAM (i.e., binary SAM) files \cite{li2009} are required as input into the read counting functions in \Biocpkg{csaw}. 
+Sorting should be performed on the genomic coordinates of the mapped reads.
+Each read should only have one alignment in the file, i.e., secondary alignments should not be present.
+
+For a given BAM file named \file{xxx.bam}, the corresponding index file should be named as \file{xxx.bam.bai} in the same directory. 
+The sensibility of the supplied index is not checked prior to counting. 
 A common mistake is to replace or update the BAM file without updating the index. 
-This will cause \Biocpkg{csaw} to return incorrect results when it attempts to load alignments from new BAM file.
-Also, each read should only have one alignment in the file, i.e., secondary alignments should not be present.
+This will cause \Biocpkg{csaw} to return incorrect results when it attempts to load alignments from the new BAM file.
 
 \section{Counting reads into windows}
 
 \subsection{Overview}
 The \Rfunction{windowCounts} function uses a sliding window approach to count fragments for a set of libraries. 
 For single-end data, the fragment corresponding to a read is imputed by directionally extending each read to the average fragment length. 
-The number of fragments overlapping a genomic window is counted. 
+We define a window as a fixed-width genomic interval, and we count the number of fragments overlapping that window in each library.
 This is repeated after sliding the window along the genome to a new position. 
-A count is then obtained for each window in each library. 
+A count is then obtained for each window in each library, thus quantifying protein binding intensity across the genome.
 
 <<>>=
 frag.len <- 110
@@ -190,7 +191,7 @@ head(rowRanges(data))
 data$totals
 @
 
-For single-end data, suitable values for the average fragment length in \Rcode{ext} can be estimated from the primary peak in a cross-correlation plot (see Section~\ref{sec:ccf}). 
+For single-end data, we estimate the average fragment length from a cross-correlation plot (see Section~\ref{sec:ccf}) for use as \Rcode{ext}.
 Alternatively, the length can be estimated from diagnostics during ChIP or library preparation, e.g., post-fragmentation gel electrophoresis images. 
 Typical values range from 100 to 300 bp, depending on the efficiency of sonication and the use of size selection steps in library preparation.
 
@@ -220,27 +221,15 @@ Typical values range from 100 to 300 bp, depending on the efficiency of sonicati
 \end{tikzpicture}
 \end{center}
 
-The specified \Rcode{width} of each window controls the compromise between spatial resolution and count size. 
-Larger windows will yield higher read counts which can provide more power for DB detection. 
-However, spatial resolution is also lost for large windows whereby adjacent features can no longer be distinguished. 
-Reads from a DB site may be counted alongside reads from a non-DB site (e.g., non-specific background) or even those from an adjacent site that is DB in the opposite direction. 
-This will result in the loss of DB detection power.
-
-The window size can be interpreted as a measure of the width of the binding site. 
-Thus, TF analyses will typically use a small window size, e.g., 10 - 20 bp.
-This maximizes spatial resolution to allow optimal detection of narrow regions of enrichment. 
-For histone marks, widths of at least 150 bp are recommended \cite{humburg2011}. 
-This corresponds to the length of DNA wrapped up in each nucleosome, i.e., the smallest relevant unit for histone mark enrichment. 
-For diffuse marks, the sizes of enriched regions are more variable and so the compromise between resolution and power is more arbitrary. 
-Analyses with multiple widths can be combined to examine DB across several resolutions (see Section~\ref{sec:bin_integrate}).
-
-For TF analyses with small windows, the choice of spacing interval will also have an effect on the choice of window size -- see Section~\ref{sec:efficiency} for more details.
+The \Rcode{width} argument defines the window size, which we interpret as the width of the binding site for the target protein.
+This is user-specified and has important implications for the power and resolution of a DB analysis, which are discussed in Section~\ref{sec:windowsize}.
+For TF analyses with small windows, the choice of spacing interval will also be affected by the choice of window size -- see Section~\ref{sec:efficiency} for more details.
 
 \subsection{Filtering out low-quality reads}
 Read extraction from the BAM files is controlled with the \Rcode{param} argument in \Rfunction{windowCounts}.
 This takes a \Rclass{readParam} object that specifies a number of extraction parameters.
-The idea is to define the \Rclass{readParam} object once in the entire analysis pipeline.
-It can then be reused for all relevant functions, thus ensuring that read loading is consistent throughout the analysis.
+The idea is to define the \Rclass{readParam} object once in the entire analysis pipeline, which is then reused for all relevant functions.
+This ensures that read loading is consistent throughout the analysis.
 
 <<>>=
 param
@@ -268,8 +257,9 @@ Duplicate removal is generally not recommended for routine DB analyses.
 This is because it caps the number of reads at each position, reducing DB detection power in high-abundance regions. 
 Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size. 
 However, it may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
-Duplicate removal is also safer with paired-end data, where the probability of accidentally obtaining exact overlaps for both reads of a pair is greatly reduced 
-(assuming that a pair-aware method was used during marking).
+Duplicate removal is also acceptable for paired-end data, as exact overlaps for both paired reads are required to define duplicates.
+This greatly reduces the probability of incorrectly discarding read pairs from non-duplicate DNA fragments
+(assuming that a pair-aware method was used during duplicate marking).
 
 \subsection{Avoiding problematic genomic regions}
 Read extraction and counting can be restricted to particular chromosomes by specifying the names of the chromosomes of interest in \Rcode{restrict}. 
@@ -296,8 +286,8 @@ This list is constructed empirically from the ENCODE datasets and includes obvio
 Alternatively, repeats can be predicted from the genome sequence using software like \software{RepeatMasker}.
 These calls are available from the UCSC website (e.g., \url{hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/chromOut.tar.gz} for mouse) or they can be extracted from an appropriate masked \Rclass{BSgenome} object. 
 
-Using \Rcode{discard} is safer than simply ignoring windows that overlap the repeats. 
-For example, a large window might contain both repeat regions and non-repeat regions. 
+Using \Rcode{discard} is more appropriate than simply ignoring windows that overlap the repeat regions.
+For example, a large window might contain both repeat and non-repeat regions. 
 Discarding the window because of the former will compromise detection of DB features in the latter. 
 Of course, any DB sites within the discarded regions will be lost from downstream analyses.  
 Some caution is therefore required when specifying the regions of disinterest.
@@ -313,7 +303,7 @@ another.param <- reform(param, minq=20, discard=repeats)
 another.param
 @
 
-Users are encouraged to construct their own \Rclass{readParam} objects (or lists thereof) and apply them consistently throughout their analyses.
+Users are encouraged to construct their own \Rclass{readParam} objects and apply them consistently throughout their analyses.
 A good measure of synchronisation between \Rfunction{windowCounts} calls is to check that the values of \Rcode{...\$totals} are identical between calls. 
 This suggests that the same reads are being extracted from the BAM files in each call. 
 
@@ -332,16 +322,16 @@ demo <- windowCounts(bam.files, spacing=100, ext=frag.len,
 head(rowRanges(demo))
 @
 
-For analyses with large windows, it is worth increasing the \Rcode{spacing} to a fraction of the specified \Rcode{width}. 
+For analyses with large windows, we suggest increasing the \Rcode{spacing} to a fraction of the specified \Rcode{width}. 
 This reduces the computational work by decreasing the number of windows and extracted counts. 
-Any loss in spatial resolution due to a larger spacing interval is negligble when compared to that already lost by using a large window size. 
+Any loss in spatial resolution due to a larger spacing interval is negligible compared to that already lost by using a large window size. 
 Conversely, \Rcode{spacing} should not be larger than \Rcode{ext/2} for analyses with small windows.
 This ensures that a narrow binding site will not be overlooked if it falls between two windows.
 If \Rcode{ext} is also very small, \Rcode{spacing} should be set to \Rcode{width} to avoid loading too many small windows.
 
-Windows that are overlapped by few fragments can be filtered out using the \Rcode{filter} argument. 
+Windows that are overlapped by few fragments are filtered out based on the \Rcode{filter} argument. 
+A window is removed if the sum of counts across all libraries is below \Rcode{filter}.
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions. 
-Specifically, any window is removed if the sum of counts across all libraries is below \Rcode{filter}.
 The default value of the filter threshold is 10, though it can be raised to reduce memory usage for large libraries.
 More sophisticated filtering is recommended and should be applied later (see Chapter~\ref{chap:filter}).
 
@@ -361,25 +351,26 @@ param$BPPARAM
 @
 
 \subsection{Assigning reads into bins}
-Setting \Rcode{bin=TRUE} will cause \Rfunction{windowCounts} to count reads into contiguous bins across the genome.
-Specifically, \Rcode{spacing} is set to \Rcode{width} such that each window forms a bin.
-Only the $5'$ end of each read is used for counting into bins, without any directional extension.
+Setting \Rcode{bin=TRUE} will direct \Rfunction{windowCounts} to count reads into contiguous bins across the genome.
+Here, \Rcode{spacing} is set to \Rcode{width} such that each window forms a bin.
+Only the 5\ensuremath{'} end of each read is used for counting into bins, without any directional extension.
 (For paired-end data, the midpoint of the originating fragment is used -- see below.)
-No filtering is performed on the count sum which means that counts will be returned for each genomic bin. 
-As a result, users should set \Rcode{width} to a reasonably large value.
-This avoids problems with memory constraints when counts are returned for a large number of small bins.
 
 <<>>=
 demo <- windowCounts(bam.files, width=1000, bin=TRUE, param=param)
 head(rowRanges(demo))
 @
 
+The \Rcode{filter} argument is automatically set to 1, which means that counts will be returned for each non-empty genomic bin.
+Users should set \Rcode{width} to a reasonably large value, to avoid running out of memory with a large number of small bins.
+We can also force \Rfunction{windowCounts} to return bins for \textit{all} bins by setting \Rcode{filter=0} manually.
+
 \section{Experiments involving paired-end data}
 \label{data:pet}
 
-ChIP experiments with paired-end sequencing can be accomodated by setting \Rcode{pe="both"} in the \Robject{param} object supplied to \Rfunction{windowCounts}. 
-Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined as that between the $5'$ positions of the paired reads.
-The number of fragments overlapping each window is then counted as described. 
+ChIP experiments with paired-end sequencing are accomodated by setting \Rcode{pe="both"} in the \Robject{param} object supplied to \Rfunction{windowCounts}. 
+Read extension is not required as the genomic interval spanned by the originating fragment is explicitly defined as that between the 5\ensuremath{'} positions of the paired reads.
+The number of fragments overlapping each window is then counted as previously described. 
 By default, only proper pairs are used in which the two paired reads are on the same chromosome, face inward and are no more than \Rcode{max.frag} apart.
 
 <<>>=
@@ -389,8 +380,8 @@ demo <- windowCounts(pe.bam, ext=250, param=pe.param)
 demo$totals
 @
 
-A suitable value for \Rcode{max.frag} can be chosen by examining the distribution of fragment sizes from the \Rfunction{getPESizes} function. 
-In this example, a user might use a value of around 400 bp as it exceeds the vast majority of the fragment size distribution. 
+A suitable value for \Rcode{max.frag} is chosen by examining the distribution of fragment sizes from the \Rfunction{getPESizes} function. 
+In this example, we might use a value of around 400 bp as it is larger than the vast majority of fragment sizes.
 The plot can also be used to examine the quality of the PE sequencing procedure. 
 The location of the mode should be consistent with the fragmentation and size selection steps in library preparation. 
 
@@ -402,7 +393,7 @@ hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)",
 abline(v=400, col="red")
 @
 
-The number of fragments exceeding the maximum size can be recorded for quality control. 
+The number of fragments exceeding the maximum size is recorded for quality control. 
 The \Rfunction{getPESizes} function also returns the number of single reads, pairs with one unmapped read, improperly orientated pairs and inter-chromosomal pairs.
 A non-negligble proportion of these reads may be indicative of problems with paired-end alignment or sequencing. 
 
@@ -410,8 +401,8 @@ A non-negligble proportion of these reads may be indicative of problems with pai
 c(out$diagnostics, too.large=sum(out$sizes > 400))
 @
 
-Note that all of the paired-end methods in \Biocpkg{csaw} depend on the synchronisation of mate information for each alignment in the BAM file. 
-This is usually enforced in the alignments that are reported directly from the aligner. 
+Note that all of the paired-end methods in \Biocpkg{csaw} depend on correct mate information for each alignment.
+This is usually enforced by the aligner in the output BAM file.
 Any file manipulations that might break the synchronisation should be corrected 
 (e.g., with the \software{FixMateInformation} program from the \software{Picard} suite) prior to read counting.
 
@@ -429,7 +420,7 @@ demo$totals
 \label{sec:ccf}
 
 \subsection{Using cross-correlation plots}
-Cross-correlation plots can be generated directly from BAM files using the \Rfunction{correlateReads} function. 
+Cross-correlation plots are generated directly from BAM files using the \Rfunction{correlateReads} function. 
 This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment \cite{kharchenko2008}. 
 Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
 This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
@@ -441,15 +432,15 @@ x <- correlateReads(bam.files, max.delay, param=dedup.on)
 plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
 @
 
-The location of the peak can be used as an estimate of the fragment length for read extension in \Rfunction{windowCounts}. 
-An estimate of $\sim$110 bp is obtained from the plot above.
-This can be done more precisely with the \Rfunction{maximizeCcf} function, which returns a similar value.
+The location of the peak is used as an estimate of the fragment length for read extension in \Rfunction{windowCounts}. 
+An estimate of \textasciitilde{}110 bp is obtained from the plot above.
+We can do this more precisely with the \Rfunction{maximizeCcf} function, which returns a similar value.
 
 <<>>=
 maximizeCcf(x)
 @
 
-A sharp spike may also observed in the plot at a distance corresponding to the read length. 
+A sharp spike may also be observed in the plot at a distance corresponding to the read length. 
 This is thought to be an artifact, caused by the preference of aligners towards uniquely mapped reads. 
 Duplicate removal is typically required here (i.e., set \Rcode{dedup=TRUE} in \Rfunction{readParam}) to reduce the size of this spike. 
 Otherwise, the fragment length peak will not be visible as a separate entity.
@@ -481,7 +472,7 @@ For example, libraries with less efficient fragmentation will have larger fragme
 Single-end reads in the peaks of such libraries will require more directional extension to impute a fragment interval that covers the binding site.
 However, some work is required to avoid detecting irrelevant DB from differences in peak widths.
 This is done by resizing the inferred fragments to the same length in all libraries.
-(Consider a bimodal peak across several libraries.
+(Consider a bimodal peak, present in several libraries that have different fragment lengths.
 Resizing ensures that the subpeak on the forward strand is centered at the same location in each library.
 The same applies for the subpeak on the reverse strand.)
 Thus, the effect of differences in peak width between libraries can be largely mitigated.
@@ -504,60 +495,34 @@ metadata(demo)$final
 In general, use of different extension lengths is unnecessary in well-controlled datasets.
 Difference in lengths between libraries are usually smaller than 50 bp.
 This is less than the inherent variability in fragment lengths within each library (see the histogram for the paired-end data in Section~\ref{data:pet}).
-Such variability will affect the read coverage profile more than any difference in lengths, and is likely to mask the latter.
-Thus, an \Rcode{ext} list should only specified for datasets that exhibit large differences in the fragment sizes.
+The effect on the coverage profile of within-library variability in lengths will likely mask the effect of small between-library differences in the average lengths.
+Thus, an \Rcode{ext} list should only be specified for datasets that exhibit large differences in the average fragment sizes between libraries.
 
 \section{Choosing an appropriate window size}
-The coverage profile around potential binding sites can be obtained with the \Rfunction{profileSites} function.
-Binding sites are defined by taking high-abundance 50 bp windows and identifying those that are locally maximal using \Rfunction{findMaxima}.
-(Potential duplicates are ignored by using \Robject{dedup.on} during read extraction, to reduce the impact of read stacks on the constructed profile.)
-For each selected window, \Rfunction{profileSites} records the coverage across the flanking regions as a function of the distance from the start of the window.
-This is normalized by dividing by the maximum coverage across the interval for each window.
-Coverage values are then averaged across selected windows to obtain an aggregated profile for each library.
+\label{sec:windowsize}
 
-<<>>=
-all.bam <- c("h3ac.bam", "h3k4me2.bam", "es_1.bam")
-collected <- list()
-for (curbam in all.bam) {
-    windowed <- windowCounts(curbam, spacing=50, width=50, 
-                             param=dedup.on, filter=20)
-    rwsms <- rowSums(assay(windowed))
-    maxed <- findMaxima(rowRanges(windowed), range=1000, metric=rwsms)
-    collected[[curbam]] <- profileSites(curbam, rowRanges(windowed)[maxed], 
-                                        param=dedup.on, normalize="max")
-}
-@
+We interpret the window size as the width of the binding ``footprint'' for the target protein, where the protein residues directly contact the DNA.
+TF analyses typically use a small window size, e.g., 10 - 20 bp, which maximizes spatial resolution for optimal detection of narrow regions of enrichment. 
+For histone marks, widths of at least 150 bp are recommended \cite{humburg2011}. 
+This corresponds to the length of DNA wrapped up in each nucleosome, which is the smallest relevant unit for histone mark enrichment. 
+We consider diffuse marks as chains of adjacent histones, for which the combined footprint may be very large (e.g., 1-10 kbp).
 
-The coverage profile around locally maximal windows is plotted below for each library.
-We see that enrichment for the two histone marks is mostly contained within a 350 bp region around the maxima (dashed lines).
-This suggests that a window size of \textasciitilde{}150 bp is ideal, given that directional extension by 100 bp has been performed on both sides of the peak.
-Most of the coverage can then be captured without including too much background noise.
-In contrast, the NF-YA profile drops off more sharply.
-This indicates that a smaller window size (\textless{} 50 bp) is probably adequate, consistent with sharp TF binding.
-See the \Rfunction{wwhm} function for selection of a window width from the coverage profile.
+The choice of window size controls the compromise between spatial resolution and count size. 
+Larger windows will yield larger read counts that can provide more power for DB detection. 
+However, spatial resolution is also lost for large windows whereby adjacent features can no longer be distinguished. 
+Reads from a DB site may be counted alongside reads from a non-DB site (e.g., non-specific background) or even those from an adjacent site that is DB in the opposite direction. 
+This will result in the loss of DB detection power.
 
-<<profiling>>=
-xranged <- as.integer(names(collected[[1]]))
-plot(xranged, collected[[1]], type="l", col="blue", xlim=c(-1000, 1000), lwd=2, 
-     xlab="Distance (bp)", ylab="Relative coverage per base")
-lines(xranged, collected[[2]], col="forestgreen", lwd=2)
-lines(xranged, collected[[3]], col=rgb(0,0,0,0.5), lwd=2)
-legend("topright", col=c("blue", "forestgreen", rgb(0,0,0,0.5)),
-       c("H3Ac", "H3K4me2", "NF-YA"), pch=16)
-abline(v=c(-150,200), col="dodgerblue", lty=2)
-@
+We might expect to be able to infer the optimal window size from the data, e.g., based on the width of the enriched regions.
+However, in practice, a clear-cut choice of distance/window size is rarely found in real datasets.
+For many non-TF targets, the widths of the enriched regions can be highly variable, suggesting that no single window size is optimal.
+Indeed, even if all enriched regions were of constant width, the width of the DB events occurring \textit{within} those regions may be variable.
+This is especially true of diffuse marks where the compromise between resolution and power is more arbitrary. 
 
-In practice, a clear-cut choice of distance/window size is rarely found in real datasets.
-For many non-TF targets, the widths of the enriched regions can be highly variable.
-This manifests as a long tail in the coverage profile plot and suggests that no single window size is optimal.
-Indeed, even if all enriched regions were of constant width, the width of the DB events occurring within those regions may be variable.
-Thus, it may be preferable to err on the side of smaller windows to maintain spatial resolution for such events.
-
-The performance of this approach also deteriorates when background enrichment is prevalent.
-This makes it difficult to determine when the coverage becomes negligble.
-The problem is compounded for diffuse marks where the transition between enrichment and background is unclear.
-Indeed, local maxima are unlikely to be well-defined within diffuse regions.
-Thus, users are advised to exercise caution when picking a window size from these plots.
+We suggest performing an initial DB analysis with small windows to maintain spatial resolution.
+The widths of the final merged regions (see Section~\ref{sec:cluster}) can provide an indication of the appropriate window size.
+Alternatively, the analysis can be repeated with a series of larger windows, and the results combined (see Section~\ref{sec:bin_integrate}).
+This examines a spread of resolutions for more comprehensive detection of DB regions.
 
 \section{Miscellaneous functions for non-standard counting}
 
@@ -577,7 +542,7 @@ head(assay(reg.counts))
 \subsection{Strand-specific counting}
 Techniques like CLIP-seq, MeDIP-seq or CAGE provide strand-specific sequence information.
 The \Biocpkg{csaw} package can analyze these datasets through strand-specific counting.
-This can be done manually setting the \Rcode{forward} slot in the \Rclass{readParam} object to \Rcode{TRUE} or \Rcode{FALSE}, to count only forward- or reverse-strand reads respectively.
+This can be done manually setting the \Rcode{forward} slot in the \Rclass{readParam} object to \Rcode{TRUE} or \Rcode{FALSE}, to count only forward- or reverse-strand reads respectively in \Rfunction{windowCounts} or \Rfunction{regionCounts}.
 Alternatively, the \Rfunction{strandedCounts} wrapper function can be used to obtain strand-specific counts for each window or region.
 The strand of each output range indicates the strand on which reads were counted for that row.
 Up to two rows can be generated for each window or region, depending on filtering.
