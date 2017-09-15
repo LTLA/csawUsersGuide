@@ -2,7 +2,7 @@
 \usepackage{tikz}
 
 <<style-knitr, eval=TRUE, echo=FALSE, results="asis">>=
-BiocStyle::latex()
+BiocStyle::latex(relative.path=TRUE)
 @
 
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
@@ -46,7 +46,7 @@ picdir <- "plots-ug/"
 if (file.exists(picdir)) { unlink(picdir, recursive=TRUE) }
 dir.create(picdir)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
-knitr::opts_chunk$set(fig.path=picdir, eval=FALSE)
+knitr::opts_chunk$set(fig.path=picdir)
 @
 
 \chapter{Introduction}
@@ -961,7 +961,7 @@ This indicates that undersampling has been identified and corrected.
 % bins should still be free of binding, though (8000/260000 bins, based on 
 % those that overlap globally filtered windows in Chapter 4).
 
-<<normplot, fig.wide=TRUE, fig.asp=3>>=
+<<normplot, fig.wide=TRUE, fig.asp=0.4>>=
 par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
 adj.counts <- cpm(asDGEList(binned), log=TRUE)
 normfacs <- filtered.data$norm.factors
@@ -1064,7 +1064,7 @@ The normalization factors from removal of composition bias (dashed) pass through
 A non-zero M-value location for the high A-value cloud represents a systematic difference between libraries for the bound regions, either due to genuine DB or variable IP efficiency. 
 This also induces composition bias, leading to a non-zero M-value for the background cloud.
 
-<<methplot, fig.wide=TRUE, fig.asp=2>>=
+<<methplot, fig.wide=TRUE, fig.asp=0.5>>=
 par(mfrow=c(1,2))
 for (main in c("H3K4me3", "H3ac")) { 
     if (main=="H3K4me3") { 
@@ -1185,7 +1185,7 @@ We examine the MA plots to determine whether normalization was successful.
 Any abundance-dependent trend in the M-values should be eliminated after applying the offsets to the log-counts.
 This is done by subtraction, though note that the offsets are base $e$ while most log-values in \Biocpkg{edgeR} are reported as base 2.
 
-<<trendplot, fig.wide=TRUE, fig.asp=2>>=
+<<trendplot, fig.wide=TRUE, fig.asp=0.5>>=
 par(mfrow=c(1,2))
 
 # MA plot without normalization.
@@ -1920,7 +1920,7 @@ The blue and red tracks represent the coverage on the forward and reverse strand
 Strong strand bimodality is consistent with a genuine TF binding site.
 For paired-end data, coverage can be similarly plotted for fragments, i.e., proper read pairs.
 
-<<regionplot, fig.wide=TRUE, fig.asp=0.5>>=
+<<regionplot, fig.wide=TRUE, fig.asp=1.5>>=
 require(Gviz)
 collected <- vector("list", length(bam.files))
 for (i in seq_along(bam.files)) { 
