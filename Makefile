@@ -1,7 +1,7 @@
 all: csaw.pdf output.pdf compile.tar.gz
 
 compile.tar.gz: csaw.tex 
-	tar -czf $@ $< plots-ug/ Bioconductor2.sty
+	tar -czf $@ $< plots-ug/ Bioconductor2.sty unsrturl.bst
 
 csaw.pdf: csaw.tex
 	pdflatex $<
