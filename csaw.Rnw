@@ -100,13 +100,13 @@ colnames(design) <- c("intercept", "cell.type")
 \begin{enumerate}
 \item Loading in data from BAM files.
 <<>>=
-require(csaw)
+library(csaw)
 param <- readParam(minq=50)
 data <- windowCounts(bam.files, ext=110, width=10, param=param)
 @
 \item Filtering out uninteresting regions.
 <<>>=
-require(edgeR)
+library(edgeR)
 keep <- aveLogCPM(asDGEList(data)) >= -1
 data <- data[keep,]
 @
@@ -811,7 +811,7 @@ Alternatively, sites could be defined from a previous experiment or based on the
 The example below retrieves the coordinates of the broad gene bodies from the mouse genome, including the 3 kbp region upstream of the TSS that represents the putative promoter region for each gene. 
 
 <<>>=
-require(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 broads <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)
 broads <- resize(broads, width(broads)+3000, fix="end")
 head(broads)
@@ -947,7 +947,7 @@ This is more convenient than returning a \Rclass{RangedSummarizedExperiment} obj
 Here, the factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
 See Section~\ref{sec:eff_norm_ma} for some examples with greater bias.
 
-\subsection{Visualizing normalization efforts with MA plots}
+\subsection{Visualizing normalization outcomes with MA plots}
 The effectiveness of normalization can be examined using a MA plot. 
 A single main cloud of points should be present, consisting primarily of background regions.
 Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
@@ -1308,7 +1308,8 @@ These plots can also be used to decide whether the fitted trend is appropriate.
 Sudden irregulaties may be indicative of an underlying structure in the data which cannot be modelled with the mean-dispersion trend. 
 Discrete patterns in the raw dispersions are indicative of low counts and suggest that more aggressive filtering is required.
 
-<<dispplot, fig.asp=1>>=
+<<dispplot, fig.wide=TRUE, fig.asp=0.5>>=
+par(mfrow=c(1,2))
 o <- order(y$AveLogCPM)
 plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
      ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
@@ -1324,7 +1325,7 @@ Filtering of low-abundance regions (as described in Chapter~\ref{chap:filter}) p
 Users can compare raw and filtered results to see whether it makes any difference.
 Filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
-<<rmchecker, fig.asp=1>>=
+<<rmchecker, fig.small=TRUE, fig.asp=1>>=
 relevant <- rowSums(assay(data)) >= 20 # weaker filtering than 'filtered.data'
 yo <- asDGEList(data[relevant], norm.factors=normfacs)
 yo <- estimateDisp(yo, design)
@@ -1813,7 +1814,7 @@ Here, the promoter region of each gene is defined as some interval 3 kbp up- and
 Any exonic features within \Rcode{dist} on the left or right side of each supplied region will also be reported.
 
 <<>>=
-require(org.Mm.eg.db)
+library(org.Mm.eg.db)
 anno <- detailRanges(merged$region, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
                      orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
 head(anno$overlap)
@@ -1887,7 +1888,7 @@ A transformed FDR is used here for the score field.
 
 <<>>=
 is.sig <- merged$region$FDR <= 0.05
-require(rtracklayer)
+library(rtracklayer)
 test <- merged$region[is.sig]
 test$score <- -10*log10(merged$region$FDR[is.sig])
 names(test) <- paste0("region", 1:sum(is.sig))
@@ -1920,8 +1921,8 @@ The blue and red tracks represent the coverage on the forward and reverse strand
 Strong strand bimodality is consistent with a genuine TF binding site.
 For paired-end data, coverage can be similarly plotted for fragments, i.e., proper read pairs.
 
-<<regionplot, fig.wide=TRUE, fig.asp=1.5>>=
-require(Gviz)
+<<regionplot, fig.asp=1>>=
+library(Gviz)
 collected <- vector("list", length(bam.files))
 for (i in seq_along(bam.files)) { 
     reads <- extractReads(bam.files[i], cur.region, param=param)
