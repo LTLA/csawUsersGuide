@@ -8,11 +8,8 @@ BiocStyle::latex(relative.path=TRUE)
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
 %% also: \bioctitle{Title used for both header and title page}
 %% or... \title{Title used for both header and title page}
-\author[1,2]{Aaron T. L. Lun}
-\author[1,3]{Gordon K. Smyth}
+\author[1]{Aaron T. L. Lun}
 \affil[1]{The Walter and Eliza Hall Institute of Medical Research, Melbourne, Australia}
-\affil[2]{Department of Medical Biology, The University of Melbourne, Melbourne, Australia}
-\affil[3]{Department of Mathematics and Statistics, The University of Melbourne, Melbourne, Australia}
 
 \usepackage{framed,color}
 \newenvironment{combox}
@@ -880,9 +877,9 @@ Several normalization strategies are presented here, though users should only pi
 Advice on choosing the most appropriate method is scattered throughout the chapter, so read carefully.
 
 \section{Eliminating composition biases}
+\label{sec:compo_norm}
 
 \subsection{Using the TMM method on binned counts}
-\label{sec:compo_norm}
 As the name suggests, composition biases are formed when there are differences in the composition of sequences across libraries. 
 Highly enriched regions consume more sequencing resources and thereby suppress the representation of other regions. 
 Differences in the magnitude of suppression between libraries can lead to spurious DB calls. 
@@ -1086,10 +1083,11 @@ for (main in c("H3K4me3", "H3ac")) {
 
 \section{Choosing between normalization strategies}
 \label{sec:normchoice}
-The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of factors will ultimately be used.
+The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of normalization factors will ultimately be used in \Biocpkg{edgeR}.
 The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
-If so, composition bias should be removed to preserve the assumed DB.
-Otherwise, the differences must represent efficiency bias and should be removed.
+If so, the binned TMM method from Section~\ref{sec:compo_norm} should be used to remove composition bias.
+This will preserve the assumed DB, at the cost of ignoring any efficiency biases that might be present.
+Otherwise, if the systematic differences are not genuine DB, they must represent efficiency bias and should be removed by applying the TMM method on high-abundance windows (Section~\ref{sec:eff_norm}).
 Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are expected to be consistent in most conditions.
 
 For the main NF-YA example, there is no expectation of constant binding between cell types.
