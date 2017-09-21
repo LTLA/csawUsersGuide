@@ -1786,17 +1786,15 @@ Discrete patterns in the raw dispersions are indicative of low counts and sugges
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
+\hlkwd{par}\hlstd{(}\hlkwc{mfrow}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{1}\hlstd{,}\hlnum{2}\hlstd{))}
 \hlstd{o} \hlkwb{<-} \hlkwd{order}\hlstd{(y}\hlopt{$}\hlstd{AveLogCPM)}
 \hlkwd{plot}\hlstd{(y}\hlopt{$}\hlstd{AveLogCPM[o],} \hlkwd{sqrt}\hlstd{(y}\hlopt{$}\hlstd{trended.dispersion[o]),} \hlkwc{type}\hlstd{=}\hlstr{"l"}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{,}
      \hlkwc{ylim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{0}\hlstd{,} \hlnum{1}\hlstd{),} \hlkwc{xlab}\hlstd{=}\hlkwd{expression}\hlstd{(}\hlstr{"Ave."}\hlopt{~}\hlstd{Log[}\hlnum{2}\hlstd{]}\hlopt{~}\hlstr{"CPM"}\hlstd{),}
      \hlkwc{ylab}\hlstd{=(}\hlstr{"Biological coefficient of variation"}\hlstd{))}
-\end{alltt}
-\end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/dispplot-1} \end{adjustwidth}\begin{kframe}\begin{alltt}
 \hlkwd{plotQLDisp}\hlstd{(fit)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/dispplot-2} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{plots-ug/dispplot-1} \end{adjustwidth}
 \end{knitrout}
 
 A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
@@ -2817,7 +2815,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 \hlstd{gax} \hlkwb{<-} \hlkwd{GenomeAxisTrack}\hlstd{(}\hlkwc{col}\hlstd{=}\hlstr{"black"}\hlstd{)}
 \hlkwd{plotTracks}\hlstd{(}\hlkwd{c}\hlstd{(gax, collected),} \hlkwc{from}\hlstd{=}\hlkwd{start}\hlstd{(cur.region),} \hlkwc{to}\hlstd{=}\hlkwd{end}\hlstd{(cur.region))}
 \end{alltt}
-\end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
+\end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
 \includegraphics[width=\maxwidth]{plots-ug/regionplot-1} \end{adjustwidth}
 \end{knitrout}
 
