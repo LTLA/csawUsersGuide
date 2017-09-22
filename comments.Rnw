@@ -888,6 +888,15 @@ An alternative approach is to fit the proper model to the ChIP samples, and then
 This avoids the problem with inflated dispersions -- however, a related but more subtle effect arises where regions with large dispersions are more likely to be filtered out.
 This is an implicit form of filtering on the variance, which is not healthy for edgeR and friends which need to model the full range of dispersions.
 
+The proper way of doing it would be to filter independently on the average abundance of all libraries (input and ChIP).
+We then detect windows that were DB between ChIP and input in each group, using an appropriate paired-sample design matrix.
+(We would probably normalize each input against the ChIP separately using the binned method, blocking factors avoid us having to do anything else.)
+This yields two or more p-values for each retained window indicating enrichment over input.
+Next, we detect windows between the ChIP libraries using a one-way layout, and possibly with a different set of normalization factors.
+The independence of the filtering still applies to different design matrices (putting aside the effect of normalization on filtering).
+Each input library gets its own coefficient to ensure that the correlations between ChIP/input don't affect dispersion estimation.
+Finally, we compute a combined IUT p-value for all contrasts to identify regions that are peaks \textit{and} DB.
+
 \subsubsection*{Selective filtering based on the contrast}
 
 One common complaint with the average abundance is that performance will deteriorate as the number of groups increases.
