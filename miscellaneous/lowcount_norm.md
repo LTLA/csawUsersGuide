@@ -182,5 +182,3 @@ sessionInfo()
 ##  [9] lattice_0.20-35 evaluate_0.10.1
 ```
 
-sessionInfo()
-
