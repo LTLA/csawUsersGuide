@@ -427,19 +427,53 @@ Here I shall list the assorted failures in my attempts to truly solve this probl
 
 \begin{itemize}
 \item Any sort of sitewise trimming procedure seemed to fail. 
-I've tried trimming on the deviance and on the p-value, neither have gone down well.  
+I've tried trimming on the deviance and on the p-value, neither have worked well.
 I suspect it is because of the sensitivity to the dispersion estimate, which I want to avoid estimating because it's a pain. 
 In particular, different dispersions will mean that tags with the same fold change but different count sizes will get trimmed differently (whereas really they should be trimmed together).
-Also, you basically convert the fold change distribution into a one-tailed thing where you only trim from one side. 
-This is problematic when everything is discrete as it means you trim off big chunks at a time. 
+Also, the use of site-wise counts results in a highly discrete distribution where you trim off big chunks at a time. 
 Instability results as you will start to remove big chunks, each corresponding to opposite sides of the fold change distribution.
 
-\item  Finding the offset with the minimal sum of deviances across sites. 
-I used the tagwise dispersion estimate here.
-The hope was that, for DB sites, the dispersion would be large so the deviance wouldn't change much when you altered the dispersions. 
+\item Finding the offset with the minimal sum of deviances across sites, with re-estimation of the tagwise dispersion for an intercept-only design matrix.
+The hope is that, for DB sites, the dispersion would already be so large that the deviance wouldn't change much when you altered the offsets. 
 However, this didn't work out too well as the influence of the truly DB sites would still be enough to underestimate the normalization factor. 
-Indeed, when the number of DB sites is large, this tends to do worse than TMM. 
-Looks like we have to remove them directly to avoid problems.
+(Funnily enough, the code below behaves without \code{prior.df=0}, due to vagaries of prior d.f. estimation -- but it makes no sense to shrink in this context!)
+
+<<>>=
+set.seed(1233)
+a <- matrix(rnbinom(10000*2, mu=20, size=10), ncol=2)
+a[1:2000,1] <- a[1:2000,1] * 2
+
+design <- cbind(c(1,1))
+truth <- DGEList(a, lib.size=rep(1e6, 2))
+truth <- estimateDisp(truth, design, prior.df=0)
+fit.truth <- glmFit(truth, design)
+sum(fit.truth$deviance) # Deviance for the true offsets
+
+fake <- DGEList(a, lib.size=c(1.1e6, 1e6)) 
+fake <- estimateDisp(fake, design, prior.df=0)
+fit.fake <- glmFit(fake, design)
+sum(fit.fake$deviance) # Deviance for other offsets
+@
+
+An alternative would be to use a design matrix appropriate to the experimental design, and maximize the log-likelihood with a ridge regression penalization. 
+This would shrink coefficients to zero for most genes but still allow DE genes with non-zero log-fold changes to be present.
+The trouble is that the coefficients for the DE genes are quite large and ridge regression will also attempt to shrink them to zero.
+This results in a biased outcome again -- as one might expect, because we're basically summing the squared log-fold changes.
+
+<<>>=
+set.seed(123123)
+a <- matrix(rnbinom(10000*2, mu=20, size=10), ncol=2)
+a[1:1000,1] <- a[1:1000,1] * 4
+
+design <- cbind(1, 0:1)
+truth.fit <- glmFit(a, design, dispersion=0.1, offset=c(0, 0))
+sum(truth.fit$coefficients[,2]^2) # Deviance is implicitly zero.
+
+fake.fit <- glmFit(a, design, dispersion=0.1, offset=c(0.1, 0))
+sum(fake.fit$coefficients[,2]^2) # Lower than the truth.
+@
+
+So, it looks like we have to remove them directly to avoid problems.
 
 \item Finding the offset where the number of sites with increasing deviance matches the number of sites with decreasing deviance.
 I've also tested variants thereof, all involving numbers of sites rather than the magnitude of the difference. 
