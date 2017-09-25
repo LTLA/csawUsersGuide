@@ -66,58 +66,6 @@ Changes in chromatin structure are still biologically interesting, even if it wa
 In comparison, the false positives in a comparison to input would be purely technical in origin. 
 In any case, these should form a minority of the detected regions in a successful experiment.
 
-\subsubsection*{Comments on correcting for changes in chromatin state}
-
-One could theoretically use control data to correct for chromatin state when searching for DB. 
-The most obvious is to subtract the control coverage from the ChIP coverage.
-The idea is to avoid detecting spurious DB due to changes in chromatin state.
-However, this has a number of logistical and statistical issues.
-
-\begin{itemize}
-\item It obviously requires sequencing of a negative control sample for each condition, which adds to cost.
-This may not even be possible for complex designs without a one-way layout.
-
-\item It assumes that the controls are accurate estimators of background, which mightn't be the case.
-Inputs are particularly troublesome as you don't do any pulldown, which gives you something similar to DNase-seq profiles.
-In contrast, the pulldown and washes in an actual ChIP library would presumably remove a lot of the signal in open chromatin.
-It is also difficult to imagine that the input profile would not be affected by various IP biases, especially in relation to histone density and fragment length.
-I am comfortable with using inputs for direct comparisons to ChIP samples, where I can accept that the log-fold change may not be accurate but is in the right direction.
-I am less comfortable with using inputs for correction, where inaccuracies in the log-fold changes may lead to spurious DB.
-
-\item Subtraction will distort the mean-variance relationship as the absolute size of the counts is lost.
-This is most relevant when both ChIP and control coverage are high, where subtraction is meant to be most beneficial.
-In particular, a small relative difference between libraries at large counts would be amplified in the subtracted counts.
-This leads to false positives (if between groups) or inflated variance (if within groups). 
-Conservativeness seems to dominate, see the simulation in \verb!miscellaneous/subtract_control.R! for a demonstration.
-
-\item Negative counts need to be coerced to zeros, resulting in an excess of zeros that aren't easily handled by the NB model.
-Using the zero-inflated NB model is difficult, while simply filtering out low-abundance windows post-subtraction is not the solution.
-This is because you would retain windows with zeros where the other subtracted counts (e.g., for the replicate) are large due to variability for high raw counts.
-
-\item In practice, other high-abundance regions will buffer any damage to the variance and EB statistics.
-However, this would result in more false positives if variance inflation is prevented.
-\end{itemize}
-
-The other approach is to do log-subtraction, where you include the controls as part of the model.
-You could then ask if log-fold change over the control is the same in the two conditions.
-This avoids the statistical problems with pure subtraction, but can result in loss of detection power.
-For example, consider a case where both ChIP and control coverage increases two-fold. 
-This would not be detected after log-correction, as the fold change cancels out.
-However, there is DB here if you assume an additive model for the raw coverage, 
-e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the other condition, resulting in $x$ against $2x$ binding between conditions.
-This loss of power would be most problematic when DB coincides with changes in chromatin accessibility.
-This is biologically sensible but will not be detected if the latter cancels out the former (personal comm. from Gordon, Mike Love).
-
-% The ideal solution would be to switch to an identity-link GLM.
-% This would allow for subtraction-based contrasts, while preserving the mean-variance relationship.
-% However, there's the scaling effect of library size differences, which isn't easy to model with identity offsets.
-% There are also computational difficulties with enforcing positive fitted values.
- 
-So, in short, it is difficult to rigorously adjust for changes in chromatin state.
-I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
-Protection is generally provided by filtering, as most changes in state should be depleted after the IP step.
-Of course, if there are likely to be extreme changes, then control correction may be the lesser of two evils. 
-
 \subsubsection*{Justifying the \textit{de novo} focus}
 
 With a new data set, it's generally a good strategy to do a \textit{de novo} analysis.
@@ -479,19 +427,53 @@ Here I shall list the assorted failures in my attempts to truly solve this probl
 
 \begin{itemize}
 \item Any sort of sitewise trimming procedure seemed to fail. 
-I've tried trimming on the deviance and on the p-value, neither have gone down well.  
+I've tried trimming on the deviance and on the p-value, neither have worked well.
 I suspect it is because of the sensitivity to the dispersion estimate, which I want to avoid estimating because it's a pain. 
 In particular, different dispersions will mean that tags with the same fold change but different count sizes will get trimmed differently (whereas really they should be trimmed together).
-Also, you basically convert the fold change distribution into a one-tailed thing where you only trim from one side. 
-This is problematic when everything is discrete as it means you trim off big chunks at a time. 
+Also, the use of site-wise counts results in a highly discrete distribution where you trim off big chunks at a time. 
 Instability results as you will start to remove big chunks, each corresponding to opposite sides of the fold change distribution.
 
-\item  Finding the offset with the minimal sum of deviances across sites. 
-I used the tagwise dispersion estimate here.
-The hope was that, for DB sites, the dispersion would be large so the deviance wouldn't change much when you altered the dispersions. 
+\item Finding the offset with the minimal sum of deviances across sites, with re-estimation of the tagwise dispersion for an intercept-only design matrix.
+The hope is that, for DB sites, the dispersion would already be so large that the deviance wouldn't change much when you altered the offsets. 
 However, this didn't work out too well as the influence of the truly DB sites would still be enough to underestimate the normalization factor. 
-Indeed, when the number of DB sites is large, this tends to do worse than TMM. 
-Looks like we have to remove them directly to avoid problems.
+(Funnily enough, the code below behaves without \code{prior.df=0}, due to vagaries of prior d.f. estimation -- but it makes no sense to shrink in this context!)
+
+<<>>=
+set.seed(1233)
+a <- matrix(rnbinom(10000*2, mu=20, size=10), ncol=2)
+a[1:2000,1] <- a[1:2000,1] * 2
+
+design <- cbind(c(1,1))
+truth <- DGEList(a, lib.size=rep(1e6, 2))
+truth <- estimateDisp(truth, design, prior.df=0)
+fit.truth <- glmFit(truth, design)
+sum(fit.truth$deviance) # Deviance for the true offsets
+
+fake <- DGEList(a, lib.size=c(1.1e6, 1e6)) 
+fake <- estimateDisp(fake, design, prior.df=0)
+fit.fake <- glmFit(fake, design)
+sum(fit.fake$deviance) # Deviance for other offsets
+@
+
+An alternative would be to use a design matrix appropriate to the experimental design, and maximize the log-likelihood with a ridge regression penalization. 
+This would shrink coefficients to zero for most genes but still allow DE genes with non-zero log-fold changes to be present.
+The trouble is that the coefficients for the DE genes are quite large and ridge regression will also attempt to shrink them to zero.
+This results in a biased outcome again -- as one might expect, because we're basically summing the squared log-fold changes.
+
+<<>>=
+set.seed(123123)
+a <- matrix(rnbinom(10000*2, mu=20, size=10), ncol=2)
+a[1:1000,1] <- a[1:1000,1] * 4
+
+design <- cbind(1, 0:1)
+truth.fit <- glmFit(a, design, dispersion=0.1, offset=c(0, 0))
+sum(truth.fit$coefficients[,2]^2) # Deviance is implicitly zero.
+
+fake.fit <- glmFit(a, design, dispersion=0.1, offset=c(0.1, 0))
+sum(fake.fit$coefficients[,2]^2) # Lower than the truth.
+@
+
+So, it looks like we have to remove them directly to avoid problems.
 
 \item Finding the offset where the number of sites with increasing deviance matches the number of sites with decreasing deviance.
 I've also tested variants thereof, all involving numbers of sites rather than the magnitude of the difference. 
@@ -832,7 +814,7 @@ For example, we could avoid detecting DB due to changes in chromatin state, as m
 \subsubsection*{Independence of the average abundance as a filter statistic}
 
 The analogy to the normal case suggests that the average abundance is the independent filter statistic.
-This seems to hold up for different library sizes, unbalanced designs and correlations.
+This seems to hold up for different library sizes, unbalanced designs and correlations (see \url{https://github.com/LTLA/IndependentFilter2015}).
 Note that this assumes that the null design matrix can be parametrized with an intercept column.
 The independence of the filter is important as most windows are low-abundance, which means that the density at the filter boundary is high relative to the number of retained windows.
 Thus, any biases introduced during filtering will have a large effect on the DB analysis.
@@ -855,29 +837,6 @@ Fortunately, analogies with the normal case suggest that any statistic computed 
 % Assume that each slice corresponds to a combination of two filter statistics, where both must be okay to retain.
 % Filtering on either statistic alone could acquire one upper and lower triangle, such that the $p$-value distribution is still uniform.
 % However, filtering on both statistics could yield only one triangle and a non-uniform distribution.
-%
-% A proof of validity requires consideration of the correlation structure -- 
-%	it seems to work out under normality, where filtering on a difference in abundances will remove the same proportion from each hyperplane of the multivariate normal.
-% Consider multiple windows with normally-distributed observation vectors of y_1, y_2, ... with mean 0.
-% Assume that, for any pair of windows, all corresponding observations are correlated by some constant covariance.
-% (The covariance doesn't have to be the same for each pair, and non-corresponding observations are still independent).
-% Let y*_1 denote an instance of y_1, and t_1 denote a scalar added to all observations in y*_1.
-% This means that the vector [y*_1+t_1, y*_2+t_2, ...] is a MVN with a mean vector of zeroes and a striated covariance matrix (only diagonals of each internal square are non-zero).
-%
-% Anyway, consider the PDF of obtaining the vector at a given t_1, t_2, ... (noting that the inverse covariance matrix is similarly striated).
-% You can reformulate it as a distribution in terms of t_1, t_2, ...
-% Specifically, the space obtained by varying t_1, t_2, ... is a hyperplane, and the probably density of sampled points follows a MVN.
-% All points on this hyperplane have the same p-value and variance, as the values of t_1, etc. cancel out when computing these statistics.
-% The mean vector is equal to the negative means of y*_1, y*_2, ..., while the inverse covariance matrix should only depend on the original covariances. 
-% All this means that you can split up the original MVN into a bunch of hyperplanes that only vary in their mean.
-% As long as you remove the same proportion of probability density from each hyperplane, the filter will be independent.
-%
-% This gets us to the crux of the matter, in that the filter function for each hyperplane should only vary with the location of the mean vector of the hyperplane MVN.
-% This mean vector is equal to the sample means of the observed instances corresponding to that hyperplane.
-% Thus, as long as your filter statistic only depends on the sample means, the same proportion will be removed from each hyperplane.
-% For example, requiring that all windows are above a threshold would be equivalent to saying that mean(y*_i + t_i) > T.
-% This becomes t_i > T - mean(y*_i), which will always be T above the mean vector for each hyperplane.
-% The same applies for more complex filters involving interactions between windows, e.g., if mean(y*_1 + t_1) - mean(y*_2 + t_2) > T.
 
 \subsubsection*{Misuse of the negative control libraries for filtering}
 
@@ -887,6 +846,15 @@ This means that they will get filtered as they are not significantly enriched ov
 An alternative approach is to fit the proper model to the ChIP samples, and then test whether the average enrichment is greater than the input.
 This avoids the problem with inflated dispersions -- however, a related but more subtle effect arises where regions with large dispersions are more likely to be filtered out.
 This is an implicit form of filtering on the variance, which is not healthy for edgeR and friends which need to model the full range of dispersions.
+
+The proper way of doing it would be to filter independently on the average abundance of all libraries (input and ChIP).
+We then detect windows that were DB between ChIP and input in each group, using an appropriate paired-sample design matrix.
+(We would probably normalize each input against the ChIP separately using the binned method, blocking factors avoid us having to do anything else.)
+This yields two or more p-values for each retained window indicating enrichment over input.
+Next, we detect windows between the ChIP libraries using a one-way layout, and possibly with a different set of normalization factors.
+The independence of the filtering still applies to different design matrices (putting aside the effect of normalization on filtering).
+Each input library gets its own coefficient to ensure that the correlations between ChIP/input don't affect dispersion estimation.
+Finally, we compute a combined IUT p-value for all contrasts to identify regions that are peaks \textit{and} DB.
 
 \subsubsection*{Selective filtering based on the contrast}
 
