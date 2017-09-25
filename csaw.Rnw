@@ -43,7 +43,7 @@ picdir <- "plots-ug/"
 if (file.exists(picdir)) { unlink(picdir, recursive=TRUE) }
 dir.create(picdir)
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
-knitr::opts_chunk$set(fig.path=picdir)
+knitr::opts_chunk$set(fig.path=picdir, dev='png', dpi=150)
 @
 
 \chapter{Introduction}
@@ -382,11 +382,11 @@ In this example, we might use a value of around 400 bp as it is larger than the 
 The plot can also be used to examine the quality of the PE sequencing procedure. 
 The location of the mode should be consistent with the fragmentation and size selection steps in library preparation. 
 
-<<frag>>=
+<<frag, fig.small=TRUE>>=
 out <- getPESizes(pe.bam)
 frag.sizes <- out$sizes[out$sizes<=800]
 hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", 
-     ylab="Frequency", main="")
+     ylab="Frequency", main="", col="grey80")
 abline(v=400, col="red")
 @
 
@@ -422,7 +422,7 @@ This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq
 Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length. 
 This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites. 
 
-<<ccf>>=
+<<ccf, fig.small=TRUE>>=
 max.delay <- 500
 dedup.on <- reform(param, dedup=TRUE)
 x <- correlateReads(bam.files, max.delay, param=dedup.on)
@@ -557,7 +557,7 @@ In fact, the function will \textit{only} accept a \Rcode{NULL} value for this sl
 This is intended to protect the user, as any attempt to re-use the \Rcode{ss.param} object in functions that are not designed for strand specificity will (appropriately) raise an error.
 
 <<results='hide',echo=FALSE>>=
-rm(demo, ss.counts, windowed)
+rm(demo, ss.counts)
 gc()
 @
 
@@ -678,7 +678,7 @@ This is due to the dominance of the background-containing bins throughout the ge
 
 <<binhist>>=
 hist(filter.stat$back.abundances, xlab="Adjusted bin log-CPM", breaks=100, 
-     main="", xlim=c(min(filter.stat$back.abundances), 0))
+     main="", col="grey80", xlim=c(min(filter.stat$back.abundances), 0))
 global.bg <- filter.stat$abundances - filter.stat$filter
 abline(v=global.bg[1], col="red", lwd=2)
 abline(v=global.bg[1]+log2(3), col="blue", lwd=2)
@@ -1323,7 +1323,7 @@ Filtering of low-abundance regions (as described in Chapter~\ref{chap:filter}) p
 Users can compare raw and filtered results to see whether it makes any difference.
 Filtering has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
 
-<<rmchecker, fig.small=TRUE, fig.asp=1>>=
+<<rmchecker, fig.small=TRUE>>=
 relevant <- rowSums(assay(data)) >= 20 # weaker filtering than 'filtered.data'
 yo <- asDGEList(data[relevant], norm.factors=normfacs)
 yo <- estimateDisp(yo, design)
