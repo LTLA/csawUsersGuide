@@ -263,69 +263,6 @@ for (it in 1:10) {
 plotAlpha(null.p)
 ```
 
-# Using the mean filter with variable dispersions
-
-The sample mean is approxiamtely independent of the dispersion estimate and p-value for Poisson and NB-distributed counts.
-However, this only applies to a single distribution.
-Consider a mixture of NB distributions with different dispersions following an inverse-chi-squared distribution but the same mean.
-
-```{r}
-set.seed(50005)
-PFUN <- function(n) { 1/rchisq(n, df=10) }
-mean(PFUN(10000))
-```
-
-Running on a randomly selected subset of sites (i.e., completely unbiased filtering) doesn't cause any issues other than some anticonservativeness at low _p_-values.
-This is relatively modest and acceptable given that the inverse-chi-squared distribution for the NB dispersions only mimics the true QL model.
-(In contrast, the _ad hoc_ filters were tested on purely NB counts, so they should not have any problems.)
-
-```{r}
-dispersions <- numeric(10)
-null.p <- vector("list", 10)
-for (it in 1:10) {
-    out <- simulateCounts(nrow(design), dispfun=PFUN)
-    keep <- sample(nrow(out$counts), 1000)
-    kept.null <- keep %in% out$null
-    res <- detectDiff(out$counts[keep,], design)
-    dispersions[it] <- res$common.dispersion
-    null.p[[it]] <- res$PValue[kept.null]
-}
-summary(dispersions)
-plotAlpha(null.p, ylim=c(0.5, 2))
-```
-
-However, applying a stringent mean filter will select for higher dispersions.
-This is because high-dispersion features are more likely to achieve large sample means. 
-The result is to encourage inflation of the dispersion estimate.
-
-```{r}
-dispersions <- numeric(10)
-null.p <- vector("list", 10)
-for (it in 1:10) {
-    out <- simulateCounts(nrow(design), dispfun=PFUN)
-    keep <- MeanFilter(out$counts) <= 1000
-    kept.null <- which(keep) %in% out$null
-    res <- detectDiff(out$counts[keep,], design)
-    dispersions[it] <- res$common.dispersion
-    null.p[[it]] <- res$PValue[kept.null]
-}
-summary(dispersions)
-```
-
-Funnily enough, this doesn't actually hurt the type I error rate.
-This is possibly because the same issue affects both DB and non-DB sites, i.e., DB sites with high dispersions will be similarly preferred.
-This ensures that there is no enrichment for low-dispersion DB sites to suppress the variance inflation and lead to anticonservativeness.
-
-```{r}
-plotAlpha(null.p, ylim=c(0.5, 2))
-```
-
-In practice, this is not much of an issue.
-For ChIP-seq data, the prior degrees of freedom is usually quite high such that there is not much variability in the dispersions.
-For RNA-seq data, the filter boundary is not dense so the specifics of filtering doesn't matter.
-The same effect is present in the other filters anyway (in addition to their poor performance on the constant dispersion case),
-    as high dispersions make it more likely to get one or two peaks above the threshold.
-
 # Wrapping up
 
 ```{r}

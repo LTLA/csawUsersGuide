@@ -814,7 +814,7 @@ For example, we could avoid detecting DB due to changes in chromatin state, as m
 \subsubsection*{Independence of the average abundance as a filter statistic}
 
 The analogy to the normal case suggests that the average abundance is the independent filter statistic.
-This seems to hold up for different library sizes, unbalanced designs and correlations.
+This seems to hold up for different library sizes, unbalanced designs and correlations (see \url{https://github.com/LTLA/IndependentFilter2015}).
 Note that this assumes that the null design matrix can be parametrized with an intercept column.
 The independence of the filter is important as most windows are low-abundance, which means that the density at the filter boundary is high relative to the number of retained windows.
 Thus, any biases introduced during filtering will have a large effect on the DB analysis.
@@ -837,29 +837,6 @@ Fortunately, analogies with the normal case suggest that any statistic computed 
 % Assume that each slice corresponds to a combination of two filter statistics, where both must be okay to retain.
 % Filtering on either statistic alone could acquire one upper and lower triangle, such that the $p$-value distribution is still uniform.
 % However, filtering on both statistics could yield only one triangle and a non-uniform distribution.
-%
-% A proof of validity requires consideration of the correlation structure -- 
-%	it seems to work out under normality, where filtering on a difference in abundances will remove the same proportion from each hyperplane of the multivariate normal.
-% Consider multiple windows with normally-distributed observation vectors of y_1, y_2, ... with mean 0.
-% Assume that, for any pair of windows, all corresponding observations are correlated by some constant covariance.
-% (The covariance doesn't have to be the same for each pair, and non-corresponding observations are still independent).
-% Let y*_1 denote an instance of y_1, and t_1 denote a scalar added to all observations in y*_1.
-% This means that the vector [y*_1+t_1, y*_2+t_2, ...] is a MVN with a mean vector of zeroes and a striated covariance matrix (only diagonals of each internal square are non-zero).
-%
-% Anyway, consider the PDF of obtaining the vector at a given t_1, t_2, ... (noting that the inverse covariance matrix is similarly striated).
-% You can reformulate it as a distribution in terms of t_1, t_2, ...
-% Specifically, the space obtained by varying t_1, t_2, ... is a hyperplane, and the probably density of sampled points follows a MVN.
-% All points on this hyperplane have the same p-value and variance, as the values of t_1, etc. cancel out when computing these statistics.
-% The mean vector is equal to the negative means of y*_1, y*_2, ..., while the inverse covariance matrix should only depend on the original covariances. 
-% All this means that you can split up the original MVN into a bunch of hyperplanes that only vary in their mean.
-% As long as you remove the same proportion of probability density from each hyperplane, the filter will be independent.
-%
-% This gets us to the crux of the matter, in that the filter function for each hyperplane should only vary with the location of the mean vector of the hyperplane MVN.
-% This mean vector is equal to the sample means of the observed instances corresponding to that hyperplane.
-% Thus, as long as your filter statistic only depends on the sample means, the same proportion will be removed from each hyperplane.
-% For example, requiring that all windows are above a threshold would be equivalent to saying that mean(y*_i + t_i) > T.
-% This becomes t_i > T - mean(y*_i), which will always be T above the mean vector for each hyperplane.
-% The same applies for more complex filters involving interactions between windows, e.g., if mean(y*_1 + t_1) - mean(y*_2 + t_2) > T.
 
 \subsubsection*{Misuse of the negative control libraries for filtering}
 
