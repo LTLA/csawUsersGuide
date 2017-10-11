@@ -19,3 +19,5 @@ Bioconductor2.sty
 csaw.R
 unsrturl.bst
 
+additional/*.html
+additional/figures-*
