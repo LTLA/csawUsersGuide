@@ -34,11 +34,8 @@
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
 %% also: \bioctitle{Title used for both header and title page}
 %% or... \title{Title used for both header and title page}
-\author[1,2]{Aaron T. L. Lun}
-\author[1,3]{Gordon K. Smyth}
+\author[1]{Aaron T. L. Lun}
 \affil[1]{The Walter and Eliza Hall Institute of Medical Research, Melbourne, Australia}
-\affil[2]{Department of Medical Biology, The University of Melbourne, Melbourne, Australia}
-\affil[3]{Department of Mathematics and Statistics, The University of Melbourne, Melbourne, Australia}
 
 \usepackage{framed,color}
 \newenvironment{combox}
@@ -59,10 +56,10 @@ summarization of windows into regions, and visualization and annotation of detec
 \vspace{0.05in}
 \textit{First edition:} 15 August 2012 \\
 \textit{Last revised:} 17 September 2017 \\
-\textit{Last compiled:} 16 September 2017
+\textit{Last compiled:} 11 October 2017
 \end{abstract}
 
-\packageVersion{csaw 1.11.2}
+\packageVersion{csaw 1.11.3}
 
 \tableofcontents
 \newpage
@@ -118,7 +115,7 @@ The code is split across several steps:
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlkwd{require}\hlstd{(csaw)}
+\hlkwd{library}\hlstd{(csaw)}
 \hlstd{param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{50}\hlstd{)}
 \hlstd{data} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{ext}\hlstd{=}\hlnum{110}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{10}\hlstd{,} \hlkwc{param}\hlstd{=param)}
 \end{alltt}
@@ -128,7 +125,7 @@ The code is split across several steps:
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlkwd{require}\hlstd{(edgeR)}
+\hlkwd{library}\hlstd{(edgeR)}
 \hlstd{keep} \hlkwb{<-} \hlkwd{aveLogCPM}\hlstd{(}\hlkwd{asDGEList}\hlstd{(data))} \hlopt{>= -}\hlnum{1}
 \hlstd{data} \hlkwb{<-} \hlstd{data[keep,]}
 \end{alltt}
@@ -576,10 +573,10 @@ The location of the mode should be consistent with the fragmentation and size se
 \hlstd{out} \hlkwb{<-} \hlkwd{getPESizes}\hlstd{(pe.bam)}
 \hlstd{frag.sizes} \hlkwb{<-} \hlstd{out}\hlopt{$}\hlstd{sizes[out}\hlopt{$}\hlstd{sizes}\hlopt{<=}\hlnum{800}\hlstd{]}
 \hlkwd{hist}\hlstd{(frag.sizes,} \hlkwc{breaks}\hlstd{=}\hlnum{50}\hlstd{,} \hlkwc{xlab}\hlstd{=}\hlstr{"Fragment sizes (bp)"}\hlstd{,}
-     \hlkwc{ylab}\hlstd{=}\hlstr{"Frequency"}\hlstd{,} \hlkwc{main}\hlstd{=}\hlstr{""}\hlstd{)}
+     \hlkwc{ylab}\hlstd{=}\hlstr{"Frequency"}\hlstd{,} \hlkwc{main}\hlstd{=}\hlstr{""}\hlstd{,} \hlkwc{col}\hlstd{=}\hlstr{"grey80"}\hlstd{)}
 \hlkwd{abline}\hlstd{(}\hlkwc{v}\hlstd{=}\hlnum{400}\hlstd{,} \hlkwc{col}\hlstd{=}\hlstr{"red"}\hlstd{)}
 \end{alltt}
-\end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
+\end{kframe}\begin{adjustwidth}{2\fltoffset}{2\fltoffset}
 \includegraphics[width=\maxwidth]{plots-ug/frag-1} \end{adjustwidth}
 \end{knitrout}
 
@@ -640,7 +637,7 @@ This reflects the strand-dependent bimodality of reads around narrow regions of 
 \hlstd{x} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(bam.files, max.delay,} \hlkwc{param}\hlstd{=dedup.on)}
 \hlkwd{plot}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{max.delay, x,} \hlkwc{type}\hlstd{=}\hlstr{"l"}\hlstd{,} \hlkwc{ylab}\hlstd{=}\hlstr{"CCF"}\hlstd{,} \hlkwc{xlab}\hlstd{=}\hlstr{"Delay (bp)"}\hlstd{)}
 \end{alltt}
-\end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
+\end{kframe}\begin{adjustwidth}{2\fltoffset}{2\fltoffset}
 \includegraphics[width=\maxwidth]{plots-ug/ccf-1} \end{adjustwidth}
 \end{knitrout}
 
@@ -978,7 +975,7 @@ This is due to the dominance of the background-containing bins throughout the ge
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlkwd{hist}\hlstd{(filter.stat}\hlopt{$}\hlstd{back.abundances,} \hlkwc{xlab}\hlstd{=}\hlstr{"Adjusted bin log-CPM"}\hlstd{,} \hlkwc{breaks}\hlstd{=}\hlnum{100}\hlstd{,}
-     \hlkwc{main}\hlstd{=}\hlstr{""}\hlstd{,} \hlkwc{xlim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlkwd{min}\hlstd{(filter.stat}\hlopt{$}\hlstd{back.abundances),} \hlnum{0}\hlstd{))}
+     \hlkwc{main}\hlstd{=}\hlstr{""}\hlstd{,} \hlkwc{col}\hlstd{=}\hlstr{"grey80"}\hlstd{,} \hlkwc{xlim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlkwd{min}\hlstd{(filter.stat}\hlopt{$}\hlstd{back.abundances),} \hlnum{0}\hlstd{))}
 \hlstd{global.bg} \hlkwb{<-} \hlstd{filter.stat}\hlopt{$}\hlstd{abundances} \hlopt{-} \hlstd{filter.stat}\hlopt{$}\hlstd{filter}
 \hlkwd{abline}\hlstd{(}\hlkwc{v}\hlstd{=global.bg[}\hlnum{1}\hlstd{],} \hlkwc{col}\hlstd{=}\hlstr{"red"}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
 \hlkwd{abline}\hlstd{(}\hlkwc{v}\hlstd{=global.bg[}\hlnum{1}\hlstd{]}\hlopt{+}\hlkwd{log2}\hlstd{(}\hlnum{3}\hlstd{),} \hlkwc{col}\hlstd{=}\hlstr{"blue"}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
@@ -1155,7 +1152,7 @@ The example below retrieves the coordinates of the broad gene bodies from the mo
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlkwd{require}\hlstd{(TxDb.Mmusculus.UCSC.mm10.knownGene)}
+\hlkwd{library}\hlstd{(TxDb.Mmusculus.UCSC.mm10.knownGene)}
 \hlstd{broads} \hlkwb{<-} \hlkwd{genes}\hlstd{(TxDb.Mmusculus.UCSC.mm10.knownGene)}
 \hlstd{broads} \hlkwb{<-} \hlkwd{resize}\hlstd{(broads,} \hlkwd{width}\hlstd{(broads)}\hlopt{+}\hlnum{3000}\hlstd{,} \hlkwc{fix}\hlstd{=}\hlstr{"end"}\hlstd{)}
 \hlkwd{head}\hlstd{(broads)}
@@ -1242,9 +1239,9 @@ Several normalization strategies are presented here, though users should only pi
 Advice on choosing the most appropriate method is scattered throughout the chapter, so read carefully.
 
 \section{Eliminating composition biases}
+\label{sec:compo_norm}
 
 \subsection{Using the TMM method on binned counts}
-\label{sec:compo_norm}
 As the name suggests, composition biases are formed when there are differences in the composition of sequences across libraries. 
 Highly enriched regions consume more sequencing resources and thereby suppress the representation of other regions. 
 Differences in the magnitude of suppression between libraries can lead to spurious DB calls. 
@@ -1511,10 +1508,11 @@ This also induces composition bias, leading to a non-zero M-value for the backgr
 
 \section{Choosing between normalization strategies}
 \label{sec:normchoice}
-The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of factors will ultimately be used.
+The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of normalization factors will ultimately be used in \Biocpkg{edgeR}.
 The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
-If so, composition bias should be removed to preserve the assumed DB.
-Otherwise, the differences must represent efficiency bias and should be removed.
+If so, the binned TMM method from Section~\ref{sec:compo_norm} should be used to remove composition bias.
+This will preserve the assumed DB, at the cost of ignoring any efficiency biases that might be present.
+Otherwise, if the systematic differences are not genuine DB, they must represent efficiency bias and should be removed by applying the TMM method on high-abundance windows (Section~\ref{sec:eff_norm}).
 Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are expected to be consistent in most conditions.
 
 For the main NF-YA example, there is no expectation of constant binding between cell types.
@@ -2579,7 +2577,7 @@ Any exonic features within \Rcode{dist} on the left or right side of each suppli
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlkwd{require}\hlstd{(org.Mm.eg.db)}
+\hlkwd{library}\hlstd{(org.Mm.eg.db)}
 \hlstd{anno} \hlkwb{<-} \hlkwd{detailRanges}\hlstd{(merged}\hlopt{$}\hlstd{region,} \hlkwc{txdb}\hlstd{=TxDb.Mmusculus.UCSC.mm10.knownGene,}
                      \hlkwc{orgdb}\hlstd{=org.Mm.eg.db,} \hlkwc{promoter}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{3000}\hlstd{,} \hlnum{1000}\hlstd{),} \hlkwc{dist}\hlstd{=}\hlnum{5000}\hlstd{)}
 \hlkwd{head}\hlstd{(anno}\hlopt{$}\hlstd{overlap)}
@@ -2725,7 +2723,7 @@ A transformed FDR is used here for the score field.
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{is.sig} \hlkwb{<-} \hlstd{merged}\hlopt{$}\hlstd{region}\hlopt{$}\hlstd{FDR} \hlopt{<=} \hlnum{0.05}
-\hlkwd{require}\hlstd{(rtracklayer)}
+\hlkwd{library}\hlstd{(rtracklayer)}
 \hlstd{test} \hlkwb{<-} \hlstd{merged}\hlopt{$}\hlstd{region[is.sig]}
 \hlstd{test}\hlopt{$}\hlstd{score} \hlkwb{<-} \hlopt{-}\hlnum{10}\hlopt{*}\hlkwd{log10}\hlstd{(merged}\hlopt{$}\hlstd{region}\hlopt{$}\hlstd{FDR[is.sig])}
 \hlkwd{names}\hlstd{(test)} \hlkwb{<-} \hlkwd{paste0}\hlstd{(}\hlstr{"region"}\hlstd{,} \hlnum{1}\hlopt{:}\hlkwd{sum}\hlstd{(is.sig))}
@@ -2798,7 +2796,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlkwd{require}\hlstd{(Gviz)}
+\hlkwd{library}\hlstd{(Gviz)}
 \hlstd{collected} \hlkwb{<-} \hlkwd{vector}\hlstd{(}\hlstr{"list"}\hlstd{,} \hlkwd{length}\hlstd{(bam.files))}
 \hlkwa{for} \hlstd{(i} \hlkwa{in} \hlkwd{seq_along}\hlstd{(bam.files)) \{}
     \hlstd{reads} \hlkwb{<-} \hlkwd{extractReads}\hlstd{(bam.files[i], cur.region,} \hlkwc{param}\hlstd{=param)}
@@ -2843,18 +2841,18 @@ But died when he saw the bill.
 
 \subsection{Obtaining the FastQ files}
 The NFYA dataset used throughout the guide was first mentioned in Section~\ref{data:main}. 
-This was generated by \cite{tiwari2012} and is available from the NCBI Gene Expression Omnibus (GEO) with the accession number GSE25532. 
-FastQ files werer obtained from the Sequence Read Archive (SRA) with accessions of SRR074398 for \file{es_1.bam}, SRR074399 for \file{es_2.bam}, SRR074417 for \file{tn_1.bam}, SRR074418 for \file{tn_2.bam} and SRR074401 for \file{input.bam}.
+This is available from the NCBI Gene Expression Omnibus (GEO) using the accession number GSE25532 \cite{tiwari2012}.
+FastQ files were obtained from the Sequence Read Archive (SRA) with accessions of SRR074398 for \file{es_1.bam}, SRR074399 for \file{es_2.bam}, SRR074417 for \file{tn_1.bam}, SRR074418 for \file{tn_2.bam} and SRR074401 for \file{input.bam}.
 
-The paired-end dataset used in Section~\ref{data:pet} was generated by \cite{pal2013} and is available from the NCBI GEO under the accession GSE43212.
-The lone FastQ file can be obtained from the SRA with the accession SRR642390 for \file{example-pet.bam}.
+The paired-end dataset used in Section~\ref{data:pet} is available from NCBI GEO using the accession GSE43212 \cite{pal2013}.
+The relevant FastQ file was obtained from the SRA with the accession SRR642390 for \file{example-pet.bam}.
 
-All libraries used in Section~\ref{data:ccf} were generated by \cite{zhang2012} and are available from the NCBI GEO under the accession GSE31233. 
-FastQ files can be obtained from the SRA under the accessions SRR330784 and SRR330785 for \file{h3ac.bam}; SRR330800 and SRR330801 for \file{h3k4me2.bam}; and SRR330814, SRR330815 and SRR330816 for \file{h3k27me3.bam}. 
+All libraries used in Section~\ref{data:ccf} are available from NCBI GEO using the accession GSE31233 \cite{zhang2012}.
+FastQ files were obtained from the SRA with the accessions SRR330784 and SRR330785 for \file{h3ac.bam}; SRR330800 and SRR330801 for \file{h3k4me2.bam}; and SRR330814, SRR330815 and SRR330816 for \file{h3k27me3.bam}. 
 Multiple FastQ files represent technical replicates that were merged into a single BAM file.
 
-Finally, the H3K4me3 dataset in Section~\ref{data:norm} was generated by \cite{domingo2012} and is available under the accession GSE38046. 
-FastQ files can be obtained from the SRA under the accessions SRR499732 and SRR499733 for \file{h3k4me3_pro.bam}, and SRR499716 and SRR499717 for \file{h3k4me3_mat.bam}. 
+Finally, the H3K4me3 dataset in Section~\ref{data:norm} is available from NCBI GEO using the accession GSE38046 \cite{domingo2012}.
+FastQ files were obtained from the SRA with the accessions SRR499732 and SRR499733 for \file{h3k4me3_pro.bam}, and SRR499716 and SRR499717 for \file{h3k4me3_mat.bam}. 
 Again, technical replicates were merged together.
 For H3ac, the FastQ file at SRR330786 was also downloaded and used as \file{h3ac_2.bam}.
  
@@ -2910,58 +2908,58 @@ These commands are stored in a Bash file named \file{sra2bam.sh} at \url{https:/
 ##  [2] rtracklayer_1.37.3                      
 ##  [3] org.Mm.eg.db_3.4.1                      
 ##  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.0
-##  [5] GenomicFeatures_1.29.9                  
+##  [5] GenomicFeatures_1.29.11                 
 ##  [6] AnnotationDbi_1.39.3                    
-##  [7] edgeR_3.19.5                            
-##  [8] limma_3.33.9                            
-##  [9] csaw_1.11.2                             
-## [10] BiocParallel_1.11.8                     
-## [11] SummarizedExperiment_1.7.8              
-## [12] DelayedArray_0.3.19                     
+##  [7] edgeR_3.19.7                            
+##  [8] limma_3.33.13                           
+##  [9] csaw_1.11.3                             
+## [10] BiocParallel_1.11.9                     
+## [11] SummarizedExperiment_1.7.10             
+## [12] DelayedArray_0.3.21                     
 ## [13] matrixStats_0.52.2                      
 ## [14] Biobase_2.37.2                          
-## [15] GenomicRanges_1.29.14                   
-## [16] GenomeInfoDb_1.13.4                     
-## [17] IRanges_2.11.16                         
-## [18] S4Vectors_0.15.8                        
-## [19] BiocGenerics_0.23.1                     
+## [15] GenomicRanges_1.29.15                   
+## [16] GenomeInfoDb_1.13.5                     
+## [17] IRanges_2.11.19                         
+## [18] S4Vectors_0.15.12                       
+## [19] BiocGenerics_0.23.3                     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] ProtGenerics_1.9.0            bitops_1.0-6                 
+##  [1] ProtGenerics_1.9.1            bitops_1.0-6                 
 ##  [3] bit64_0.9-7                   httr_1.3.1                   
 ##  [5] RColorBrewer_1.1-2            progress_1.1.2               
 ##  [7] rprojroot_1.2                 tools_3.4.0                  
-##  [9] backports_1.1.0               R6_2.2.2                     
+##  [9] backports_1.1.1               R6_2.2.2                     
 ## [11] rpart_4.1-11                  KernSmooth_2.23-15           
 ## [13] Hmisc_4.0-3                   DBI_0.7                      
 ## [15] lazyeval_0.2.0                colorspace_1.3-2             
 ## [17] nnet_7.3-12                   gridExtra_2.3                
-## [19] prettyunits_1.0.2             curl_2.8.1                   
+## [19] prettyunits_1.0.2             curl_3.0                     
 ## [21] bit_1.1-12                    compiler_3.4.0               
 ## [23] htmlTable_1.9                 scales_0.5.0                 
-## [25] checkmate_1.8.3               stringr_1.2.0                
+## [25] checkmate_1.8.4               stringr_1.2.0                
 ## [27] digest_0.6.12                 Rsamtools_1.29.1             
 ## [29] foreign_0.8-69                rmarkdown_1.6                
 ## [31] XVector_0.17.1                base64enc_0.1-3              
 ## [33] dichromat_2.0-0               pkgconfig_2.0.1              
-## [35] htmltools_0.3.6               ensembldb_2.1.12             
+## [35] htmltools_0.3.6               ensembldb_2.1.13             
 ## [37] BSgenome_1.45.3               highr_0.6                    
 ## [39] htmlwidgets_0.9               rlang_0.1.2                  
-## [41] RSQLite_2.0                   BiocInstaller_1.27.4         
+## [41] RSQLite_2.0                   BiocInstaller_1.27.5         
 ## [43] shiny_1.0.5                   acepack_1.4.1                
 ## [45] VariantAnnotation_1.23.8      RCurl_1.95-4.8               
 ## [47] magrittr_1.5                  GenomeInfoDbData_0.99.1      
 ## [49] Formula_1.2-2                 Matrix_1.2-11                
-## [51] Rcpp_0.12.12                  munsell_0.4.3                
+## [51] Rcpp_0.12.13                  munsell_0.4.3                
 ## [53] stringi_1.1.5                 yaml_2.1.14                  
-## [55] zlibbioc_1.23.0               AnnotationHub_2.9.12         
+## [55] zlibbioc_1.23.0               AnnotationHub_2.9.19         
 ## [57] plyr_1.8.4                    blob_1.1.0                   
 ## [59] lattice_0.20-35               Biostrings_2.45.4            
 ## [61] splines_3.4.0                 locfit_1.5-9.1               
 ## [63] knitr_1.17                    biomaRt_2.33.4               
 ## [65] XML_3.98-1.9                  evaluate_0.10.1              
 ## [67] biovizBase_1.25.1             latticeExtra_0.6-28          
-## [69] data.table_1.10.4             httpuv_1.3.5                 
+## [69] data.table_1.10.4-1           httpuv_1.3.5                 
 ## [71] gtable_0.2.0                  assertthat_0.2.0             
 ## [73] ggplot2_2.2.1                 mime_0.5                     
 ## [75] xtable_1.8-2                  AnnotationFilter_1.1.9       
@@ -2969,7 +2967,7 @@ These commands are stored in a Bash file named \file{sra2bam.sh} at \url{https:/
 ## [79] GenomicAlignments_1.13.6      memoise_1.1.0                
 ## [81] cluster_2.0.6                 statmod_1.4.30               
 ## [83] interactiveDisplayBase_1.15.0 Rhtslib_1.9.2                
-## [85] BiocStyle_2.5.38
+## [85] BiocStyle_2.5.39
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
