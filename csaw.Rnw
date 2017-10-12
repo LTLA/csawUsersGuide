@@ -693,10 +693,9 @@ Smaller minimum fold changes are recommended for diffuse marks where the differe
 \section{By local enrichment}
 
 \subsection{Mimicking single-sample peak callers}
-Local background estimators can also be constructed.
-This avoids inappropriate filtering when there are differences in background coverage across the genome. 
+Local background estimators can also be constructed, which avoids inappropriate filtering when there are differences in background coverage across the genome. 
 Here, the 2 kbp region surrounding each window will be used as the ``neighborhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
-The counts for this region can be obtained with the aptly-named \Rfunction{regionCounts} function.
+The counts for these regions are first obtained with the \Rfunction{regionCounts} function.
 This should be synchronized with \Rfunction{windowCounts} by using the same \Robject{param}, if any non-default settings were used.
 
 <<>>=
@@ -705,14 +704,16 @@ neighbor <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
 wider <- regionCounts(bam.files, regions=neighbor, ext=frag.len, param=param)
 @
 
-Counts for each window are subtracted from the counts for its neighborhood.
+We apply \Rfunction{filterWindows} with \Rcode{type="local"} to compute enrichment values, i.e., the increase in the abundance of each window over its neighborhood.
+In this function, counts for each window are subtracted from the counts for its neighborhood.
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.
 The width of the window is also subtracted from that of its neighborhood, to reflect the effective size of the latter after subtraction of counts.
-Using these differences in widths, the abundance of the neighborhood is scaled down for a valid comparison to that of the corresponding window.
-This entire procedure can be performed automatically by setting \Rcode{type="local"} for \Rfunction{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighborhood.
+Based on the fold-differences in widths, the abundance of the neighborhood is scaled down for a valid comparison to that of the corresponding window.
+Enrichment values are subsequently calculated from the differences in scaled abundances.
 
 <<>>=
 filter.stat <- filterWindows(data, wider, type="local")
+summary(filter.stat$filter)
 @
 
 Filtering can then be performed using a quantile- or fold change-based threshold on the enrichment values. 
@@ -736,7 +737,7 @@ This is equivalent to filtering on the average count and avoids loss of the type
 
 \subsection{Identifying local maxima}
 \label{sec:localmax}
-Another approach uses the \Rfunction{findMaxima} function to identify local maxima in the read density across the genome.
+Another strategy is to use the \Rfunction{findMaxima} function to identify local maxima in the read density across the genome.
 The code below will determine if each window is a local maximum, i.e., whether it has the highest average abundance within 1 kbp on either side.
 The data can then be filtered to retain only these locally maximal windows.
 This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
@@ -756,12 +757,13 @@ This accounts for sequencing/mapping biases in ChIP-seq data.
 IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
 These controls are mostly irrelevant when testing for DB between ChIP samples. 
 However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
+To illustrate, let us add an input library to our NF-YA data set in the code below.
 
 <<>>=
 with.input <- c(bam.files, "input.bam")
 in.demo <- windowCounts(with.input, ext=frag.len, param=param)
-chip <- in.demo[,1:4]
-control <- in.demo[,5]
+chip <- in.demo[,1:4] # All ChIP libraries
+control <- in.demo[,5] # All control libraries
 @
 
 Some additional work is required to account for composition biases that are likely to be present when comparing ChIP to negative control samples (see Section~\ref{sec:compo_norm}).
@@ -774,8 +776,8 @@ control.binned <- in.binned[,5]
 scale.info <- scaleControlFilter(chip.binned, control.binned)
 @
 
-The \Rfunction{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
-This uses \Robject{scale.info} to adjust for composition biases between ChIP and control sampes.
+We use the \Rfunction{filterWindows} function with \Rcode{type="control"} to compute the enrichment of the ChIP counts over the control counts for each window.
+This uses \Robject{scale.info} to adjust for composition biases between ChIP and control samples.
 A larger \Rcode{prior.count} of 5 is also used to compute the average abundance.
 This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
 By comparison, the global and local background estimates require less protection (\Rcode{prior.count=2}, by default) as they are derived from larger bins with more counts.
@@ -1039,7 +1041,7 @@ These will interfere with calculation of normalization factors from binding site
 This is due to the lower coverage for background regions, as well as the fact that they are not affected by efficiency bias (and cannot contribute to its estimation).
 Conversely, attempting to use the computed factors on windows from background regions will result in incorrect normalization of those windows.
 Thus, it is usually better to err on the side of caution and filter aggressively to ensure that background regions are not retained in downstream analyses.
-Obviously, though, retaining too few windows will result in unstable estimates.
+Obviously, though, retaining too few windows will result in unstable estimates of the normalization factors.
 
 \subsection{Checking normalization with MA plots}
 \label{sec:eff_norm_ma}
@@ -1412,7 +1414,7 @@ A small top set visualizes the most extreme differences whereas a large set visu
 Checking a range of \Rcode{top} values may be useful when the scope of DB is unknown.
 Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
 
-<<mds, fig.wide=TRUE, fig.asp=1>>=
+<<mds, fig.asp=1>>=
 par(mfrow=c(2,2), mar=c(5,4,2,2))
 adj.counts <- cpm(y, log=TRUE)
 for (top in c(100, 500, 1000, 5000)) {
