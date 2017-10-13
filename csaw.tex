@@ -56,7 +56,7 @@ summarization of windows into regions, and visualization and annotation of detec
 \vspace{0.05in}
 \textit{First edition:} 15 August 2012 \\
 \textit{Last revised:} 17 September 2017 \\
-\textit{Last compiled:} 11 October 2017
+\textit{Last compiled:} 12 October 2017
 \end{abstract}
 
 \packageVersion{csaw 1.11.3}
@@ -993,10 +993,9 @@ Smaller minimum fold changes are recommended for diffuse marks where the differe
 \section{By local enrichment}
 
 \subsection{Mimicking single-sample peak callers}
-Local background estimators can also be constructed.
-This avoids inappropriate filtering when there are differences in background coverage across the genome. 
+Local background estimators can also be constructed, which avoids inappropriate filtering when there are differences in background coverage across the genome. 
 Here, the 2 kbp region surrounding each window will be used as the ``neighborhood'' over which a local estimate of non-specific enrichment for that window can be obtained. 
-The counts for this region can be obtained with the aptly-named \Rfunction{regionCounts} function.
+The counts for these regions are first obtained with the \Rfunction{regionCounts} function.
 This should be synchronized with \Rfunction{windowCounts} by using the same \Robject{param}, if any non-default settings were used.
 
 \begin{knitrout}
@@ -1009,17 +1008,23 @@ This should be synchronized with \Rfunction{windowCounts} by using the same \Rob
 \end{kframe}
 \end{knitrout}
 
-Counts for each window are subtracted from the counts for its neighborhood.
+We apply \Rfunction{filterWindows} with \Rcode{type="local"} to compute enrichment values, i.e., the increase in the abundance of each window over its neighborhood.
+In this function, counts for each window are subtracted from the counts for its neighborhood.
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.
 The width of the window is also subtracted from that of its neighborhood, to reflect the effective size of the latter after subtraction of counts.
-Using these differences in widths, the abundance of the neighborhood is scaled down for a valid comparison to that of the corresponding window.
-This entire procedure can be performed automatically by setting \Rcode{type="local"} for \Rfunction{filterWindows}, which returns the enrichment values i.e., the increase in the abundance of each window over its neighborhood.
+Based on the fold-differences in widths, the abundance of the neighborhood is scaled down for a valid comparison to that of the corresponding window.
+Enrichment values are subsequently calculated from the differences in scaled abundances.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{filter.stat} \hlkwb{<-} \hlkwd{filterWindows}\hlstd{(data, wider,} \hlkwc{type}\hlstd{=}\hlstr{"local"}\hlstd{)}
+\hlkwd{summary}\hlstd{(filter.stat}\hlopt{$}\hlstd{filter)}
 \end{alltt}
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+## -8.7479  0.4775  0.6075  0.6202  0.7514  8.6100
+\end{verbatim}
 \end{kframe}
 \end{knitrout}
 
@@ -1051,7 +1056,7 @@ This is equivalent to filtering on the average count and avoids loss of the type
 
 \subsection{Identifying local maxima}
 \label{sec:localmax}
-Another approach uses the \Rfunction{findMaxima} function to identify local maxima in the read density across the genome.
+Another strategy is to use the \Rfunction{findMaxima} function to identify local maxima in the read density across the genome.
 The code below will determine if each window is a local maximum, i.e., whether it has the highest average abundance within 1 kbp on either side.
 The data can then be filtered to retain only these locally maximal windows.
 This can also be combined with other filters to ensure that the retained windows have high absolute abundance.
@@ -1079,14 +1084,15 @@ This accounts for sequencing/mapping biases in ChIP-seq data.
 IgG controls also quantify the amount of non-specific enrichment throughout the genome. 
 These controls are mostly irrelevant when testing for DB between ChIP samples. 
 However, they can be used to filter out windows where the average abundance across the ChIP samples is below the abundance of the control. 
+To illustrate, let us add an input library to our NF-YA data set in the code below.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{with.input} \hlkwb{<-} \hlkwd{c}\hlstd{(bam.files,} \hlstr{"input.bam"}\hlstd{)}
 \hlstd{in.demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(with.input,} \hlkwc{ext}\hlstd{=frag.len,} \hlkwc{param}\hlstd{=param)}
-\hlstd{chip} \hlkwb{<-} \hlstd{in.demo[,}\hlnum{1}\hlopt{:}\hlnum{4}\hlstd{]}
-\hlstd{control} \hlkwb{<-} \hlstd{in.demo[,}\hlnum{5}\hlstd{]}
+\hlstd{chip} \hlkwb{<-} \hlstd{in.demo[,}\hlnum{1}\hlopt{:}\hlnum{4}\hlstd{]} \hlcom{# All ChIP libraries}
+\hlstd{control} \hlkwb{<-} \hlstd{in.demo[,}\hlnum{5}\hlstd{]} \hlcom{# All control libraries}
 \end{alltt}
 \end{kframe}
 \end{knitrout}
@@ -1105,8 +1111,8 @@ A simple strategy for normalization involves counting reads into large bins, whi
 \end{kframe}
 \end{knitrout}
 
-The \Rfunction{filterWindows} function computes the enrichment of the ChIP counts over the control counts for each window.
-This uses \Robject{scale.info} to adjust for composition biases between ChIP and control sampes.
+We use the \Rfunction{filterWindows} function with \Rcode{type="control"} to compute the enrichment of the ChIP counts over the control counts for each window.
+This uses \Robject{scale.info} to adjust for composition biases between ChIP and control samples.
 A larger \Rcode{prior.count} of 5 is also used to compute the average abundance.
 This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
 By comparison, the global and local background estimates require less protection (\Rcode{prior.count=2}, by default) as they are derived from larger bins with more counts.
@@ -1447,7 +1453,7 @@ These will interfere with calculation of normalization factors from binding site
 This is due to the lower coverage for background regions, as well as the fact that they are not affected by efficiency bias (and cannot contribute to its estimation).
 Conversely, attempting to use the computed factors on windows from background regions will result in incorrect normalization of those windows.
 Thus, it is usually better to err on the side of caution and filter aggressively to ensure that background regions are not retained in downstream analyses.
-Obviously, though, retaining too few windows will result in unstable estimates.
+Obviously, though, retaining too few windows will result in unstable estimates of the normalization factors.
 
 \subsection{Checking normalization with MA plots}
 \label{sec:eff_norm_ma}
@@ -1945,7 +1951,7 @@ Again, counting with large bins is recommended as fold changes will be undefined
                    \hlkwc{labels}\hlstd{=}\hlkwd{c}\hlstd{(}\hlstr{"es.1"}\hlstd{,} \hlstr{"es.2"}\hlstd{,} \hlstr{"tn.1"}\hlstd{,} \hlstr{"tn.2"}\hlstd{),} \hlkwc{top}\hlstd{=top)}
 \hlstd{\}}
 \end{alltt}
-\end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
+\end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
 \includegraphics[width=\maxwidth]{plots-ug/mds-1} \end{adjustwidth}
 \end{knitrout}
 
@@ -2967,7 +2973,7 @@ These commands are stored in a Bash file named \file{sra2bam.sh} at \url{https:/
 ## [79] GenomicAlignments_1.13.6      memoise_1.1.0                
 ## [81] cluster_2.0.6                 statmod_1.4.30               
 ## [83] interactiveDisplayBase_1.15.0 Rhtslib_1.9.2                
-## [85] BiocStyle_2.5.39
+## [85] BiocStyle_2.5.40
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
