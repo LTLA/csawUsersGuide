@@ -903,8 +903,8 @@ A larger normalization factor results in a larger effective library size and is 
 Check out the \Biocpkg{edgeR} user's guide for more information.
 
 In the above code, the \Rfunction{normOffsets} call computes normalization factors from the bin-level counts in \Robject{binned} (see Section~\ref{sec:normbinsize}).
-It then returns a modified version of \Robject{filtered.data}, where the normalization factors are stored alongside the \textit{window}-level counts for further analysis.
-Composition biases affect both bin- and window-level counts, so transferring normalization factors between the counts is valid -- \emph{provided that the library sizes are the same between the two sets of counts}, as the factors are interpreted with respect to the library sizes.
+The \Rcode{se.out} argument directs the function to return a modified version of \Robject{filtered.data}, where the normalization factors are stored alongside the \textit{window}-level counts for further analysis.
+Composition biases affect both bin- and window-level counts, so computing normalization factors from the former and applying them to the latter is valid -- provided that the library sizes are the same between the two sets of counts, as the factors are interpreted with respect to the library sizes.
 (In \Biocpkg{csaw}, separate calls to \Rfunction{windowCounts} with the same \Rclass{readParam} object will always yield the same library sizes in \Rcode{totals}.)
 
 Note that \Rfunction{normOffsets} skips the precision weighting step in the TMM method.
