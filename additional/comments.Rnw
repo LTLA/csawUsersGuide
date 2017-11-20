@@ -551,6 +551,12 @@ Then, only the DB sites that change in the expected direction should be retained
 This normalizes across the majority of the expected DB binding sites, sacrificing them in order to detect the top set of DB.
 For experiments with variable IP efficiency, this may still detect more sites than normalizing for composition bias.
 
+Another approach, if you have enough replicates, is to normalize for composition biases and use methods like \textit{RUVseq} or \textit{sva}.
+If the design matrix is supplied, these methods should be able to detect systematic differences in binding efficiency across enriched regions.
+This will allow you to block on efficiency in the design matrix, while preserving the mean shift in binding intensity between conditions.
+The idea is that the estimated blocking factor should be more-or-less orthogonal to the condition factor,
+though obviously this requires a large number of samples to get a precise estimate of the mean shift in the first place.
+
 \subsubsection*{Some thoughts on non-linear normalization with NB-loess}
 
 The current implementation of NB-loess uses a fast approach, whereby all samples are compared to an average library.
