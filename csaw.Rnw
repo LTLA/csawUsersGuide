@@ -88,9 +88,14 @@ A typical ChIP-seq analysis in \Biocpkg{csaw} would look something like that des
 This assumes that a vector of file paths to sorted and indexed BAM files is provided in \Robject{bam.files} and a design matrix in supplied in \Robject{design}.
 The code is split across several steps:
 
-<<results='hide',echo=FALSE,label=bamdef>>=
-bam.files <- c("es_1.bam", "es_2.bam", "tn_1.bam", "tn_2.bam")
-design <- model.matrix(~factor(c('es', 'es', 'tn', 'tn')))
+<<results='hide',echo=FALSE>>=
+library(chipseqDBData)
+tf.data <- NFYAData()
+tf.data <- head(tf.data, -1) # skip the input.
+bam.files <- tf.data$Path
+
+cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", tf.data$Description)
+design <- model.matrix(~factor(cell.type))
 colnames(design) <- c("intercept", "cell.type")
 @
 
@@ -126,17 +131,6 @@ tabcom <- combineTests(merged$id, results$table)
 @
 \end{enumerate}
 
-In this guide, the behavior of each step will be demonstrated with some publicly available data.
-The dataset below focuses on changes in the binding profile of the NFYA protein between embryonic stem cells and terminal neurons \cite{tiwari2012}. 
-This will be used as a case study for most of the code examples throughout the guide.
-
-<<>>=
-<<bamdef>>
-@
-\label{data:main}
-
-A comprehensive listing of the datasets used in this guide is provided in Section~\ref{sec:dataset}, along with instructions on how to obtain and process them for entry into the \Biocpkg{csaw} pipeline.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -148,7 +142,6 @@ Hello, reader.
 A little box like this will be present at the start of each chapter.
 The idea is to list the objects from previous chapters that are needed to run the code in the current chapter.
 Hopefully, it'll provide a nice segue between chapters for tired eyes.
-At this point, all we need are the \Robject{bam.files} that we defined in the introduction above.
 \end{combox}
 
 \section{Types of input data}
@@ -160,6 +153,18 @@ For a given BAM file named \file{xxx.bam}, the corresponding index file should b
 The sensibility of the supplied index is not checked prior to counting. 
 A common mistake is to replace or update the BAM file without updating the index. 
 This will cause \Biocpkg{csaw} to return incorrect results when it attempts to load alignments from the new BAM file.
+
+In this guide, the behavior of each step will be demonstrated with some publicly available data from the \Biocpkg{chipseqDBData} package.
+The dataset below focuses on changes in the binding profile of the NF-YA transcription factor between embryonic stem cells and terminal neurons \cite{tiwari2012}. 
+This will be used as a case study for most of the code examples throughout the guide.
+
+<<>>=
+library(chipseqDBData)
+tf.data <- NFYAData()
+tf.data
+bam.files <- head(tf.data$Path, -1) # skip the input.
+bam.files
+@
 
 \section{Counting reads into windows}
 
@@ -236,7 +241,7 @@ In the example above, reads are filtered out based on the minimum mapping score 
 Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
 Removal of these reads is highly recommended as it will ensure that only the reliable alignments are supplied to \Biocpkg{csaw}.
 The exact value of the threshold depends on the range of scores provided by the aligner. 
-The \software{subread} program \cite{liao2013} was used to align the reads in this dataset, so a value of 50 might be appropriate.
+The \software{subread} program \cite{liao2013} was used to align the reads in this dataset, so a value of 20 might be appropriate.
 
 Reads mapping to the same genomic position can be marked as putative PCR duplicates using software like the \software{MarkDuplicates} program from the \software{Picard} suite.
 Marked reads in the BAM file can be ignored during counting by setting \Rcode{dedup=TRUE} in the \Rclass{readParam} object. 
@@ -244,7 +249,7 @@ This reduces the variability caused by inconsistent amplification between replic
 An example of counting with duplicate removal is shown below, where fewer reads are used from each library relative to \Rcode{data\$totals}.
 
 <<>>=
-dedup.param <- readParam(minq=50, dedup=TRUE)
+dedup.param <- readParam(minq=20, dedup=TRUE)
 demo <- windowCounts(bam.files, ext=frag.len, width=win.width, 
                      param=dedup.param)
 demo$totals
@@ -371,7 +376,10 @@ The number of fragments overlapping each window is then counted as previously de
 By default, only proper pairs are used in which the two paired reads are on the same chromosome, face inward and are no more than \Rcode{max.frag} apart.
 
 <<>>=
-pe.bam <- "example-pet.bam"
+# Using the BAM file in Rsamtools as an example.
+pe.bam <- system.file("extdata", "ex1.bam", package="Rsamtools", 
+    mustWork=TRUE)
+
 pe.param <- readParam(max.frag=400, pe="both")
 demo <- windowCounts(pe.bam, ext=250, param=pe.param)
 demo$totals
@@ -449,15 +457,23 @@ However, they are less effective for regions of diffuse enrichment where bimodal
 
 <<histone_ccf, fig.asp=1>>=
 n <- 1000
-h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
-h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
-h3k4me2 <- correlateReads("h3k4me2.bam", n, param=dedup.on)
-plot(0:n, h3ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
+
+# Using more data sets from 'chipseqDBData'.
+acdata <- H3K9acData()
+h3k9ac <- correlateReads(acdata$Path[1], n, param=dedup.on)
+
+k27data <- H3K27me3Data()
+h3k27me3 <- correlateReads(k27data$Path[1], n, param=dedup.on)
+
+k4data <- H3K4me3Data()
+h3k4me2 <- correlateReads(k4data$Path[1], n, param=dedup.on)
+
+plot(0:n, h3k9ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
      xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
 lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
 lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
 legend("topright", col=c("blue", "red", "forestgreen"),
-       c("H3Ac", "H3K27me3", "H3K4me2"), pch=16)
+       c("H3K9ac", "H3K27me3", "H3K4me2"), pch=16)
 @
 \label{data:ccf}
 
@@ -569,7 +585,7 @@ gc()
 \label{chap:filter}
 
 \begin{combox}
-This chapter will require the \Robject{frag.len}, \Robject{param} and \Robject{data} from the last chapter, as well as the \Robject{bam.files} vector we defined at the start.
+This chapter will require \Robject{bam.files}, \Robject{frag.len}, \Robject{param} and \Robject{data} from the last chapter.
 We'll also need the \Rfunction{aveLogCPM} function from \Biocpkg{csaw}, so load the package if you haven't done so already.
 \end{combox}
 
@@ -760,7 +776,8 @@ However, they can be used to filter out windows where the average abundance acro
 To illustrate, let us add an input library to our NF-YA data set in the code below.
 
 <<>>=
-with.input <- c(bam.files, "input.bam")
+tf.data <- NFYAData()
+with.input <- tf.data$Path
 in.demo <- windowCounts(with.input, ext=frag.len, param=param)
 chip <- in.demo[,1:4] # All ChIP libraries
 control <- in.demo[,5] # All control libraries
@@ -986,7 +1003,9 @@ This can be achieved by assuming that high-abundance windows contain binding sit
 Consider the following H3K4me3 data set, where reads are counted into 150 bp windows.
 
 <<>>=
-me.files <- c("h3k4me3_mat.bam", "h3k4me3_pro.bam")
+k4data <- H3K4me3Data()
+k4data
+me.files <- k4data$Path[c(1,3)]
 me.demo <- windowCounts(me.files, width=150, param=param)
 @
 
@@ -1016,7 +1035,9 @@ We set \Rcode{se.out=TRUE} so that the normalization factors are stored alongsid
 As a demonstration, we repeat this procedure on another data set involving H3 acetylation.
 
 <<>>=
-ac.files <- c("h3ac.bam", "h3ac_2.bam")
+acdata <- H3K9acData()
+acdata
+ac.files <- acdata[c(1,2)]
 ac.demo <- windowCounts(ac.files, width=150, param=param)
 ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
 keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
@@ -1270,6 +1291,11 @@ This provides a general framework for the analysis of complex experiments with m
 Readers are referred to the user's guide in \Biocpkg{edgeR} for more details on parametrization.
 
 <<>>=
+tf.data <- NFYAData()
+cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", head(tf.data$Description, -1))
+cell.type
+design <- model.matrix(~factor(cell.type))
+colnames(design) <- c("intercept", "cell.type")
 design
 @
 
@@ -1961,46 +1987,6 @@ Until he was fed \\
 But died when he saw the bill. 
 \end{quote}
 \end{combox}
-
-\section{Datasets}
-\label{sec:dataset}
-
-\subsection{Obtaining the FastQ files}
-The NFYA dataset used throughout the guide was first mentioned in Section~\ref{data:main}. 
-This is available from the NCBI Gene Expression Omnibus (GEO) using the accession number GSE25532 \cite{tiwari2012}.
-FastQ files were obtained from the Sequence Read Archive (SRA) with accessions of SRR074398 for \file{es_1.bam}, SRR074399 for \file{es_2.bam}, SRR074417 for \file{tn_1.bam}, SRR074418 for \file{tn_2.bam} and SRR074401 for \file{input.bam}.
-
-The paired-end dataset used in Section~\ref{data:pet} is available from NCBI GEO using the accession GSE43212 \cite{pal2013}.
-The relevant FastQ file was obtained from the SRA with the accession SRR642390 for \file{example-pet.bam}.
-
-All libraries used in Section~\ref{data:ccf} are available from NCBI GEO using the accession GSE31233 \cite{zhang2012}.
-FastQ files were obtained from the SRA with the accessions SRR330784 and SRR330785 for \file{h3ac.bam}; SRR330800 and SRR330801 for \file{h3k4me2.bam}; and SRR330814, SRR330815 and SRR330816 for \file{h3k27me3.bam}. 
-Multiple FastQ files represent technical replicates that were merged into a single BAM file.
-
-Finally, the H3K4me3 dataset in Section~\ref{data:norm} is available from NCBI GEO using the accession GSE38046 \cite{domingo2012}.
-FastQ files were obtained from the SRA with the accessions SRR499732 and SRR499733 for \file{h3k4me3_pro.bam}, and SRR499716 and SRR499717 for \file{h3k4me3_mat.bam}. 
-Again, technical replicates were merged together.
-For H3ac, the FastQ file at SRR330786 was also downloaded and used as \file{h3ac_2.bam}.
- 
-\subsection{Alignment and processing to produce BAM files}
-Technically, each of the libraries described above are downloaded in the SRA format. 
-These can be unpacked to yield FastQ files using the \software{fastq-dump} program from the SRA Toolkit (\url{http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software}). 
-For the lone paired-end library, users will need to specify \texttt{fastq-dump --split-files} to ensure that two separate files are produced, i.e., containing sequences from either end of each fragment.
-
-Reads in the FastQ files were then aligned to the mm10 build of the mouse genome using \software{subread} v1.4.6 \cite{liao2013}. 
-The subread software can be obtained from Bioconductor as the Rsubread package, or as a standalone C program from \url{http://subread.sourceforge.net}. 
-The consensus threshold for alignment was set at 2 to accommodate short read lengths (\textless{} 45 bp in all datasets).
-Only unique alignments were reported, and any tied alignments were split by Hamming distance.
-Default values were used for all other parameters.
-Paired-end data was aligned by supplying both FastQ files to subread within the same run.
-
-Once aligned, SAM files were converted to BAM files using \software{SAMtools} v0.1.19 \cite{li2009}. 
-BAM files were position-sorted with the \texttt{samtools sort} command, and duplicate reads were marked using the \software{MarkDuplicates} command from the \software{Picard} suite v1.117 (\url{http://broadinstitute.github.io/picard}).
-Any technical replicates were merged together using \texttt{samtools merge} to form a single library. 
-Indexing was performed using \texttt{samtools index}.
-
-If all relevant SRA files have been obtained, a set of explicit commands can be used to produce each BAM file.
-These commands are stored in a Bash file named \file{sra2bam.sh} at \url{https://github.com/LTLA/csawUsersGuide}.
 
 \section{Session information}
 <<>>=
