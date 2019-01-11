@@ -115,7 +115,7 @@ data <- data[keep,]
 \item Calculating normalization factors.
 <<>>=
 binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-data <- normOffsets(binned, se.out=data)
+data <- normFactors(binned, se.out=data)
 @
 \item Identifying DB windows.
 <<>>=
@@ -904,13 +904,13 @@ Highly enriched regions consume more sequencing resources and thereby suppress t
 Differences in the magnitude of suppression between libraries can lead to spurious DB calls. 
 Scaling by library size fails to correct for this as composition biases can still occur in libraries of the same size. 
 
-To remove composition biases in \Biocpkg{csaw}, reads are counted into large bins and the counts are used for normalization with the \Rfunction{normOffsets} wrapper function.
+To remove composition biases in \Biocpkg{csaw}, reads are counted into large bins and the counts are used for normalization with the \Rfunction{normFactors} wrapper function.
 This uses the trimmed mean of M-values (TMM) method \cite{oshlack2010} to correct for any systematic fold change in the coverage of the bins. 
 The assumption here is that most bins represent non-DB background regions, so any consistent difference across bins must be technical bias.
 
 <<>>=
 binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-filtered.data <- normOffsets(binned, se.out=filtered.data)
+filtered.data <- normFactors(binned, se.out=filtered.data)
 filtered.data$norm.factors
 @
 
@@ -919,12 +919,12 @@ The size of each library is scaled by the corresponding factor to obtain an effe
 A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the (effective) library size will be smaller. 
 Check out the \Biocpkg{edgeR} user's guide for more information.
 
-In the above code, the \Rfunction{normOffsets} call computes normalization factors from the bin-level counts in \Robject{binned} (see Section~\ref{sec:normbinsize}).
+In the above code, the \Rfunction{normFactors} call computes normalization factors from the bin-level counts in \Robject{binned} (see Section~\ref{sec:normbinsize}).
 The \Rcode{se.out} argument directs the function to return a modified version of \Robject{filtered.data}, where the normalization factors are stored alongside the \textit{window}-level counts for further analysis.
 Composition biases affect both bin- and window-level counts, so computing normalization factors from the former and applying them to the latter is valid -- provided that the library sizes are the same between the two sets of counts, as the factors are interpreted with respect to the library sizes.
 (In \Biocpkg{csaw}, separate calls to \Rfunction{windowCounts} with the same \Rclass{readParam} object will always yield the same library sizes in \Rcode{totals}.)
 
-Note that \Rfunction{normOffsets} skips the precision weighting step in the TMM method.
+Note that \Rfunction{normFactors} skips the precision weighting step in the TMM method.
 Weighting aims to increase the contribution of bins with high counts, as these yield more precise M-values.
 However, high-abundance bins are more likely to contain binding sites and thus are more likely to be DB compared to background regions.
 If any DB regions should survive trimming, upweighting them would be counterproductive. 
@@ -953,12 +953,12 @@ A value of 10 kbp is usually suitable for most datasets.
 
 <<>>=
 demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
-normOffsets(demo, se.out=FALSE)
+normFactors(demo, se.out=FALSE)
 demo <- windowCounts(bam.files, bin=TRUE, width=15000, param=param)
-normOffsets(demo, se.out=FALSE)
+normFactors(demo, se.out=FALSE)
 @
 
-We use \Rcode{se.out=FALSE} to instruct \Rfunction{normOffsets} to return the normalization factors directly.
+We use \Rcode{se.out=FALSE} to instruct \Rfunction{normFactors} to return the normalization factors directly.
 This is more convenient than returning a \Rclass{RangedSummarizedExperiment} object and extracting the normalization factors with \Rcode{...\$norm.factors}.
 Here, the factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
 See Section~\ref{sec:eff_norm_ma} for some examples with greater bias.
@@ -1024,13 +1024,13 @@ Thus, any systematic differences in coverage among the high-abundance windows mu
 Scaling by the normalization factors will subseqeuently remove these bises between libraries. 
 
 <<>>=
-filtered.me <- normOffsets(filtered.me, se.out=TRUE)
+filtered.me <- normFactors(filtered.me, se.out=TRUE)
 me.eff <- filtered.me$norm.factors
 me.eff
 @
 
 The above process seems rather involved, but this is only because we need to work our way through counting and normalization for a new data set.
-Only \Rfunction{normOffsets} is actually performing the normalization step.
+Only \Rfunction{normFactors} is actually performing the normalization step.
 We set \Rcode{se.out=TRUE} so that the normalization factors are stored alongside the window counts for use in the downstream \Biocpkg{edgeR} analysis.
 As a demonstration, we repeat this procedure on another data set involving H3 acetylation.
 
@@ -1042,7 +1042,7 @@ ac.demo <- windowCounts(ac.files, width=150, param=param)
 ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
 keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
 filtered.ac <- ac.demo[keep,]
-filtered.ac <- normOffsets(filtered.ac, se.out=TRUE)
+filtered.ac <- normFactors(filtered.ac, se.out=TRUE)
 ac.eff <- filtered.ac$norm.factors
 ac.eff
 @
@@ -1073,9 +1073,9 @@ This is useful as the behavior of the entire genome can be examined, rather than
 It also allows calculation of and comparison to the factors for composition bias.
 
 <<>>=
-me.comp <- normOffsets(me.bin, se.out=FALSE)
+me.comp <- normFactors(me.bin, se.out=FALSE)
 me.comp
-ac.comp <- normOffsets(ac.bin, se.out=FALSE)
+ac.comp <- normFactors(ac.bin, se.out=FALSE)
 ac.comp
 @
 
@@ -1131,16 +1131,16 @@ This normalization strategy can be implemented in \Biocpkg{csaw} with some work.
 Assuming that the reference genome includes appropriate sequences from the foreign genome, coverage is quantified across genomic windows with \Rfunction{windowCounts}.
 Filtering is performed to select for high-abundance windows in the foreign genome (see Section~\ref{sec:eff_norm}), yielding counts for all enriched spike-in regions.
 (The filtered object is named \Robject{spike.data} in the code below.)
-Normalization factors are computed by applying the TMM method on these counts via \Rfunction{normOffsets}.
+Normalization factors are computed by applying the TMM method on these counts via \Rfunction{normFactors}.
 This aims to identify the fold-change in coverage between samples that is attributable to technical effects.
 
-<<echo=FALSE, results='hide'>>=
-spike.data <- data
-endog.data <- data
-@
-
 <<>>=
-endog.data <- normOffsets(spike.data, se.out=endog.data)
+# Pretend chr1 is a spike-in, for demonstration purposes only!
+is.1 <- seqnames(rowRanges(data))=="chr1"
+spike.data <- data[is.1,]
+endog.data <- data[!is.1,]
+
+endog.data <- normFactors(spike.data, se.out=endog.data)
 @
 
 In the code above, the spike-in normalization factors are returned in a modified copy of \Robject{endog.data} for further analysis of the endogenous windows.
@@ -1166,7 +1166,7 @@ Thus, the magnitude of the bias between libraries will change with abundance.
 The trend cannot be corrected with scaling methods as no single scaling factor will remove differences at all abundances.
 Rather, non-linear methods are required, such as cyclic loess or quantile normalization.
 
-One such implementation is provided in \Rfunction{normOffsets} by setting \Rcode{type="loess"}.
+One such implementation of a non-linear normalization method is provided in \Rfunction{normOffsets}.
 This is based on the fast loess algorithm \cite{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This offset matrix can then be directly used in \Biocpkg{edgeR}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
@@ -1179,7 +1179,7 @@ ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
 filtered <- filterWindows(ac.demo2, ac.bin, type="global")
 keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
-ac.demo2 <- normOffsets(ac.demo2, type="loess", se.out=TRUE)
+ac.demo2 <- normOffsets(ac.demo2, se.out=TRUE)
 ac.off <- assay(ac.demo2, "offset")
 head(ac.off)
 @
