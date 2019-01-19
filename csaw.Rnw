@@ -91,7 +91,7 @@ The code is split across several steps:
 <<results='hide',echo=FALSE>>=
 library(chipseqDBData)
 tf.data <- NFYAData()
-tf.data <- head(tf.data, -1) # skip the input.
+tf.data <- head(tf.data, -1) # skip the input.
 bam.files <- tf.data$Path
 
 cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", tf.data$Description)
@@ -103,7 +103,7 @@ colnames(design) <- c("intercept", "cell.type")
 \item Loading in data from BAM files.
 <<>>=
 library(csaw)
-param <- readParam(minq=50)
+param <- readParam(minq=20)
 data <- windowCounts(bam.files, ext=110, width=10, param=param)
 @
 \item Filtering out uninteresting regions.
@@ -178,7 +178,7 @@ A count is then obtained for each window in each library, thus quantifying prote
 <<>>=
 frag.len <- 110
 win.width <- 10
-param <- readParam(minq=50)
+param <- readParam(minq=20)
 data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
 @
 
@@ -466,14 +466,14 @@ k27data <- H3K27me3Data()
 h3k27me3 <- correlateReads(k27data$Path[1], n, param=dedup.on)
 
 k4data <- H3K4me3Data()
-h3k4me2 <- correlateReads(k4data$Path[1], n, param=dedup.on)
+h3k4me3 <- correlateReads(k4data$Path[1], n, param=dedup.on)
 
 plot(0:n, h3k9ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
      xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
 lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
-lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
+lines(0:n, h3k4me3, col="forestgreen", pch=16, lwd=2)
 legend("topright", col=c("blue", "red", "forestgreen"),
-       c("H3K9ac", "H3K27me3", "H3K4me2"), pch=16)
+       c("H3K9ac", "H3K27me3", "H3K4me3"), pch=16)
 @
 \label{data:ccf}
 
@@ -1037,10 +1037,11 @@ As a demonstration, we repeat this procedure on another data set involving H3 ac
 <<>>=
 acdata <- H3K9acData()
 acdata
-ac.files <- acdata[c(1,2)]
+ac.files <- acdata$Path[c(1,2)]
 ac.demo <- windowCounts(ac.files, width=150, param=param)
 ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
 keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
+summary(keep)
 filtered.ac <- ac.demo[keep,]
 filtered.ac <- normFactors(filtered.ac, se.out=TRUE)
 ac.eff <- filtered.ac$norm.factors
@@ -1684,27 +1685,33 @@ nl <- nrow(ac.large)
 mock.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
 @
 
-The \Rfunction{consolidateSizes} function is then applied to combine these results.
-This merges windows of all sizes into a single set of clusters, and computes a combined $p$-value from the associated $p$-values for each cluster.
-However, if a cluster contains many small windows, the DB results for the small window size will contribute most to the combined $p$-value.
-This is not ideal when results from all window sizes are of equal interest.
-Equal contributions from each window size can be enforced by setting \Rcode{equiweight=TRUE}, whereby a weighted version of Simes' method \cite{benjamini1997} is used.
+The \Rfunction{consolidateWindows} and \Rfunction{consolidateTests} functions are applied to combine these results.
+The former merges windows of all sizes into a single set of clusters, and the latter computes a combined $p$-value from the associated $p$-values for each cluster.
+Equal contributions from each window size are enforced by setting \Rcode{equiweight=TRUE}, which uses a weighted version of Simes' method \cite{benjamini1997}.
 The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
+Weighting avoids the problem where, if a cluster contains many small windows, the DB results for the analysis with the small window size contribute most to the combined $p$-value.
+This is not ideal when results from all window sizes are of equal interest.
 
 <<>>=
-cons <- consolidateSizes(list(ac.small, ac.large), 
-                         list(mock.small, mock.large), 
-                         equiweight=TRUE, merge.args=list(tol=1000))
-cons$region
+cons.win <- consolidateWindows(data.list=list(ac.small, ac.large), 
+    equiweight=TRUE, merge.args=list(tol=1000))
+cons.win$region
+cons.res <- consolidateTests(id.list=cons.win$id, 
+    result.list=list(mock.small, mock.large), 
+    weight.list=cons.win$weight)
+cons.res
 @
 
 The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
 This is done by specifying the \Rcode{region} argument, as shown below.
 
 <<>>=
-cons.broad <- consolidateSizes(list(ac.small, ac.large), 
-                               list(mock.small, mock.large), 
-                               region=broads, equiweight=TRUE)
+cons.olap <- consolidateWindows(data.list=list(ac.small, ac.large),
+    equiweight=TRUE, region=broads)
+cons.broad <- consolidateOverlaps(olap.list=cons.olap$olap,
+    result.list=list(mock.small, mock.large), 
+    weight.list=cons.olap$weight)
+cons.broad
 @
 
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
