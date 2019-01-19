@@ -27,7 +27,7 @@
 \usepackage{alltt}
 \usepackage{tikz}
 
-\RequirePackage[]{Bioconductor2}
+\RequirePackage[]{Bioconductor}
 \AtBeginDocument{\bibliographystyle{unsrturl}}
 
 
@@ -56,10 +56,10 @@ summarization of windows into regions, and visualization and annotation of detec
 \vspace{0.05in}
 \textit{First edition:} 15 August 2012 \\
 \textit{Last revised:} 17 September 2017 \\
-\textit{Last compiled:} 12 October 2017
+\textit{Last compiled:} 19 January 2019
 \end{abstract}
 
-\packageVersion{csaw 1.11.3}
+\packageVersion{csaw 1.17.4}
 
 \tableofcontents
 \newpage
@@ -116,7 +116,7 @@ The code is split across several steps:
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlkwd{library}\hlstd{(csaw)}
-\hlstd{param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{50}\hlstd{)}
+\hlstd{param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{20}\hlstd{)}
 \hlstd{data} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{ext}\hlstd{=}\hlnum{110}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{10}\hlstd{,} \hlkwc{param}\hlstd{=param)}
 \end{alltt}
 \end{kframe}
@@ -136,7 +136,7 @@ The code is split across several steps:
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{binned} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{bin}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{10000}\hlstd{,} \hlkwc{param}\hlstd{=param)}
-\hlstd{data} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(binned,} \hlkwc{se.out}\hlstd{=data)}
+\hlstd{data} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(binned,} \hlkwc{se.out}\hlstd{=data)}
 \end{alltt}
 \end{kframe}
 \end{knitrout}
@@ -162,23 +162,6 @@ The code is split across several steps:
 \end{knitrout}
 \end{enumerate}
 
-In this guide, the behavior of each step will be demonstrated with some publicly available data.
-The dataset below focuses on changes in the binding profile of the NFYA protein between embryonic stem cells and terminal neurons \cite{tiwari2012}. 
-This will be used as a case study for most of the code examples throughout the guide.
-
-\begin{knitrout}
-\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
-\begin{alltt}
-\hlstd{bam.files} \hlkwb{<-} \hlkwd{c}\hlstd{(}\hlstr{"es_1.bam"}\hlstd{,} \hlstr{"es_2.bam"}\hlstd{,} \hlstr{"tn_1.bam"}\hlstd{,} \hlstr{"tn_2.bam"}\hlstd{)}
-\hlstd{design} \hlkwb{<-} \hlkwd{model.matrix}\hlstd{(}\hlopt{~}\hlkwd{factor}\hlstd{(}\hlkwd{c}\hlstd{(}\hlstr{'es'}\hlstd{,} \hlstr{'es'}\hlstd{,} \hlstr{'tn'}\hlstd{,} \hlstr{'tn'}\hlstd{)))}
-\hlkwd{colnames}\hlstd{(design)} \hlkwb{<-} \hlkwd{c}\hlstd{(}\hlstr{"intercept"}\hlstd{,} \hlstr{"cell.type"}\hlstd{)}
-\end{alltt}
-\end{kframe}
-\end{knitrout}
-\label{data:main}
-
-A comprehensive listing of the datasets used in this guide is provided in Section~\ref{sec:dataset}, along with instructions on how to obtain and process them for entry into the \Biocpkg{csaw} pipeline.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -190,7 +173,6 @@ Hello, reader.
 A little box like this will be present at the start of each chapter.
 The idea is to list the objects from previous chapters that are needed to run the code in the current chapter.
 Hopefully, it'll provide a nice segue between chapters for tired eyes.
-At this point, all we need are the \Robject{bam.files} that we defined in the introduction above.
 \end{combox}
 
 \section{Types of input data}
@@ -202,6 +184,40 @@ For a given BAM file named \file{xxx.bam}, the corresponding index file should b
 The sensibility of the supplied index is not checked prior to counting. 
 A common mistake is to replace or update the BAM file without updating the index. 
 This will cause \Biocpkg{csaw} to return incorrect results when it attempts to load alignments from the new BAM file.
+
+In this guide, the behavior of each step will be demonstrated with some publicly available data from the \Biocpkg{chipseqDBData} package.
+The dataset below focuses on changes in the binding profile of the NF-YA transcription factor between embryonic stem cells and terminal neurons \cite{tiwari2012}. 
+This will be used as a case study for most of the code examples throughout the guide.
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlkwd{library}\hlstd{(chipseqDBData)}
+\hlstd{tf.data} \hlkwb{<-} \hlkwd{NFYAData}\hlstd{()}
+\hlstd{tf.data}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 5 rows and 3 columns
+##          Name   Description                                           Path
+##   <character>   <character>                                    <character>
+## 1   SRR074398 NF-YA ESC (1) /tmp/RtmpUINiXA/file715d7c566625/SRR074398.bam
+## 2   SRR074399 NF-YA ESC (2) /tmp/RtmpUINiXA/file715d7c566625/SRR074399.bam
+## 3   SRR074417  NF-YA TN (1) /tmp/RtmpUINiXA/file715d7c566625/SRR074417.bam
+## 4   SRR074418  NF-YA TN (2) /tmp/RtmpUINiXA/file715d7c566625/SRR074418.bam
+## 5   SRR074401         Input /tmp/RtmpUINiXA/file715d7c566625/SRR074401.bam
+\end{verbatim}
+\begin{alltt}
+\hlstd{bam.files} \hlkwb{<-} \hlkwd{head}\hlstd{(tf.data}\hlopt{$}\hlstd{Path,} \hlopt{-}\hlnum{1}\hlstd{)} \hlcom{# skip the input.}
+\hlstd{bam.files}
+\end{alltt}
+\begin{verbatim}
+## [1] "/tmp/RtmpUINiXA/file715d7c566625/SRR074398.bam"
+## [2] "/tmp/RtmpUINiXA/file715d7c566625/SRR074399.bam"
+## [3] "/tmp/RtmpUINiXA/file715d7c566625/SRR074417.bam"
+## [4] "/tmp/RtmpUINiXA/file715d7c566625/SRR074418.bam"
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
 
 \section{Counting reads into windows}
 
@@ -217,7 +233,7 @@ A count is then obtained for each window in each library, thus quantifying prote
 \begin{alltt}
 \hlstd{frag.len} \hlkwb{<-} \hlnum{110}
 \hlstd{win.width} \hlkwb{<-} \hlnum{10}
-\hlstd{param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{50}\hlstd{)}
+\hlstd{param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{20}\hlstd{)}
 \hlstd{data} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{ext}\hlstd{=frag.len,} \hlkwc{width}\hlstd{=win.width,} \hlkwc{param}\hlstd{=param)}
 \end{alltt}
 \end{kframe}
@@ -235,26 +251,26 @@ The total number of reads in each library (also referred to as the library size)
 \end{alltt}
 \begin{verbatim}
 ##      [,1] [,2] [,3] [,4]
-## [1,]    3    3    1    3
-## [2,]    5    6    1    3
-## [3,]    7    5    0    0
+## [1,]    2    3    3    4
+## [2,]    3    6    3    4
+## [3,]    5    5    0    0
 ## [4,]    4    7    0    0
-## [5,]    3    7    0    0
-## [6,]    1    2    2    6
+## [5,]    5    9    0    0
+## [6,]    3    9    0    0
 \end{verbatim}
 \begin{alltt}
 \hlkwd{head}\hlstd{(}\hlkwd{rowRanges}\hlstd{(data))}
 \end{alltt}
 \begin{verbatim}
 ## GRanges object with 6 ranges and 0 metadata columns:
-##       seqnames             ranges strand
-##          <Rle>          <IRanges>  <Rle>
-##   [1]     chr1 [3003701, 3003710]      *
-##   [2]     chr1 [3003751, 3003760]      *
-##   [3]     chr1 [3003801, 3003810]      *
-##   [4]     chr1 [3004001, 3004010]      *
-##   [5]     chr1 [3004051, 3004060]      *
-##   [6]     chr1 [3007551, 3007560]      *
+##       seqnames          ranges strand
+##          <Rle>       <IRanges>  <Rle>
+##   [1]     chr1 3003701-3003710      *
+##   [2]     chr1 3003751-3003760      *
+##   [3]     chr1 3003801-3003810      *
+##   [4]     chr1 3003951-3003960      *
+##   [5]     chr1 3004001-3004010      *
+##   [6]     chr1 3004051-3004060      *
 ##   -------
 ##   seqinfo: 66 sequences from an unspecified genome
 \end{verbatim}
@@ -262,7 +278,7 @@ The total number of reads in each library (also referred to as the library size)
 \hlstd{data}\hlopt{$}\hlstd{totals}
 \end{alltt}
 \begin{verbatim}
-## [1] 17196528 20040530 23118590 22075821
+## [1] 18363361 21752369 25095004 24104691
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -315,7 +331,7 @@ This ensures that read loading is consistent throughout the analysis.
 \begin{verbatim}
 ##     Extracting reads in single-end mode
 ##     Duplicate removal is turned off 
-##     Minimum allowed mapping score is 50 
+##     Minimum allowed mapping score is 20 
 ##     Reads are extracted from both strands
 ##     No restrictions are placed on read extraction
 ##     No regions are specified to discard reads
@@ -328,7 +344,7 @@ In the example above, reads are filtered out based on the minimum mapping score 
 Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences. 
 Removal of these reads is highly recommended as it will ensure that only the reliable alignments are supplied to \Biocpkg{csaw}.
 The exact value of the threshold depends on the range of scores provided by the aligner. 
-The \software{subread} program \cite{liao2013} was used to align the reads in this dataset, so a value of 50 might be appropriate.
+The \software{subread} program \cite{liao2013} was used to align the reads in this dataset, so a value of 20 might be appropriate.
 
 Reads mapping to the same genomic position can be marked as putative PCR duplicates using software like the \software{MarkDuplicates} program from the \software{Picard} suite.
 Marked reads in the BAM file can be ignored during counting by setting \Rcode{dedup=TRUE} in the \Rclass{readParam} object. 
@@ -338,13 +354,13 @@ An example of counting with duplicate removal is shown below, where fewer reads 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{dedup.param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{50}\hlstd{,} \hlkwc{dedup}\hlstd{=}\hlnum{TRUE}\hlstd{)}
+\hlstd{dedup.param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{minq}\hlstd{=}\hlnum{20}\hlstd{,} \hlkwc{dedup}\hlstd{=}\hlnum{TRUE}\hlstd{)}
 \hlstd{demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{ext}\hlstd{=frag.len,} \hlkwc{width}\hlstd{=win.width,}
                      \hlkwc{param}\hlstd{=dedup.param)}
 \hlstd{demo}\hlopt{$}\hlstd{totals}
 \end{alltt}
 \begin{verbatim}
-## [1] 13925800 13826445 16342981 18905912
+## [1] 14799759 14773466 17424949 20386739
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -442,14 +458,14 @@ Adjacent positions are not counted and thus cannot be distinguished.
 \end{alltt}
 \begin{verbatim}
 ## GRanges object with 6 ranges and 0 metadata columns:
-##       seqnames             ranges strand
-##          <Rle>          <IRanges>  <Rle>
-##   [1]     chr1 [3003701, 3003710]      *
-##   [2]     chr1 [3003801, 3003810]      *
-##   [3]     chr1 [3004001, 3004010]      *
-##   [4]     chr1 [3008301, 3008310]      *
-##   [5]     chr1 [3008401, 3008410]      *
-##   [6]     chr1 [3009201, 3009210]      *
+##       seqnames          ranges strand
+##          <Rle>       <IRanges>  <Rle>
+##   [1]     chr1 3003701-3003710      *
+##   [2]     chr1 3003801-3003810      *
+##   [3]     chr1 3004001-3004010      *
+##   [4]     chr1 3008301-3008310      *
+##   [5]     chr1 3008401-3008410      *
+##   [6]     chr1 3010801-3010810      *
 ##   -------
 ##   seqinfo: 66 sequences from an unspecified genome
 \end{verbatim}
@@ -478,12 +494,12 @@ More sophisticated filtering is recommended and should be applied later (see Cha
 \end{alltt}
 \begin{verbatim}
 ##      [,1] [,2] [,3] [,4]
-## [1,]    5   14    2    9
-## [2,]    5    2   19    6
-## [3,]    4    6   17    4
-## [4,]    6    8   16    5
-## [5,]    3   11   16    5
-## [6,]    5   11   13    2
+## [1,]    4   12   10    5
+## [2,]    5    6    8   11
+## [3,]    7    1    9   19
+## [4,]    3    1    7   22
+## [5,]    4    2   10   15
+## [6,]    6    5   10   11
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -502,7 +518,7 @@ By default, parallelization is turned off (i.e., set to a \Rclass{SerialParam} o
 ## class: SerialParam
 ##   bpisup: TRUE; bpnworkers: 1; bptasks: 0; bpjobname: BPJOB
 ##   bplog: FALSE; bpthreshold: INFO; bpstopOnError: TRUE
-##   bptimeout: 2592000; bpprogressbar: FALSE
+##   bptimeout: 2592000; bpprogressbar: FALSE; bpexportglobals: TRUE
 ##   bplogdir: NA
 \end{verbatim}
 \end{kframe}
@@ -522,14 +538,14 @@ Only the 5\ensuremath{'} end of each read is used for counting into bins, withou
 \end{alltt}
 \begin{verbatim}
 ## GRanges object with 6 ranges and 0 metadata columns:
-##       seqnames             ranges strand
-##          <Rle>          <IRanges>  <Rle>
-##   [1]     chr1 [3000001, 3001000]      *
-##   [2]     chr1 [3001001, 3002000]      *
-##   [3]     chr1 [3002001, 3003000]      *
-##   [4]     chr1 [3003001, 3004000]      *
-##   [5]     chr1 [3004001, 3005000]      *
-##   [6]     chr1 [3005001, 3006000]      *
+##       seqnames          ranges strand
+##          <Rle>       <IRanges>  <Rle>
+##   [1]     chr1 3000001-3001000      *
+##   [2]     chr1 3001001-3002000      *
+##   [3]     chr1 3002001-3003000      *
+##   [4]     chr1 3003001-3004000      *
+##   [5]     chr1 3004001-3005000      *
+##   [6]     chr1 3005001-3006000      *
 ##   -------
 ##   seqinfo: 66 sequences from an unspecified genome
 \end{verbatim}
@@ -551,13 +567,16 @@ By default, only proper pairs are used in which the two paired reads are on the 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{pe.bam} \hlkwb{<-} \hlstr{"example-pet.bam"}
+\hlcom{# Using the BAM file in Rsamtools as an example.}
+\hlstd{pe.bam} \hlkwb{<-} \hlkwd{system.file}\hlstd{(}\hlstr{"extdata"}\hlstd{,} \hlstr{"ex1.bam"}\hlstd{,} \hlkwc{package}\hlstd{=}\hlstr{"Rsamtools"}\hlstd{,}
+    \hlkwc{mustWork}\hlstd{=}\hlnum{TRUE}\hlstd{)}
+
 \hlstd{pe.param} \hlkwb{<-} \hlkwd{readParam}\hlstd{(}\hlkwc{max.frag}\hlstd{=}\hlnum{400}\hlstd{,} \hlkwc{pe}\hlstd{=}\hlstr{"both"}\hlstd{)}
 \hlstd{demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(pe.bam,} \hlkwc{ext}\hlstd{=}\hlnum{250}\hlstd{,} \hlkwc{param}\hlstd{=pe.param)}
 \hlstd{demo}\hlopt{$}\hlstd{totals}
 \end{alltt}
 \begin{verbatim}
-## [1] 11744040
+## [1] 1572
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -591,9 +610,9 @@ A non-negligble proportion of these reads may be indicative of problems with pai
 \end{alltt}
 \begin{verbatim}
 ##   total.reads  mapped.reads        single mate.unmapped    unoriented 
-##      33498954      27420853             0       2000261         74582 
+##          3307          3307             0           163             0 
 ##     inter.chr     too.large 
-##        761432        130242
+##             0             0
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -615,7 +634,7 @@ This setting may be useful for contrasting paired- and single-end analyses, or i
 \hlstd{demo}\hlopt{$}\hlstd{totals}
 \end{alltt}
 \begin{verbatim}
-## [1] 13715351
+## [1] 1654
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -651,7 +670,7 @@ We can do this more precisely with the \Rfunction{maximizeCcf} function, which r
 \hlkwd{maximizeCcf}\hlstd{(x)}
 \end{alltt}
 \begin{verbatim}
-## [1] 110
+## [1] 112
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -670,15 +689,23 @@ However, they are less effective for regions of diffuse enrichment where bimodal
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{n} \hlkwb{<-} \hlnum{1000}
-\hlstd{h3ac} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(}\hlstr{"h3ac.bam"}\hlstd{, n,} \hlkwc{param}\hlstd{=dedup.on)}
-\hlstd{h3k27me3} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(}\hlstr{"h3k27me3.bam"}\hlstd{, n,} \hlkwc{param}\hlstd{=dedup.on)}
-\hlstd{h3k4me2} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(}\hlstr{"h3k4me2.bam"}\hlstd{, n,} \hlkwc{param}\hlstd{=dedup.on)}
-\hlkwd{plot}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{n, h3ac,} \hlkwc{col}\hlstd{=}\hlstr{"blue"}\hlstd{,} \hlkwc{ylim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{0}\hlstd{,} \hlnum{0.1}\hlstd{),} \hlkwc{xlim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{0}\hlstd{,} \hlnum{1000}\hlstd{),}
+
+\hlcom{# Using more data sets from 'chipseqDBData'.}
+\hlstd{acdata} \hlkwb{<-} \hlkwd{H3K9acData}\hlstd{()}
+\hlstd{h3k9ac} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(acdata}\hlopt{$}\hlstd{Path[}\hlnum{1}\hlstd{], n,} \hlkwc{param}\hlstd{=dedup.on)}
+
+\hlstd{k27data} \hlkwb{<-} \hlkwd{H3K27me3Data}\hlstd{()}
+\hlstd{h3k27me3} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(k27data}\hlopt{$}\hlstd{Path[}\hlnum{1}\hlstd{], n,} \hlkwc{param}\hlstd{=dedup.on)}
+
+\hlstd{k4data} \hlkwb{<-} \hlkwd{H3K4me3Data}\hlstd{()}
+\hlstd{h3k4me3} \hlkwb{<-} \hlkwd{correlateReads}\hlstd{(k4data}\hlopt{$}\hlstd{Path[}\hlnum{1}\hlstd{], n,} \hlkwc{param}\hlstd{=dedup.on)}
+
+\hlkwd{plot}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{n, h3k9ac,} \hlkwc{col}\hlstd{=}\hlstr{"blue"}\hlstd{,} \hlkwc{ylim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{0}\hlstd{,} \hlnum{0.1}\hlstd{),} \hlkwc{xlim}\hlstd{=}\hlkwd{c}\hlstd{(}\hlnum{0}\hlstd{,} \hlnum{1000}\hlstd{),}
      \hlkwc{xlab}\hlstd{=}\hlstr{"Delay (bp)"}\hlstd{,} \hlkwc{ylab}\hlstd{=}\hlstr{"CCF"}\hlstd{,} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{,} \hlkwc{type}\hlstd{=}\hlstr{"l"}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
 \hlkwd{lines}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{n, h3k27me3,} \hlkwc{col}\hlstd{=}\hlstr{"red"}\hlstd{,} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
-\hlkwd{lines}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{n, h3k4me2,} \hlkwc{col}\hlstd{=}\hlstr{"forestgreen"}\hlstd{,} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
+\hlkwd{lines}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{n, h3k4me3,} \hlkwc{col}\hlstd{=}\hlstr{"forestgreen"}\hlstd{,} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{,} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
 \hlkwd{legend}\hlstd{(}\hlstr{"topright"}\hlstd{,} \hlkwc{col}\hlstd{=}\hlkwd{c}\hlstd{(}\hlstr{"blue"}\hlstd{,} \hlstr{"red"}\hlstd{,} \hlstr{"forestgreen"}\hlstd{),}
-       \hlkwd{c}\hlstd{(}\hlstr{"H3Ac"}\hlstd{,} \hlstr{"H3K27me3"}\hlstd{,} \hlstr{"H3K4me2"}\hlstd{),} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{)}
+       \hlkwd{c}\hlstd{(}\hlstr{"H3K9ac"}\hlstd{,} \hlstr{"H3K27me3"}\hlstd{,} \hlstr{"H3K4me3"}\hlstd{),} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
 \includegraphics[width=\maxwidth]{plots-ug/histone_ccf-1} \end{adjustwidth}
@@ -775,9 +802,9 @@ This can be performed with the \Rfunction{regionCounts} function, which is large
 \end{alltt}
 \begin{verbatim}
 ##      [,1] [,2] [,3] [,4]
-## [1,]   37   57  103  102
-## [2,]    0    0    1    0
-## [3,]   15   17   16    7
+## [1,]   43   68  116  111
+## [2,]    1    0    0    0
+## [3,]   17   10   14   12
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -799,8 +826,8 @@ Up to two rows can be generated for each window or region, depending on filterin
 \hlkwd{strand}\hlstd{(}\hlkwd{rowRanges}\hlstd{(ss.counts))}
 \end{alltt}
 \begin{verbatim}
-## factor-Rle of length 656381 with 70 runs
-##   Lengths: 48361 46926 15963 15666 27617 ...   657  1289  1217    49    75
+## factor-Rle of length 924432 with 72 runs
+##   Lengths: 67133 64901     2     2 22554 ...  1819     6     3    70    82
 ##   Values :     +     -     +     -     + ...     -     +     -     +     -
 ## Levels(3): + - *
 \end{verbatim}
@@ -822,7 +849,7 @@ This is intended to protect the user, as any attempt to re-use the \Rcode{ss.par
 \label{chap:filter}
 
 \begin{combox}
-This chapter will require the \Robject{frag.len}, \Robject{param} and \Robject{data} from the last chapter, as well as the \Robject{bam.files} vector we defined at the start.
+This chapter will require \Robject{bam.files}, \Robject{frag.len}, \Robject{param} and \Robject{data} from the last chapter.
 We'll also need the \Rfunction{aveLogCPM} function from \Biocpkg{csaw}, so load the package if you haven't done so already.
 \end{combox}
 
@@ -848,7 +875,7 @@ This is computed with the \Rfunction{aveLogCPM} function, as shown below for eac
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  -2.211  -2.189  -2.110  -2.041  -1.971   9.811
+##  -2.327  -2.303  -2.214  -2.143  -2.079   7.931
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -865,7 +892,7 @@ This restricts the analysis to windows with abundances above this threshold.
 \end{alltt}
 \begin{verbatim}
 ##    Mode   FALSE    TRUE 
-## logical 3674738   15072
+## logical 4688607   15708
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -892,7 +919,7 @@ The code below retains windows with (library size-adjusted) average counts great
 \end{alltt}
 \begin{verbatim}
 ##    Mode   FALSE    TRUE 
-## logical 3621824   67986
+## logical 4599548  104767
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -916,7 +943,7 @@ Users can then retain those windows with rank ratios above the unbound proportio
 \hlkwd{sum}\hlstd{(keep)}
 \end{alltt}
 \begin{verbatim}
-## [1] 54620
+## [1] 54616
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -961,7 +988,7 @@ This approach has an intuitive and experimentally relevant interpretation that a
 \hlkwd{sum}\hlstd{(keep)}
 \end{alltt}
 \begin{verbatim}
-## [1] 20588
+## [1] 23949
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1023,7 +1050,7 @@ Enrichment values are subsequently calculated from the differences in scaled abu
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-## -8.7479  0.4775  0.6075  0.6202  0.7514  8.6100
+## -6.2866  0.4377  0.5749  0.5882  0.7273  8.1494
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1039,7 +1066,7 @@ This roughly mimics the behavior of single-sample peak-calling programs such as 
 \hlkwd{sum}\hlstd{(keep)}
 \end{alltt}
 \begin{verbatim}
-## [1] 9539
+## [1] 10701
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1069,7 +1096,7 @@ This can also be combined with other filters to ensure that the retained windows
 \end{alltt}
 \begin{verbatim}
 ##    Mode   FALSE    TRUE 
-## logical 2823683  866127
+## logical 3782693  921622
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1089,7 +1116,8 @@ To illustrate, let us add an input library to our NF-YA data set in the code bel
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{with.input} \hlkwb{<-} \hlkwd{c}\hlstd{(bam.files,} \hlstr{"input.bam"}\hlstd{)}
+\hlstd{tf.data} \hlkwb{<-} \hlkwd{NFYAData}\hlstd{()}
+\hlstd{with.input} \hlkwb{<-} \hlstd{tf.data}\hlopt{$}\hlstd{Path}
 \hlstd{in.demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(with.input,} \hlkwc{ext}\hlstd{=frag.len,} \hlkwc{param}\hlstd{=param)}
 \hlstd{chip} \hlkwb{<-} \hlstd{in.demo[,}\hlnum{1}\hlopt{:}\hlnum{4}\hlstd{]} \hlcom{# All ChIP libraries}
 \hlstd{control} \hlkwb{<-} \hlstd{in.demo[,}\hlnum{5}\hlstd{]} \hlcom{# All control libraries}
@@ -1136,7 +1164,7 @@ The example below requires a 3-fold or greater increase in abundance over the co
 \hlkwd{sum}\hlstd{(keep)}
 \end{alltt}
 \begin{verbatim}
-## [1] 5910
+## [1] 6657
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1165,14 +1193,14 @@ The example below retrieves the coordinates of the broad gene bodies from the mo
 \end{alltt}
 \begin{verbatim}
 ## GRanges object with 6 ranges and 1 metadata column:
-##             seqnames                 ranges strand |     gene_id
-##                <Rle>              <IRanges>  <Rle> | <character>
-##   100009600     chr9 [ 21062393,  21078496]      - |   100009600
-##   100009609     chr7 [ 84940169,  84967009]      - |   100009609
-##   100009614    chr10 [ 77708446,  77712009]      + |   100009614
-##   100009664    chr11 [ 45805083,  45842878]      + |   100009664
-##      100012     chr4 [144157556, 144165651]      - |      100012
-##      100017     chr4 [134745412, 134771004]      - |      100017
+##             seqnames              ranges strand |     gene_id
+##                <Rle>           <IRanges>  <Rle> | <character>
+##   100009600     chr9   21062393-21078496      - |   100009600
+##   100009609     chr7   84940169-84967009      - |   100009609
+##   100009614    chr10   77708446-77712009      + |   100009614
+##   100009664    chr11   45805083-45842880      + |   100009664
+##      100012     chr4 144157556-144165651      - |      100012
+##      100017     chr4 134745412-134771004      - |      100017
 ##   -------
 ##   seqinfo: 66 sequences (1 circular) from mm10 genome
 \end{verbatim}
@@ -1190,7 +1218,7 @@ This could also be combined with abundance filtering to retain windows that cont
 \hlkwd{sum}\hlstd{(keep)}
 \end{alltt}
 \begin{verbatim}
-## [1] 2017611
+## [1] 2581579
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1253,7 +1281,7 @@ Highly enriched regions consume more sequencing resources and thereby suppress t
 Differences in the magnitude of suppression between libraries can lead to spurious DB calls. 
 Scaling by library size fails to correct for this as composition biases can still occur in libraries of the same size. 
 
-To remove composition biases in \Biocpkg{csaw}, reads are counted into large bins and the counts are used for normalization with the \Rfunction{normOffsets} wrapper function.
+To remove composition biases in \Biocpkg{csaw}, reads are counted into large bins and the counts are used for normalization with the \Rfunction{normFactors} wrapper function.
 This uses the trimmed mean of M-values (TMM) method \cite{oshlack2010} to correct for any systematic fold change in the coverage of the bins. 
 The assumption here is that most bins represent non-DB background regions, so any consistent difference across bins must be technical bias.
 
@@ -1261,11 +1289,11 @@ The assumption here is that most bins represent non-DB background regions, so an
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{binned} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{bin}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{10000}\hlstd{,} \hlkwc{param}\hlstd{=param)}
-\hlstd{filtered.data} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(binned,} \hlkwc{se.out}\hlstd{=filtered.data)}
+\hlstd{filtered.data} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(binned,} \hlkwc{se.out}\hlstd{=filtered.data)}
 \hlstd{filtered.data}\hlopt{$}\hlstd{norm.factors}
 \end{alltt}
 \begin{verbatim}
-## [1] 1.0075434 0.9745238 1.0137867 1.0046093
+## [1] 1.0084321 0.9751153 1.0136252 1.0032750
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1275,12 +1303,12 @@ The size of each library is scaled by the corresponding factor to obtain an effe
 A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the (effective) library size will be smaller. 
 Check out the \Biocpkg{edgeR} user's guide for more information.
 
-In the above code, the \Rfunction{normOffsets} call computes normalization factors from the bin-level counts in \Robject{binned} (see Section~\ref{sec:normbinsize}).
-It then returns a modified version of \Robject{filtered.data}, where the normalization factors are stored alongside the \textit{window}-level counts for further analysis.
-Composition biases affect both bin- and window-level counts, so transferring normalization factors between the counts is valid -- \emph{provided that the library sizes are the same between the two sets of counts}, as the factors are interpreted with respect to the library sizes.
+In the above code, the \Rfunction{normFactors} call computes normalization factors from the bin-level counts in \Robject{binned} (see Section~\ref{sec:normbinsize}).
+The \Rcode{se.out} argument directs the function to return a modified version of \Robject{filtered.data}, where the normalization factors are stored alongside the \textit{window}-level counts for further analysis.
+Composition biases affect both bin- and window-level counts, so computing normalization factors from the former and applying them to the latter is valid -- provided that the library sizes are the same between the two sets of counts, as the factors are interpreted with respect to the library sizes.
 (In \Biocpkg{csaw}, separate calls to \Rfunction{windowCounts} with the same \Rclass{readParam} object will always yield the same library sizes in \Rcode{totals}.)
 
-Note that \Rfunction{normOffsets} skips the precision weighting step in the TMM method.
+Note that \Rfunction{normFactors} skips the precision weighting step in the TMM method.
 Weighting aims to increase the contribution of bins with high counts, as these yield more precise M-values.
 However, high-abundance bins are more likely to contain binding sites and thus are more likely to be DB compared to background regions.
 If any DB regions should survive trimming, upweighting them would be counterproductive. 
@@ -1311,22 +1339,22 @@ A value of 10 kbp is usually suitable for most datasets.
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{bin}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{5000}\hlstd{,} \hlkwc{param}\hlstd{=param)}
-\hlkwd{normOffsets}\hlstd{(demo,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
+\hlkwd{normFactors}\hlstd{(demo,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
 \end{alltt}
 \begin{verbatim}
-## [1] 1.0093596 0.9754046 1.0105468 1.0051082
+## [1] 1.0083353 0.9778719 1.0109448 1.0031956
 \end{verbatim}
 \begin{alltt}
 \hlstd{demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(bam.files,} \hlkwc{bin}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{15000}\hlstd{,} \hlkwc{param}\hlstd{=param)}
-\hlkwd{normOffsets}\hlstd{(demo,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
+\hlkwd{normFactors}\hlstd{(demo,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
 \end{alltt}
 \begin{verbatim}
-## [1] 1.007559 0.972134 1.016096 1.004775
+## [1] 1.0085125 0.9723214 1.0160058 1.0037202
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
-We use \Rcode{se.out=FALSE} to instruct \Rfunction{normOffsets} to return the normalization factors directly.
+We use \Rcode{se.out=FALSE} to instruct \Rfunction{normFactors} to return the normalization factors directly.
 This is more convenient than returning a \Rclass{RangedSummarizedExperiment} object and extracting the normalization factors with \Rcode{...\$norm.factors}.
 Here, the factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
 See Section~\ref{sec:eff_norm_ma} for some examples with greater bias.
@@ -1378,7 +1406,26 @@ Consider the following H3K4me3 data set, where reads are counted into 150 bp win
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{me.files} \hlkwb{<-} \hlkwd{c}\hlstd{(}\hlstr{"h3k4me3_mat.bam"}\hlstd{,} \hlstr{"h3k4me3_pro.bam"}\hlstd{)}
+\hlstd{k4data} \hlkwb{<-} \hlkwd{H3K4me3Data}\hlstd{()}
+\hlstd{k4data}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 4 rows and 3 columns
+##                   Name             Description
+##            <character>             <character>
+## 1    h3k4me3-proB-8110    pro-B H3K4me3 (8110)
+## 2    h3k4me3-proB-8115    pro-B H3K4me3 (8115)
+## 3 h3k4me3-matureB-8070 mature B H3K4me3 (8070)
+## 4 h3k4me3-matureB-8088 mature B H3K4me3 (8088)
+##                                                        Path
+##                                                 <character>
+## 1    /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-proB-8110.bam
+## 2    /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-proB-8115.bam
+## 3 /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-matureB-8070.bam
+## 4 /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-matureB-8088.bam
+\end{verbatim}
+\begin{alltt}
+\hlstd{me.files} \hlkwb{<-} \hlstd{k4data}\hlopt{$}\hlstd{Path[}\hlkwd{c}\hlstd{(}\hlnum{1}\hlstd{,}\hlnum{3}\hlstd{)]}
 \hlstd{me.demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(me.files,} \hlkwc{width}\hlstd{=}\hlnum{150}\hlstd{,} \hlkwc{param}\hlstd{=param)}
 \end{alltt}
 \end{kframe}
@@ -1405,35 +1452,61 @@ Scaling by the normalization factors will subseqeuently remove these bises betwe
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{filtered.me} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(filtered.me,} \hlkwc{se.out}\hlstd{=}\hlnum{TRUE}\hlstd{)}
+\hlstd{filtered.me} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(filtered.me,} \hlkwc{se.out}\hlstd{=}\hlnum{TRUE}\hlstd{)}
 \hlstd{me.eff} \hlkwb{<-} \hlstd{filtered.me}\hlopt{$}\hlstd{norm.factors}
 \hlstd{me.eff}
 \end{alltt}
 \begin{verbatim}
-## [1] 0.791484 1.263449
+## [1] 1.2654867 0.7902098
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
 The above process seems rather involved, but this is only because we need to work our way through counting and normalization for a new data set.
-Only \Rfunction{normOffsets} is actually performing the normalization step.
+Only \Rfunction{normFactors} is actually performing the normalization step.
 We set \Rcode{se.out=TRUE} so that the normalization factors are stored alongside the window counts for use in the downstream \Biocpkg{edgeR} analysis.
 As a demonstration, we repeat this procedure on another data set involving H3 acetylation.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{ac.files} \hlkwb{<-} \hlkwd{c}\hlstd{(}\hlstr{"h3ac.bam"}\hlstd{,} \hlstr{"h3ac_2.bam"}\hlstd{)}
+\hlstd{acdata} \hlkwb{<-} \hlkwd{H3K9acData}\hlstd{()}
+\hlstd{acdata}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 4 rows and 3 columns
+##                  Name            Description
+##           <character>            <character>
+## 1    h3k9ac-proB-8113    pro-B H3K9ac (8113)
+## 2    h3k9ac-proB-8108    pro-B H3K9ac (8108)
+## 3 h3k9ac-matureB-8059 mature B H3K9ac (8059)
+## 4 h3k9ac-matureB-8086 mature B H3K9ac (8086)
+##                                                       Path
+##                                                <character>
+## 1    /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-proB-8113.bam
+## 2    /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-proB-8108.bam
+## 3 /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-matureB-8059.bam
+## 4 /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-matureB-8086.bam
+\end{verbatim}
+\begin{alltt}
+\hlstd{ac.files} \hlkwb{<-} \hlstd{acdata}\hlopt{$}\hlstd{Path[}\hlkwd{c}\hlstd{(}\hlnum{1}\hlstd{,}\hlnum{2}\hlstd{)]}
 \hlstd{ac.demo} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(ac.files,} \hlkwc{width}\hlstd{=}\hlnum{150}\hlstd{,} \hlkwc{param}\hlstd{=param)}
 \hlstd{ac.bin} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(ac.files,} \hlkwc{bin}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{width}\hlstd{=}\hlnum{10000}\hlstd{,} \hlkwc{param}\hlstd{=param)}
 \hlstd{keep} \hlkwb{<-} \hlkwd{filterWindows}\hlstd{(ac.demo, ac.bin,} \hlkwc{type}\hlstd{=}\hlstr{"global"}\hlstd{)}\hlopt{$}\hlstd{filter} \hlopt{>} \hlkwd{log2}\hlstd{(}\hlnum{5}\hlstd{)}
+\hlkwd{summary}\hlstd{(keep)}
+\end{alltt}
+\begin{verbatim}
+##    Mode   FALSE    TRUE 
+## logical  376632  438632
+\end{verbatim}
+\begin{alltt}
 \hlstd{filtered.ac} \hlkwb{<-} \hlstd{ac.demo[keep,]}
-\hlstd{filtered.ac} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(filtered.ac,} \hlkwc{se.out}\hlstd{=}\hlnum{TRUE}\hlstd{)}
+\hlstd{filtered.ac} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(filtered.ac,} \hlkwc{se.out}\hlstd{=}\hlnum{TRUE}\hlstd{)}
 \hlstd{ac.eff} \hlkwb{<-} \hlstd{filtered.ac}\hlopt{$}\hlstd{norm.factors}
 \hlstd{ac.eff}
 \end{alltt}
 \begin{verbatim}
-## [1] 1.2012717 0.8324512
+## [1] 1.0745592 0.9306142
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1466,18 +1539,18 @@ It also allows calculation of and comparison to the factors for composition bias
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{me.comp} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(me.bin,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
+\hlstd{me.comp} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(me.bin,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
 \hlstd{me.comp}
 \end{alltt}
 \begin{verbatim}
-## [1] 1.2801380 0.7811658
+## [1] 0.7750992 1.2901574
 \end{verbatim}
 \begin{alltt}
-\hlstd{ac.comp} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(ac.bin,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
+\hlstd{ac.comp} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(ac.bin,} \hlkwc{se.out}\hlstd{=}\hlnum{FALSE}\hlstd{)}
 \hlstd{ac.comp}
 \end{alltt}
 \begin{verbatim}
-## [1] 0.9049943 1.1049793
+## [1] 0.9473693 1.0555545
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1539,15 +1612,18 @@ This normalization strategy can be implemented in \Biocpkg{csaw} with some work.
 Assuming that the reference genome includes appropriate sequences from the foreign genome, coverage is quantified across genomic windows with \Rfunction{windowCounts}.
 Filtering is performed to select for high-abundance windows in the foreign genome (see Section~\ref{sec:eff_norm}), yielding counts for all enriched spike-in regions.
 (The filtered object is named \Robject{spike.data} in the code below.)
-Normalization factors are computed by applying the TMM method on these counts via \Rfunction{normOffsets}.
+Normalization factors are computed by applying the TMM method on these counts via \Rfunction{normFactors}.
 This aims to identify the fold-change in coverage between samples that is attributable to technical effects.
-
-
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{endog.data} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(spike.data,} \hlkwc{se.out}\hlstd{=endog.data)}
+\hlcom{# Pretend chr1 is a spike-in, for demonstration purposes only!}
+\hlstd{is.1} \hlkwb{<-} \hlkwd{seqnames}\hlstd{(}\hlkwd{rowRanges}\hlstd{(data))}\hlopt{==}\hlstr{"chr1"}
+\hlstd{spike.data} \hlkwb{<-} \hlstd{data[is.1,]}
+\hlstd{endog.data} \hlkwb{<-} \hlstd{data[}\hlopt{!}\hlstd{is.1,]}
+
+\hlstd{endog.data} \hlkwb{<-} \hlkwd{normFactors}\hlstd{(spike.data,} \hlkwc{se.out}\hlstd{=endog.data)}
 \end{alltt}
 \end{kframe}
 \end{knitrout}
@@ -1575,7 +1651,7 @@ Thus, the magnitude of the bias between libraries will change with abundance.
 The trend cannot be corrected with scaling methods as no single scaling factor will remove differences at all abundances.
 Rather, non-linear methods are required, such as cyclic loess or quantile normalization.
 
-One such implementation is provided in \Rfunction{normOffsets} by setting \Rcode{type="loess"}.
+One such implementation of a non-linear normalization method is provided in \Rfunction{normOffsets}.
 This is based on the fast loess algorithm \cite{ballman2004} with minor adaptations to handle low counts. 
 A matrix is produced that contains an offset term for each bin/window in each library.
 This offset matrix can then be directly used in \Biocpkg{edgeR}, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
@@ -1590,18 +1666,18 @@ Obviously, users should pick a more appropriate value for their analysis.)
 \hlstd{filtered} \hlkwb{<-} \hlkwd{filterWindows}\hlstd{(ac.demo2, ac.bin,} \hlkwc{type}\hlstd{=}\hlstr{"global"}\hlstd{)}
 \hlstd{keep} \hlkwb{<-} \hlstd{filtered}\hlopt{$}\hlstd{filter} \hlopt{>} \hlkwd{log2}\hlstd{(}\hlnum{4}\hlstd{)}
 \hlstd{ac.demo2} \hlkwb{<-} \hlstd{ac.demo2[keep,]}
-\hlstd{ac.demo2} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(ac.demo2,} \hlkwc{type}\hlstd{=}\hlstr{"loess"}\hlstd{,} \hlkwc{se.out}\hlstd{=}\hlnum{TRUE}\hlstd{)}
+\hlstd{ac.demo2} \hlkwb{<-} \hlkwd{normOffsets}\hlstd{(ac.demo2,} \hlkwc{se.out}\hlstd{=}\hlnum{TRUE}\hlstd{)}
 \hlstd{ac.off} \hlkwb{<-} \hlkwd{assay}\hlstd{(ac.demo2,} \hlstr{"offset"}\hlstd{)}
 \hlkwd{head}\hlstd{(ac.off)}
 \end{alltt}
 \begin{verbatim}
-##           [,1]       [,2]
-## [1,] 0.1382389 -0.1382389
-## [2,] 0.1382389 -0.1382389
-## [3,] 0.1673179 -0.1673179
-## [4,] 0.1805067 -0.1805067
-## [5,] 0.2021534 -0.2021534
-## [6,] 0.2144910 -0.2144910
+##            [,1]        [,2]
+## [1,] 0.07604146 -0.07604146
+## [2,] 0.07604146 -0.07604146
+## [3,] 0.07604146 -0.07604146
+## [4,] 0.07637039 -0.07637039
+## [5,] 0.07668889 -0.07668889
+## [6,] 0.07739743 -0.07739743
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1721,6 +1797,16 @@ Readers are referred to the user's guide in \Biocpkg{edgeR} for more details on 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
+\hlstd{tf.data} \hlkwb{<-} \hlkwd{NFYAData}\hlstd{()}
+\hlstd{cell.type} \hlkwb{<-} \hlkwd{sub}\hlstd{(}\hlstr{"NF-YA ([^ ]+) .*"}\hlstd{,} \hlstr{"\textbackslash{}\textbackslash{}1"}\hlstd{,} \hlkwd{head}\hlstd{(tf.data}\hlopt{$}\hlstd{Description,} \hlopt{-}\hlnum{1}\hlstd{))}
+\hlstd{cell.type}
+\end{alltt}
+\begin{verbatim}
+## [1] "ESC" "ESC" "TN"  "TN"
+\end{verbatim}
+\begin{alltt}
+\hlstd{design} \hlkwb{<-} \hlkwd{model.matrix}\hlstd{(}\hlopt{~}\hlkwd{factor}\hlstd{(cell.type))}
+\hlkwd{colnames}\hlstd{(design)} \hlkwb{<-} \hlkwd{c}\hlstd{(}\hlstr{"intercept"}\hlstd{,} \hlstr{"cell.type"}\hlstd{)}
 \hlstd{design}
 \end{alltt}
 \begin{verbatim}
@@ -1732,7 +1818,7 @@ Readers are referred to the user's guide in \Biocpkg{edgeR} for more details on 
 ## attr(,"assign")
 ## [1] 0 1
 ## attr(,"contrasts")
-## attr(,"contrasts")$`factor(c("es", "es", "tn", "tn"))`
+## attr(,"contrasts")$`factor(cell.type)`
 ## [1] "contr.treatment"
 \end{verbatim}
 \end{kframe}
@@ -1769,7 +1855,7 @@ The ideal amount of shrinkage is determined from the variability of the dispersi
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-## 0.02979 0.08471 0.08958 0.09344 0.10319 0.11643
+## 0.04627 0.08514 0.09030 0.09384 0.09978 0.11725
 \end{verbatim}
 \begin{alltt}
 \hlstd{fit} \hlkwb{<-} \hlkwd{glmQLFit}\hlstd{(y, design,} \hlkwc{robust}\hlstd{=}\hlnum{TRUE}\hlstd{)}
@@ -1777,7 +1863,7 @@ The ideal amount of shrinkage is determined from the variability of the dispersi
 \end{alltt}
 \begin{verbatim}
 ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-##  0.05018  1.06045  1.08750  1.08315  1.11546 16.85074
+##  0.08929  1.02731  1.05983  1.06655  1.10610 25.87131
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1840,7 +1926,7 @@ Fewer prior degrees of freedom (and less shrinkage) are required to maintain typ
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.4146 63.9234 63.9234 63.8403 63.9234 63.9234
+##  0.3249 37.0011 37.0011 36.9438 37.0011 37.0011
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1872,13 +1958,13 @@ Associated statistics such as log-fold changes and log-counts per million are al
 \hlkwd{head}\hlstd{(results}\hlopt{$}\hlstd{table)}
 \end{alltt}
 \begin{verbatim}
-##       logFC     logCPM         F     PValue
-## 1 0.2658122 -0.9510726 0.1310345 0.71851958
-## 2 0.2822485 -0.9569048 0.1432359 0.70630110
-## 3 1.7984741 -0.8761307 5.5293213 0.02169863
-## 4 0.7675744 -0.9927300 1.0302966 0.31379997
-## 5 0.9151089  0.3623894 3.0527285 0.08525857
-## 6 1.0975166  1.1882202 5.1842582 0.02604486
+##       logFC     logCPM        F     PValue
+## 1 1.8295648 -0.9631454 5.669892 0.02223713
+## 2 0.9413170 -0.8081324 1.907469 0.17510744
+## 3 0.9233936  0.4965227 3.407509 0.07250075
+## 4 1.0986454  1.3167989 5.784324 0.02101349
+## 5 1.2664250  1.2826709 7.192270 0.01067931
+## 6 0.7935887  0.7798144 2.436384 0.12662798
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1916,12 +2002,12 @@ DB windows are then identified using the likelihood ratio test.
 \end{alltt}
 \begin{verbatim}
 ##       logFC     logCPM        LR      PValue
-## 1 0.2684752 -0.9510726 0.2120285 0.645182146
-## 2 0.2780084 -0.9569048 0.2272337 0.633582614
-## 3 1.8018136 -0.8761307 8.2161956 0.004151815
-## 4 0.7577212 -0.9927300 1.5872704 0.207716548
-## 5 0.9143437  0.3623894 4.2229915 0.039879791
-## 6 1.0965133  1.1882202 7.5864545 0.005880849
+## 1 1.8335902 -0.9631454  8.576795 0.003404741
+## 2 0.9335664 -0.8081324  2.793258 0.094661575
+## 3 0.9217906  0.4965227  4.653039 0.030998626
+## 4 1.0960626  1.3167989  8.004891 0.004665117
+## 5 1.2631123  1.2826709 10.406617 0.001255646
+## 6 0.7878871  0.7798144  3.743536 0.053012161
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2037,22 +2123,22 @@ In either case, the \Rfunction{findOverlaps} function from the \Biocpkg{GenomicR
 \hlstd{olap}
 \end{alltt}
 \begin{verbatim}
-## Hits object with 15546 hits and 0 metadata columns:
+## Hits object with 15726 hits and 0 metadata columns:
 ##           queryHits subjectHits
 ##           <integer>   <integer>
-##       [1]         7        8690
-##       [2]         7        8691
-##       [3]         7        8692
-##       [4]        18       10377
-##       [5]        18       10378
+##       [1]         7        8922
+##       [2]         7        8923
+##       [3]         7        8924
+##       [4]        19       10619
+##       [5]        19       10620
 ##       ...       ...         ...
-##   [15542]     24037        8504
-##   [15543]     24037        8505
-##   [15544]     24040        8218
-##   [15545]     24040        8219
-##   [15546]     24040        8220
+##   [15722]     24361        8725
+##   [15723]     24361        8726
+##   [15724]     24364        8438
+##   [15725]     24364        8439
+##   [15726]     24364        8440
 ##   -------
-##   queryLength: 24044 / subjectLength: 15072
+##   queryLength: 24368 / subjectLength: 15708
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2070,13 +2156,23 @@ Regions that do not overlap any windows have values of \Rcode{NA} in all fields 
 \hlkwd{head}\hlstd{(tabbroad[}\hlopt{!}\hlkwd{is.na}\hlstd{(tabbroad}\hlopt{$}\hlstd{PValue),])}
 \end{alltt}
 \begin{verbatim}
-##    nWindows logFC.up logFC.down       PValue         FDR direction
-## 7         3        3          0 0.0001268923 0.002164191        up
-## 18        4        4          0 0.0001364321 0.002197021        up
-## 22        1        1          0 0.1770427969 0.248193525        up
-## 23        5        5          0 0.0017574170 0.010373809        up
-## 25        4        0          0 0.9862104787 0.989983933     mixed
-## 28        3        3          0 0.0028433595 0.014606067        up
+## DataFrame with 6 rows and 6 columns
+##     nWindows  logFC.up logFC.down               PValue                 FDR
+##    <integer> <integer>  <integer>            <numeric>           <numeric>
+## 7          3         3          0 0.000354344776491868 0.00450287251062473
+## 19         4         4          0 0.000831695416857529 0.00715752134982737
+## 24         4         4          0    0.084562340456042   0.144688162055889
+## 26         4         0          0      0.8665376697912    0.89687371110087
+## 29         3         3          0 0.000553807968763198 0.00568995137646539
+## 37         4         4          0   0.0163475284799344  0.0472696997829639
+##      direction
+##    <character>
+## 7           up
+## 19          up
+## 24          up
+## 26       mixed
+## 29          up
+## 37          up
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2103,20 +2199,20 @@ Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpre
 \hlstd{merged}\hlopt{$}\hlstd{region}
 \end{alltt}
 \begin{verbatim}
-## GRanges object with 4422 ranges and 0 metadata columns:
-##          seqnames                 ranges strand
-##             <Rle>              <IRanges>  <Rle>
-##      [1]     chr1     [6466701, 6466760]      *
-##      [2]     chr1     [7088951, 7088960]      *
-##      [3]     chr1     [7397851, 7398110]      *
-##      [4]     chr1     [9541401, 9541510]      *
-##      [5]     chr1     [9545251, 9545360]      *
-##      ...      ...                    ...    ...
-##   [4418]     chrX [164076151, 164076560]      *
-##   [4419]     chrX [166170351, 166170410]      *
-##   [4420]     chrY [   259151,    259360]      *
-##   [4421]     chrY [ 90808801,  90808860]      *
-##   [4422]     chrY [ 90812401,  90812910]      *
+## GRanges object with 4433 ranges and 0 metadata columns:
+##          seqnames            ranges strand
+##             <Rle>         <IRanges>  <Rle>
+##      [1]     chr1   7088951-7088960      *
+##      [2]     chr1   7397851-7398110      *
+##      [3]     chr1   9541401-9541510      *
+##      [4]     chr1   9545251-9545360      *
+##      [5]     chr1   9748451-9748460      *
+##      ...      ...               ...    ...
+##   [4429]     chrY   4065001-4065010      *
+##   [4430]     chrY   4149901-4149910      *
+##   [4431]     chrY   4160201-4160310      *
+##   [4432]     chrY 90808801-90808860      *
+##   [4433]     chrY 90812051-90812910      *
 ##   -------
 ##   seqinfo: 66 sequences from an unspecified genome
 \end{verbatim}
@@ -2135,13 +2231,23 @@ A complex DB event may be present if both \Rcode{up} and \Rcode{down} are substa
 \hlkwd{head}\hlstd{(tabcom)}
 \end{alltt}
 \begin{verbatim}
-##   nWindows logFC.up logFC.down     PValue        FDR direction
-## 1        2        0          0 0.71851958 0.78374287        up
-## 2        1        1          0 0.02169863 0.05704598        up
-## 3        6        6          0 0.07813458 0.14160292        up
-## 4        3        3          0 0.04190250 0.09016684        up
-## 5        3        3          0 0.05998063 0.11602553        up
-## 6        2        2          0 0.01396821 0.04263914        up
+## DataFrame with 6 rows and 6 columns
+##    nWindows  logFC.up logFC.down             PValue                FDR
+##   <integer> <integer>  <integer>          <numeric>          <numeric>
+## 1         1         1          0 0.0222371328049001 0.0601814467180232
+## 2         6         6          0  0.063040469764802  0.123599470352661
+## 3         3         3          0 0.0268570682027511 0.0679163624317146
+## 4         3         3          0  0.102465783196559  0.174905974936598
+## 5         1         1          0 0.0146023514325386 0.0450959801719733
+## 6         2         2          0  0.260094148644719  0.352167795034221
+##     direction
+##   <character>
+## 1          up
+## 2          up
+## 3          up
+## 4          up
+## 5          up
+## 6          up
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2161,7 +2267,7 @@ This mitigates chaining effects by reducing the density of windows in the genome
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##    10.0    60.0   110.0   159.2   160.0 15710.0
+##    10.0    60.0   110.0   172.1   160.0 15660.0
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2180,7 +2286,7 @@ This paramater can also interpreted as the maximum distance at which two binding
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##      10      60     110     158     160    4410
+##    10.0    60.0   110.0   170.6   160.0  4960.0
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2204,7 +2310,7 @@ This allows the dominant DB in significant clusters to be quickly summarized, as
 \begin{verbatim}
 ## 
 ## down   up 
-##  223 1321
+##  246 1242
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2221,7 +2327,7 @@ This requires some protection against \Rcode{NA} values for genes that contain n
 \begin{verbatim}
 ## 
 ##  down mixed    up 
-##    95    42  1369
+##   111    51  1269
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2246,13 +2352,23 @@ This reports the index of the window with the lowest $p$-value in each cluster, 
 \hlkwd{head}\hlstd{(tab.best)}
 \end{alltt}
 \begin{verbatim}
-##   best     logFC       logCPM         F     PValue        FDR
-## 1    2 0.2822485 -0.956904846 0.1432359 1.00000000 1.00000000
-## 2    3 1.7984741 -0.876130650 5.5293213 0.02169863 0.05967123
-## 3    7 1.2159952  1.118954838 6.0483890 0.09930409 0.17467091
-## 4   11 1.4411557  0.005806843 5.4781813 0.06687240 0.13207225
-## 5   14 1.4995733 -0.675937198 4.5880362 0.10768422 0.18624848
-## 6   17 2.1478277 -0.816330919 7.7552044 0.01396821 0.04430949
+## DataFrame with 6 rows and 6 columns
+##        best            logFC             logCPM                F
+##   <integer>        <numeric>          <numeric>        <numeric>
+## 1         1 1.82956475747112  -0.96314540139532 5.66989233656107
+## 2         5 1.26642495793636   1.28267085309922 7.19227034590671
+## 3        10 1.68157367738864 -0.343824512317365 6.88955747370875
+## 4        13 1.37829648547192 -0.734299801778316  4.3374048105568
+## 5        14 1.92219102619386 -0.902161777949367 6.53251835726262
+## 6        15  0.8182572696609  -0.63064237850119 1.58026126882024
+##               PValue                FDR
+##            <numeric>          <numeric>
+## 1 0.0222371328049001 0.0628280495373627
+## 2 0.0640758614079091  0.131625715301789
+## 3 0.0369507561160506 0.0893631761388174
+## 4  0.131668365407235  0.221093130246315
+## 5 0.0146023514325386 0.0470966018377845
+## 6  0.432398767945989  0.553835232101869
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2269,13 +2385,15 @@ For example, the sequence of the DB subinterval can be extracted for motif disco
 \hlkwd{head}\hlstd{(tabcom[,}\hlkwd{c}\hlstd{(}\hlstr{"best.logFC"}\hlstd{,} \hlstr{"best.start"}\hlstd{)])}
 \end{alltt}
 \begin{verbatim}
-##   best.logFC best.start
-## 1  0.2822485    6466751
-## 2  1.7984741    7088951
-## 3  1.2159952    7398001
-## 4  1.4411557    9541451
-## 5  1.4995733    9545301
-## 6  2.1478277    9748451
+## DataFrame with 6 rows and 2 columns
+##         best.logFC best.start
+##          <numeric>  <integer>
+## 1 1.82956475747112    7088951
+## 2 1.26642495793636    7398001
+## 3 1.68157367738864    9541501
+## 4 1.37829648547192    9545351
+## 5 1.92219102619386    9748451
+## 6  0.8182572696609   10007401
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2293,13 +2411,15 @@ As with \Rfunction{combineOverlaps}, regions with no windows are assigned \Rcode
 \hlkwd{head}\hlstd{(tabbroad[}\hlopt{!}\hlkwd{is.na}\hlstd{(tabbroad}\hlopt{$}\hlstd{PValue),}\hlkwd{c}\hlstd{(}\hlstr{"best.logFC"}\hlstd{,} \hlstr{"best.start"}\hlstd{)])}
 \end{alltt}
 \begin{verbatim}
-##    best.logFC best.start
-## 7   4.5767466   32657051
-## 18  3.9835426    8259301
-## 22  0.9872845  118937801
-## 23  3.6001698   92934401
-## 25 -0.3387857   71596001
-## 28  2.6344767    4137001
+## DataFrame with 6 rows and 2 columns
+##            best.logFC best.start
+##             <numeric>  <integer>
+## 7    3.08043392756386   32657101
+## 19   3.13982804061885    8259301
+## 24   1.43472431463571   92934601
+## 26 -0.481129335439545   71596001
+## 29   3.19449403596054    4137001
+## 37   1.63806823230666  100187601
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2334,38 +2454,72 @@ Corresponding tables of DB results should also be obtained -- for brevity, mock 
 \end{kframe}
 \end{knitrout}
 
-The \Rfunction{consolidateSizes} function is then applied to combine these results.
-This merges windows of all sizes into a single set of clusters, and computes a combined $p$-value from the associated $p$-values for each cluster.
-However, if a cluster contains many small windows, the DB results for the small window size will contribute most to the combined $p$-value.
-This is not ideal when results from all window sizes are of equal interest.
-Equal contributions from each window size can be enforced by setting \Rcode{equiweight=TRUE}, whereby a weighted version of Simes' method \cite{benjamini1997} is used.
+The \Rfunction{consolidateWindows} and \Rfunction{consolidateTests} functions are applied to combine these results.
+The former merges windows of all sizes into a single set of clusters, and the latter computes a combined $p$-value from the associated $p$-values for each cluster.
+Equal contributions from each window size are enforced by setting \Rcode{equiweight=TRUE}, which uses a weighted version of Simes' method \cite{benjamini1997}.
 The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
+Weighting avoids the problem where, if a cluster contains many small windows, the DB results for the analysis with the small window size contribute most to the combined $p$-value.
+This is not ideal when results from all window sizes are of equal interest.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{cons} \hlkwb{<-} \hlkwd{consolidateSizes}\hlstd{(}\hlkwd{list}\hlstd{(ac.small, ac.large),}
-                         \hlkwd{list}\hlstd{(mock.small, mock.large),}
-                         \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{merge.args}\hlstd{=}\hlkwd{list}\hlstd{(}\hlkwc{tol}\hlstd{=}\hlnum{1000}\hlstd{))}
-\hlstd{cons}\hlopt{$}\hlstd{region}
+\hlstd{cons.win} \hlkwb{<-} \hlkwd{consolidateWindows}\hlstd{(}\hlkwc{data.list}\hlstd{=}\hlkwd{list}\hlstd{(ac.small, ac.large),}
+    \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{merge.args}\hlstd{=}\hlkwd{list}\hlstd{(}\hlkwc{tol}\hlstd{=}\hlnum{1000}\hlstd{))}
+\hlstd{cons.win}\hlopt{$}\hlstd{region}
 \end{alltt}
 \begin{verbatim}
-## GRanges object with 29892 ranges and 0 metadata columns:
-##           seqnames               ranges strand
-##              <Rle>            <IRanges>  <Rle>
-##       [1]     chr1   [4571001, 4572500]      *
-##       [2]     chr1   [4783501, 4787000]      *
-##       [3]     chr1   [4806501, 4809500]      *
-##       [4]     chr1   [4856501, 4859500]      *
-##       [5]     chr1   [5082501, 5084500]      *
-##       ...      ...                  ...    ...
-##   [29888]     chrY [  897001,   899000]      *
-##   [29889]     chrY [ 1010001,  1012000]      *
-##   [29890]     chrY [ 1244001,  1246500]      *
-##   [29891]     chrY [ 1285001,  1287000]      *
-##   [29892]     chrY [90738501, 90740500]      *
+## GRanges object with 21726 ranges and 0 metadata columns:
+##                       seqnames          ranges strand
+##                          <Rle>       <IRanges>  <Rle>
+##       [1]                 chr1 4774501-4776000      *
+##       [2]                 chr1 4784501-4787000      *
+##       [3]                 chr1 4807001-4809000      *
+##       [4]                 chr1 4856501-4859500      *
+##       [5]                 chr1 5082501-5084500      *
+##       ...                  ...             ...    ...
+##   [21722] chrX_GL456233_random   336001-336933      *
+##   [21723]                 chrY   897501-898500      *
+##   [21724]                 chrY 1010001-1011500      *
+##   [21725]                 chrY 1244501-1246000      *
+##   [21726]                 chrY 1285501-1287000      *
 ##   -------
 ##   seqinfo: 66 sequences from an unspecified genome
+\end{verbatim}
+\begin{alltt}
+\hlstd{cons.res} \hlkwb{<-} \hlkwd{consolidateTests}\hlstd{(}\hlkwc{id.list}\hlstd{=cons.win}\hlopt{$}\hlstd{id,}
+    \hlkwc{result.list}\hlstd{=}\hlkwd{list}\hlstd{(mock.small, mock.large),}
+    \hlkwc{weight.list}\hlstd{=cons.win}\hlopt{$}\hlstd{weight)}
+\hlstd{cons.res}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 21726 rows and 6 columns
+##        nWindows  logFC.up logFC.down             PValue               FDR
+##       <integer> <integer>  <integer>          <numeric>         <numeric>
+## 1             2         0          1  0.261313516646624 0.989617173606933
+## 2            13         6          4   0.48972743205153 0.996606563842107
+## 3             7         1          1  0.369826351292431 0.996606563842107
+## 4            18         5          6  0.844250607820552 0.998168715421028
+## 5             7         2          2  0.439831266977957 0.996606563842107
+## ...         ...       ...        ...                ...               ...
+## 21722         5         1          2 0.0420264936983585 0.968406238726708
+## 21723         1         0          1  0.149147776886821 0.986666526179761
+## 21724         3         0          0  0.274719097651541 0.989617173606933
+## 21725         4         2          0  0.758170083165169 0.998168715421028
+## 21726         4         1          1  0.011742933653295 0.946898079531129
+##         direction
+##       <character>
+## 1            down
+## 2            down
+## 3           mixed
+## 4           mixed
+## 5           mixed
+## ...           ...
+## 21722        down
+## 21723        down
+## 21724        down
+## 21725          up
+## 21726        down
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2376,10 +2530,42 @@ This is done by specifying the \Rcode{region} argument, as shown below.
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{cons.broad} \hlkwb{<-} \hlkwd{consolidateSizes}\hlstd{(}\hlkwd{list}\hlstd{(ac.small, ac.large),}
-                               \hlkwd{list}\hlstd{(mock.small, mock.large),}
-                               \hlkwc{region}\hlstd{=broads,} \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{)}
+\hlstd{cons.olap} \hlkwb{<-} \hlkwd{consolidateWindows}\hlstd{(}\hlkwc{data.list}\hlstd{=}\hlkwd{list}\hlstd{(ac.small, ac.large),}
+    \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{region}\hlstd{=broads)}
+\hlstd{cons.broad} \hlkwb{<-} \hlkwd{consolidateOverlaps}\hlstd{(}\hlkwc{olap.list}\hlstd{=cons.olap}\hlopt{$}\hlstd{olap,}
+    \hlkwc{result.list}\hlstd{=}\hlkwd{list}\hlstd{(mock.small, mock.large),}
+    \hlkwc{weight.list}\hlstd{=cons.olap}\hlopt{$}\hlstd{weight)}
+\hlstd{cons.broad}
 \end{alltt}
+\begin{verbatim}
+## DataFrame with 24368 rows and 6 columns
+##        nWindows  logFC.up logFC.down            PValue               FDR
+##       <integer> <integer>  <integer>         <numeric>         <numeric>
+## 1            11         2          2 0.668729060340718 0.996533125904792
+## 2            NA        NA         NA                NA                NA
+## 3            NA        NA         NA                NA                NA
+## 4            NA        NA         NA                NA                NA
+## 5            NA        NA         NA                NA                NA
+## ...         ...       ...        ...               ...               ...
+## 24364       103        31         27  0.54309746456102 0.996533125904792
+## 24365        17         3          9 0.437573739443905 0.994837264364171
+## 24366         5         1          2 0.702550453366712 0.996533125904792
+## 24367        16         4          3 0.934611816657707 0.998024202568164
+## 24368         8         2          3 0.866734127746895 0.996633189500054
+##         direction
+##       <character>
+## 1           mixed
+## 2              NA
+## 3              NA
+## 4              NA
+## 5              NA
+## ...           ...
+## 24364       mixed
+## 24365        down
+## 24366       mixed
+## 24367       mixed
+## 24368       mixed
+\end{verbatim}
 \end{kframe}
 \end{knitrout}
 
@@ -2412,20 +2598,30 @@ Window-specific weights are then computed using the \Rfunction{upweightSummits} 
 \hlkwd{head}\hlstd{(weights)}
 \end{alltt}
 \begin{verbatim}
-## [1] 2 1 1 1 1 6
+## [1] 1 1 1 6 1 1
 \end{verbatim}
 \begin{alltt}
 \hlstd{tabcom.w} \hlkwb{<-} \hlkwd{combineTests}\hlstd{(merged}\hlopt{$}\hlstd{id, results}\hlopt{$}\hlstd{table,} \hlkwc{weight}\hlstd{=weights)}
 \hlkwd{head}\hlstd{(tabcom.w)}
 \end{alltt}
 \begin{verbatim}
-##   nWindows logFC.up logFC.down     PValue        FDR direction
-## 1        2        0          0 0.71851958 0.78047005        up
-## 2        1        1          0 0.02169863 0.05667533        up
-## 3        6        6          0 0.04092764 0.08806911        up
-## 4        3        3          0 0.03491875 0.07874081        up
-## 5        3        3          0 0.04998386 0.10083423        up
-## 6        2        2          0 0.01047616 0.03477896        up
+## DataFrame with 6 rows and 6 columns
+##    nWindows  logFC.up logFC.down             PValue                FDR
+##   <integer> <integer>  <integer>          <numeric>          <numeric>
+## 1         1         1          0 0.0222371328049001 0.0595632687154816
+## 2         6         6          0 0.0330211984482296 0.0785274257799715
+## 3         3         3          0 0.0223808901689593 0.0598037891012637
+## 4         3         3          0 0.0853881526637988  0.152262944794296
+## 5         1         1          0 0.0146023514325386 0.0442497839374581
+## 6         2         2          0  0.260094148644719  0.350561678608099
+##     direction
+##   <character>
+## 1          up
+## 2          up
+## 3          up
+## 4          up
+## 5          up
+## 6          up
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2442,13 +2638,23 @@ These wrappers are designed to minimize book-keeping problems when one window ov
 \hlkwd{head}\hlstd{(broad.best[}\hlopt{!}\hlkwd{is.na}\hlstd{(broad.best}\hlopt{$}\hlstd{PValue),])}
 \end{alltt}
 \begin{verbatim}
-##     best      logFC     logCPM           F       PValue         FDR
-## 7   8691  3.2094654 -0.5127818 17.55991283 8.459486e-05 0.001477841
-## 18 10378  1.3722344  0.7189963  6.70525137 1.181860e-02 0.037719863
-## 22  4460  0.9872845 -0.8611100  1.86192392 1.770428e-01 0.250947267
-## 23   405  1.1650460  0.4066434  4.55073129 3.663129e-02 0.079378445
-## 25 12509 -0.1802183 -0.2793734  0.09139579 7.633619e-01 0.800441856
-## 28 10964  2.1645373 -0.6385065  8.58112907 4.661007e-03 0.020193017
+## DataFrame with 6 rows and 6 columns
+##         best              logFC             logCPM                 F
+##    <integer>          <numeric>          <numeric>         <numeric>
+## 7       8923   3.08043392756386 -0.452904564559266  18.3038930138366
+## 19     10620   1.39821129233062  0.576529254835471  6.38118914299321
+## 24       413  0.981084306115614  0.372636647518153   3.1325329558643
+## 26     12753 -0.096208260364703 -0.110784753139787 0.029067316502803
+## 29     11210   3.19449403596054 -0.638878311087708  17.0669754515381
+## 37      3509   1.63806823230666 -0.170697692941698  7.81008539653676
+##                  PValue                 FDR
+##               <numeric>           <numeric>
+## 7  0.000118114925497289  0.0021219686691453
+## 19   0.0157050623040909  0.0466535890455085
+## 24    0.084562340456042   0.147771584890213
+## 26    0.865505096004326   0.886306585116588
+## 29 0.000184602656254399 0.00279541165185233
+## 37  0.00801699278542564  0.0300102072742979
 \end{verbatim}
 \begin{alltt}
 \hlstd{broad.weights} \hlkwb{<-} \hlkwd{summitOverlaps}\hlstd{(olap,} \hlkwc{region.best}\hlstd{=broad.best}\hlopt{$}\hlstd{best)}
@@ -2484,26 +2690,26 @@ To overcome this, a \textit{post-hoc} analysis can be performed whereby only sig
 \hlstd{postclust}\hlopt{$}\hlstd{FDR}
 \end{alltt}
 \begin{verbatim}
-## [1] 0.0498132
+## [1] 0.04985163
 \end{verbatim}
 \begin{alltt}
 \hlstd{postclust}\hlopt{$}\hlstd{region}
 \end{alltt}
 \begin{verbatim}
-## GRanges object with 1606 ranges and 0 metadata columns:
-##          seqnames                 ranges strand
-##             <Rle>              <IRanges>  <Rle>
-##      [1]     chr1   [15805551, 15805610]      *
-##      [2]     chr1   [33565951, 33566010]      *
-##      [3]     chr1   [35985451, 35985510]      *
-##      [4]     chr1   [36445351, 36445360]      *
-##      [5]     chr1   [36684301, 36684360]      *
-##      ...      ...                    ...    ...
-##   [1602]     chrX [ 75514251,  75514260]      *
-##   [1603]     chrX [ 76599001,  76599110]      *
-##   [1604]     chrX [100494251, 100494310]      *
-##   [1605]     chrX [102157051, 102157060]      *
-##   [1606]     chrX [143482951, 143483160]      *
+## GRanges object with 1685 ranges and 0 metadata columns:
+##                      seqnames              ranges strand
+##                         <Rle>           <IRanges>  <Rle>
+##      [1]                 chr1   10037951-10037960      *
+##      [2]                 chr1   15805551-15805610      *
+##      [3]                 chr1   33565901-33566010      *
+##      [4]                 chr1   35985451-35985510      *
+##      [5]                 chr1   36684301-36684360      *
+##      ...                  ...                 ...    ...
+##   [1681]                 chrX 102157051-102157060      *
+##   [1682]                 chrX 104482701-104482760      *
+##   [1683]                 chrX 143483001-143483060      *
+##   [1684] chrX_GL456233_random       336801-336910      *
+##   [1685]                 chrY     4160201-4160310      *
 ##   -------
 ##   seqinfo: 66 sequences from an unspecified genome
 \end{verbatim}
@@ -2589,24 +2795,24 @@ Any exonic features within \Rcode{dist} on the left or right side of each suppli
 \hlkwd{head}\hlstd{(anno}\hlopt{$}\hlstd{overlap)}
 \end{alltt}
 \begin{verbatim}
-## [1] ""                               "Pcmtd1|0-1|+"                  
-## [3] ""                               ""                              
-## [5] "Rrs1|0|+,Adhfe1|0|+"            "Vcpip1|0|-,1700034P13Rik|0-1|+"
+## [1] "Pcmtd1:+:PE"                   ""                             
+## [3] ""                              "Rrs1:+:P,Adhfe1:+:P"          
+## [5] "Vcpip1:-:P,1700034P13Rik:+:PE" "Ppp1r42:-:I"
 \end{verbatim}
 \begin{alltt}
 \hlkwd{head}\hlstd{(anno}\hlopt{$}\hlstd{left)}
 \end{alltt}
 \begin{verbatim}
 ## [1] ""               ""               ""               ""              
-## [5] ""               "Vcpip1|1|-[19]"
+## [5] "Vcpip1:-:69"    "Ppp1r42:-:3948"
 \end{verbatim}
 \begin{alltt}
 \hlkwd{head}\hlstd{(anno}\hlopt{$}\hlstd{right)}
 \end{alltt}
 \begin{verbatim}
-## [1] ""                                ""                               
-## [3] ""                                "Rrs1|1|+[3898]"                 
-## [5] "Rrs1|1|+[48],Adhfe1|1-2|+[2686]" "1700034P13Rik|2|+[3989]"
+## [1] ""                        ""                       
+## [3] "Rrs1:+:3898"             "Rrs1:+:48,Adhfe1:+:2686"
+## [5] "1700034P13Rik:+:3989"    "Ppp1r42:-:1612"
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2640,33 +2846,20 @@ This can then be used for interactive manipulation, e.g., to identify all genes 
 \hlstd{anno.ranges}
 \end{alltt}
 \begin{verbatim}
-## GRanges object with 317093 ranges and 3 metadata columns:
-##             seqnames                 ranges strand |      symbol      exon
-##                <Rle>              <IRanges>  <Rle> | <character> <integer>
-##   100009600     chr9   [21062393, 21062717]      - |       Zglp1         7
-##   100009600     chr9   [21062894, 21062987]      - |       Zglp1         6
-##   100009600     chr9   [21063314, 21063396]      - |       Zglp1         5
-##   100009600     chr9   [21066024, 21066377]      - |       Zglp1         4
-##   100009600     chr9   [21066926, 21070925]      - |       Zglp1         0
-##         ...      ...                    ...    ... .         ...       ...
-##       99889     chr3 [ 85785218,  85887518]      - |      Arfip1        -1
-##       99890     chr3 [110246104, 110250999]      - |       Prmt6        -1
-##       99899     chr3 [151730923, 151749959]      - |       Ifi44        -1
-##       99929     chr3 [ 65528447,  65555518]      + |      Tiparp        -1
-##       99982     chr4 [136550533, 136602723]      - |       Kdm1a        -1
-##              internal
-##             <integer>
-##   100009600         1
-##   100009600         1
-##   100009600         1
-##   100009600         1
-##   100009600         1
-##         ...       ...
-##       99889     24268
-##       99890     24269
-##       99899     24270
-##       99929     24271
-##       99982     24272
+## GRanges object with 319008 ranges and 2 metadata columns:
+##             seqnames              ranges strand |      symbol        type
+##                <Rle>           <IRanges>  <Rle> | <character> <character>
+##   100009600     chr9   21062393-21062717      - |       Zglp1           E
+##   100009600     chr9   21062894-21062987      - |       Zglp1           E
+##   100009600     chr9   21063314-21063396      - |       Zglp1           E
+##   100009600     chr9   21066024-21066377      - |       Zglp1           E
+##   100009600     chr9   21066940-21067925      - |       Zglp1           E
+##         ...      ...                 ...    ... .         ...         ...
+##       99982     chr4 136592965-136593130      - |       Kdm1a           E
+##       99982     chr4 136602232-136602723      - |       Kdm1a           E
+##       99982     chr4 136601724-136605723      - |       Kdm1a           P
+##       99982     chr4 136601724-136605723      - |       Kdm1a           P
+##       99982     chr4 136550533-136602723      - |       Kdm1a           G
 ##   -------
 ##   seqinfo: 66 sequences (1 circular) from mm10 genome
 \end{verbatim}
@@ -2689,7 +2882,7 @@ A high score is only possible if both ratios are large, i.e., strand bimodality 
 \hlkwd{head}\hlstd{(sbm.score)}
 \end{alltt}
 \begin{verbatim}
-## [1] 1.272727 1.437500 1.406977 2.315789 1.454545 1.222222
+## [1] 1.400000 1.455696 2.263158 1.363636 1.222222 5.333333
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2738,12 +2931,12 @@ A transformed FDR is used here for the score field.
 \end{alltt}
 \begin{verbatim}
 ##     V1       V2       V3      V4       V5 V6
-## 1 chr1  9748400  9748460 region1 13.70192  .
-## 2 chr1 15805500 15805660 region2 17.29728  .
-## 3 chr1 23762950 23762960 region3 15.09542  .
-## 4 chr1 32172600 32172710 region4 13.62131  .
-## 5 chr1 33565950 33566010 region5 27.78238  .
-## 6 chr1 35985450 35985560 region6 30.00744  .
+## 1 chr1  9748450  9748460 region1 13.45862  .
+## 2 chr1 10037950 10038010 region2 16.40853  .
+## 3 chr1 15805500 15805660 region3 19.17791  .
+## 4 chr1 23762950 23762960 region4 14.69600  .
+## 5 chr1 33565900 33566010 region5 27.55389  .
+## 6 chr1 35985450 35985510 region6 24.81004  .
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -2772,20 +2965,20 @@ This ensures that the same reads used in the analysis will be pulled out during 
 \hlkwd{extractReads}\hlstd{(bam.files[}\hlnum{1}\hlstd{], cur.region,} \hlkwc{param}\hlstd{=param)}
 \end{alltt}
 \begin{verbatim}
-## GRanges object with 45 ranges and 0 metadata columns:
-##        seqnames               ranges strand
-##           <Rle>            <IRanges>  <Rle>
-##    [1]    chr18 [77806886, 77806922]      +
-##    [2]    chr18 [77806887, 77806923]      +
-##    [3]    chr18 [77806887, 77806923]      +
-##    [4]    chr18 [77806887, 77806923]      +
-##    [5]    chr18 [77806890, 77806926]      +
-##    ...      ...                  ...    ...
-##   [41]    chr18 [77807048, 77807084]      -
-##   [42]    chr18 [77807068, 77807104]      -
-##   [43]    chr18 [77807082, 77807119]      -
-##   [44]    chr18 [77807084, 77807120]      -
-##   [45]    chr18 [77807087, 77807123]      -
+## GRanges object with 55 ranges and 0 metadata columns:
+##        seqnames            ranges strand
+##           <Rle>         <IRanges>  <Rle>
+##    [1]    chr18 77806886-77806922      +
+##    [2]    chr18 77806887-77806923      +
+##    [3]    chr18 77806887-77806923      +
+##    [4]    chr18 77806887-77806923      +
+##    [5]    chr18 77806890-77806926      +
+##    ...      ...               ...    ...
+##   [51]    chr18 77807063-77807095      -
+##   [52]    chr18 77807068-77807104      -
+##   [53]    chr18 77807082-77807119      -
+##   [54]    chr18 77807084-77807120      -
+##   [55]    chr18 77807087-77807123      -
 ##   -------
 ##   seqinfo: 1 sequence from an unspecified genome
 \end{verbatim}
@@ -2842,46 +3035,6 @@ But died when he saw the bill.
 \end{quote}
 \end{combox}
 
-\section{Datasets}
-\label{sec:dataset}
-
-\subsection{Obtaining the FastQ files}
-The NFYA dataset used throughout the guide was first mentioned in Section~\ref{data:main}. 
-This is available from the NCBI Gene Expression Omnibus (GEO) using the accession number GSE25532 \cite{tiwari2012}.
-FastQ files were obtained from the Sequence Read Archive (SRA) with accessions of SRR074398 for \file{es_1.bam}, SRR074399 for \file{es_2.bam}, SRR074417 for \file{tn_1.bam}, SRR074418 for \file{tn_2.bam} and SRR074401 for \file{input.bam}.
-
-The paired-end dataset used in Section~\ref{data:pet} is available from NCBI GEO using the accession GSE43212 \cite{pal2013}.
-The relevant FastQ file was obtained from the SRA with the accession SRR642390 for \file{example-pet.bam}.
-
-All libraries used in Section~\ref{data:ccf} are available from NCBI GEO using the accession GSE31233 \cite{zhang2012}.
-FastQ files were obtained from the SRA with the accessions SRR330784 and SRR330785 for \file{h3ac.bam}; SRR330800 and SRR330801 for \file{h3k4me2.bam}; and SRR330814, SRR330815 and SRR330816 for \file{h3k27me3.bam}. 
-Multiple FastQ files represent technical replicates that were merged into a single BAM file.
-
-Finally, the H3K4me3 dataset in Section~\ref{data:norm} is available from NCBI GEO using the accession GSE38046 \cite{domingo2012}.
-FastQ files were obtained from the SRA with the accessions SRR499732 and SRR499733 for \file{h3k4me3_pro.bam}, and SRR499716 and SRR499717 for \file{h3k4me3_mat.bam}. 
-Again, technical replicates were merged together.
-For H3ac, the FastQ file at SRR330786 was also downloaded and used as \file{h3ac_2.bam}.
- 
-\subsection{Alignment and processing to produce BAM files}
-Technically, each of the libraries described above are downloaded in the SRA format. 
-These can be unpacked to yield FastQ files using the \software{fastq-dump} program from the SRA Toolkit (\url{http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software}). 
-For the lone paired-end library, users will need to specify \texttt{fastq-dump --split-files} to ensure that two separate files are produced, i.e., containing sequences from either end of each fragment.
-
-Reads in the FastQ files were then aligned to the mm10 build of the mouse genome using \software{subread} v1.4.6 \cite{liao2013}. 
-The subread software can be obtained from Bioconductor as the Rsubread package, or as a standalone C program from \url{http://subread.sourceforge.net}. 
-The consensus threshold for alignment was set at 2 to accommodate short read lengths (\textless{} 45 bp in all datasets).
-Only unique alignments were reported, and any tied alignments were split by Hamming distance.
-Default values were used for all other parameters.
-Paired-end data was aligned by supplying both FastQ files to subread within the same run.
-
-Once aligned, SAM files were converted to BAM files using \software{SAMtools} v0.1.19 \cite{li2009}. 
-BAM files were position-sorted with the \texttt{samtools sort} command, and duplicate reads were marked using the \software{MarkDuplicates} command from the \software{Picard} suite v1.117 (\url{http://broadinstitute.github.io/picard}).
-Any technical replicates were merged together using \texttt{samtools merge} to form a single library. 
-Indexing was performed using \texttt{samtools index}.
-
-If all relevant SRA files have been obtained, a set of explicit commands can be used to produce each BAM file.
-These commands are stored in a Bash file named \file{sra2bam.sh} at \url{https://github.com/LTLA/csawUsersGuide}.
-
 \section{Session information}
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
@@ -2889,91 +3042,98 @@ These commands are stored in a Bash file named \file{sra2bam.sh} at \url{https:/
 \hlkwd{sessionInfo}\hlstd{()}
 \end{alltt}
 \begin{verbatim}
-## R version 3.4.0 Patched (2017-04-28 r72639)
+## R Under development (unstable) (2019-01-14 r75992)
 ## Platform: x86_64-pc-linux-gnu (64-bit)
-## Running under: CentOS release 6.4 (Final)
+## Running under: Ubuntu 16.04.5 LTS
 ## 
 ## Matrix products: default
-## BLAS: /wehisan/home/allstaff/a/alun/Software/R/R-3-4-branch_devel/lib/libRblas.so
-## LAPACK: /wehisan/home/allstaff/a/alun/Software/R/R-3-4-branch_devel/lib/libRlapack.so
+## BLAS: /home/cri.camres.org/lun01/Software/R/trunk/lib/libRblas.so
+## LAPACK: /home/cri.camres.org/lun01/Software/R/trunk/lib/libRlapack.so
 ## 
 ## locale:
-##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
-##  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
-##  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
-##  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+##  [1] LC_CTYPE=en_GB.UTF-8       LC_NUMERIC=C              
+##  [3] LC_TIME=en_GB.UTF-8        LC_COLLATE=en_GB.UTF-8    
+##  [5] LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_GB.UTF-8   
+##  [7] LC_PAPER=en_GB.UTF-8       LC_NAME=C                 
 ##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
-## [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+## [11] LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
 ## 
 ## attached base packages:
 ##  [1] grid      parallel  stats4    stats     graphics  grDevices utils    
 ##  [8] datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] Gviz_1.21.2                             
-##  [2] rtracklayer_1.37.3                      
-##  [3] org.Mm.eg.db_3.4.1                      
-##  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.0
-##  [5] GenomicFeatures_1.29.11                 
-##  [6] AnnotationDbi_1.39.3                    
-##  [7] edgeR_3.19.7                            
-##  [8] limma_3.33.13                           
-##  [9] csaw_1.11.3                             
-## [10] BiocParallel_1.11.9                     
-## [11] SummarizedExperiment_1.7.10             
-## [12] DelayedArray_0.3.21                     
-## [13] matrixStats_0.52.2                      
-## [14] Biobase_2.37.2                          
-## [15] GenomicRanges_1.29.15                   
-## [16] GenomeInfoDb_1.13.5                     
-## [17] IRanges_2.11.19                         
-## [18] S4Vectors_0.15.12                       
-## [19] BiocGenerics_0.23.3                     
+##  [1] Gviz_1.27.5                             
+##  [2] rtracklayer_1.43.1                      
+##  [3] org.Mm.eg.db_3.7.0                      
+##  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.4
+##  [5] GenomicFeatures_1.35.4                  
+##  [6] AnnotationDbi_1.45.0                    
+##  [7] edgeR_3.25.3                            
+##  [8] limma_3.39.3                            
+##  [9] csaw_1.17.4                             
+## [10] SummarizedExperiment_1.13.0             
+## [11] DelayedArray_0.9.6                      
+## [12] BiocParallel_1.17.6                     
+## [13] matrixStats_0.54.0                      
+## [14] Biobase_2.43.1                          
+## [15] GenomicRanges_1.35.1                    
+## [16] GenomeInfoDb_1.19.1                     
+## [17] IRanges_2.17.4                          
+## [18] S4Vectors_0.21.9                        
+## [19] BiocGenerics_0.29.1                     
+## [20] chipseqDBData_0.99.3                    
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] ProtGenerics_1.9.1            bitops_1.0-6                 
-##  [3] bit64_0.9-7                   httr_1.3.1                   
-##  [5] RColorBrewer_1.1-2            progress_1.1.2               
-##  [7] rprojroot_1.2                 tools_3.4.0                  
-##  [9] backports_1.1.1               R6_2.2.2                     
-## [11] rpart_4.1-11                  KernSmooth_2.23-15           
-## [13] Hmisc_4.0-3                   DBI_0.7                      
-## [15] lazyeval_0.2.0                colorspace_1.3-2             
-## [17] nnet_7.3-12                   gridExtra_2.3                
-## [19] prettyunits_1.0.2             curl_3.0                     
-## [21] bit_1.1-12                    compiler_3.4.0               
-## [23] htmlTable_1.9                 scales_0.5.0                 
-## [25] checkmate_1.8.4               stringr_1.2.0                
-## [27] digest_0.6.12                 Rsamtools_1.29.1             
-## [29] foreign_0.8-69                rmarkdown_1.6                
-## [31] XVector_0.17.1                base64enc_0.1-3              
-## [33] dichromat_2.0-0               pkgconfig_2.0.1              
-## [35] htmltools_0.3.6               ensembldb_2.1.13             
-## [37] BSgenome_1.45.3               highr_0.6                    
-## [39] htmlwidgets_0.9               rlang_0.1.2                  
-## [41] RSQLite_2.0                   BiocInstaller_1.27.5         
-## [43] shiny_1.0.5                   acepack_1.4.1                
-## [45] VariantAnnotation_1.23.8      RCurl_1.95-4.8               
-## [47] magrittr_1.5                  GenomeInfoDbData_0.99.1      
-## [49] Formula_1.2-2                 Matrix_1.2-11                
-## [51] Rcpp_0.12.13                  munsell_0.4.3                
-## [53] stringi_1.1.5                 yaml_2.1.14                  
-## [55] zlibbioc_1.23.0               AnnotationHub_2.9.19         
-## [57] plyr_1.8.4                    blob_1.1.0                   
-## [59] lattice_0.20-35               Biostrings_2.45.4            
-## [61] splines_3.4.0                 locfit_1.5-9.1               
-## [63] knitr_1.17                    biomaRt_2.33.4               
-## [65] XML_3.98-1.9                  evaluate_0.10.1              
-## [67] biovizBase_1.25.1             latticeExtra_0.6-28          
-## [69] data.table_1.10.4-1           httpuv_1.3.5                 
-## [71] gtable_0.2.0                  assertthat_0.2.0             
-## [73] ggplot2_2.2.1                 mime_0.5                     
-## [75] xtable_1.8-2                  AnnotationFilter_1.1.9       
-## [77] survival_2.41-3               tibble_1.3.4                 
-## [79] GenomicAlignments_1.13.6      memoise_1.1.0                
-## [81] cluster_2.0.6                 statmod_1.4.30               
-## [83] interactiveDisplayBase_1.15.0 Rhtslib_1.9.2                
-## [85] BiocStyle_2.5.40
+##  [1] colorspace_1.4-0              biovizBase_1.31.1            
+##  [3] htmlTable_1.13.1              XVector_0.23.0               
+##  [5] base64enc_0.1-3               dichromat_2.0-0              
+##  [7] rstudioapi_0.9.0              bit64_0.9-7                  
+##  [9] interactiveDisplayBase_1.21.0 splines_3.6.0                
+## [11] knitr_1.21                    Formula_1.2-3                
+## [13] Rsamtools_1.35.1              cluster_2.0.7-1              
+## [15] shiny_1.2.0                   BiocManager_1.30.4           
+## [17] compiler_3.6.0                httr_1.4.0                   
+## [19] backports_1.1.3               assertthat_0.2.0             
+## [21] Matrix_1.2-15                 lazyeval_0.2.1               
+## [23] later_0.7.5                   acepack_1.4.1                
+## [25] htmltools_0.3.6               prettyunits_1.0.2            
+## [27] tools_3.6.0                   bindrcpp_0.2.2               
+## [29] gtable_0.2.0                  glue_1.3.0                   
+## [31] GenomeInfoDbData_1.2.0        dplyr_0.7.8                  
+## [33] Rcpp_1.0.0                    Biostrings_2.51.2            
+## [35] ExperimentHub_1.9.1           xfun_0.4                     
+## [37] stringr_1.3.1                 mime_0.6                     
+## [39] ensembldb_2.7.5               statmod_1.4.30               
+## [41] XML_3.98-1.16                 AnnotationHub_2.15.4         
+## [43] zlibbioc_1.29.0               scales_1.0.0                 
+## [45] BSgenome_1.51.0               BiocStyle_2.11.0             
+## [47] VariantAnnotation_1.29.13     ProtGenerics_1.15.0          
+## [49] hms_0.4.2                     promises_1.0.1               
+## [51] AnnotationFilter_1.7.0        RColorBrewer_1.1-2           
+## [53] yaml_2.2.0                    curl_3.3                     
+## [55] memoise_1.1.0                 gridExtra_2.3                
+## [57] ggplot2_3.1.0                 biomaRt_2.39.2               
+## [59] rpart_4.1-13                  latticeExtra_0.6-28          
+## [61] stringi_1.2.4                 RSQLite_2.1.1                
+## [63] highr_0.7                     checkmate_1.9.1              
+## [65] rlang_0.3.1                   pkgconfig_2.0.2              
+## [67] bitops_1.0-6                  evaluate_0.12                
+## [69] lattice_0.20-38               purrr_0.2.5                  
+## [71] bindr_0.1.1                   GenomicAlignments_1.19.1     
+## [73] htmlwidgets_1.3               bit_1.1-14                   
+## [75] tidyselect_0.2.5              plyr_1.8.4                   
+## [77] magrittr_1.5                  R6_2.3.0                     
+## [79] Hmisc_4.1-1                   DBI_1.0.0                    
+## [81] pillar_1.3.1                  foreign_0.8-71               
+## [83] survival_2.43-3               RCurl_1.95-4.11              
+## [85] nnet_7.3-12                   tibble_2.0.1                 
+## [87] crayon_1.3.4                  KernSmooth_2.23-15           
+## [89] rmarkdown_1.11                progress_1.2.0               
+## [91] locfit_1.5-9.1                data.table_1.12.0            
+## [93] blob_1.1.1                    digest_0.6.18                
+## [95] xtable_1.8-3                  httpuv_1.4.5.1               
+## [97] munsell_0.5.0
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
