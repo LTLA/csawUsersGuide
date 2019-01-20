@@ -1856,10 +1856,10 @@ head(anno$right)
 @
 
 Character vectors of compact string representations are provided to summarize the features overlapped by each supplied region. 
-Each pattern contains \Rcode{GENE|EXONS|STRAND} to describe the strand and overlapped exons of that gene. 
-Promoters are labelled as exon \Rcode{0} whereas introns are labelled as \Rcode{I}. 
-For \Rcode{left} and \Rcode{right}, an additional \Rcode{[DISTANCE]} field is included.
-This indicates the gap between the annotated feature and the supplied region.
+Each pattern contains \Rcode{GENE|STRAND|TYPE} to describe the strand and overlapped features of that gene. 
+Exons are labelled as \Rcode{E}, promoters are \Rcode{P} and introns are \Rcode{I}. 
+For \Rcode{left} and \Rcode{right}, \Rcode{TYPE} is replaced by \Rcode{DISTANCE}.
+This indicates the gap (in base pairs) between the supplied region and the closest non-overlapping exon of the annotated feature.
 All of this annotation can be stored in the metadata of the \Rcode{GRanges} object for later use.
 
 <<>>=
