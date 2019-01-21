@@ -7,11 +7,12 @@ Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
 Suggests: csaw,
     chipseqDBData,
     edgeR,
-    chipseqDBData,
     TxDb.Mmusculus.UCSC.mm10.knownGene,
     org.Mm.eg.db,
     rtracklayer,
-    Gviz
+    Gviz,
+    knitr,
+    BiocStyle
 biocViews: MultipleComparison, ChIPSeq, Normalization, Sequencing,
     Coverage, Annotation, DifferentialPeakCalling
 Description: A user's guide for the csaw package for detecting 
@@ -22,4 +23,4 @@ Description: A user's guide for the csaw package for detecting
     consolidation of per-window results to obtain per-region statistics,
     and annotation and visualization of the DB results.
 License: GPL-3
-
+VignetteBuilder: knitr

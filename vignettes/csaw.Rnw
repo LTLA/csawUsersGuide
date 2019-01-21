@@ -1,6 +1,8 @@
 \documentclass{report}
 \usepackage{tikz}
 
+%\VignetteEngine{knitr::knitr}
+
 <<style-knitr, eval=TRUE, echo=FALSE, results="asis">>=
 BiocStyle::latex(relative.path=TRUE)
 @
@@ -37,14 +39,6 @@ summarization of windows into regions, and visualization and annotation of detec
 
 \tableofcontents
 \newpage
-
-<<results="hide",echo=FALSE>>=
-picdir <- "plots-ug/"
-if (file.exists(picdir)) { unlink(picdir, recursive=TRUE) }
-dir.create(picdir)
-knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
-knitr::opts_chunk$set(fig.path=picdir, dev='png', dpi=150)
-@
 
 \chapter{Introduction}
 
