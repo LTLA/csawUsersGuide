@@ -10,6 +10,7 @@ Suggests: csaw,
     TxDb.Mmusculus.UCSC.mm10.knownGene,
     org.Mm.eg.db,
     rtracklayer,
+    Rsamtools,
     Gviz,
     knitr,
     BiocStyle
