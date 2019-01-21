@@ -1,0 +1,15 @@
+*.tsv
+*.bed
+*.gz
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.pdf
+*.toc
+*.rds
+plots-ug/
+Bioconductor.sty
+csaw.R
+unsrturl.bst
