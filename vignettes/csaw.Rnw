@@ -3,8 +3,12 @@
 
 %\VignetteEngine{knitr::knitr}
 
-<<style-knitr, eval=TRUE, echo=FALSE, results="asis">>=
+<<style-knitr, echo=FALSE, results="asis">>=
 BiocStyle::latex(relative.path=TRUE)
+@
+
+<<results="hide", echo=FALSE>>=
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
 @
 
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
