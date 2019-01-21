@@ -1,0 +1,11 @@
+citEntry(
+    entry = "article",
+    author ="Aaron T L Lun and Gordon K Smyth",
+    title="csaw: a {B}ioconductor package for differential binding analysis of {C}h{I}{P}-seq data using sliding windows",
+    journal="Nucleic Acids Res.",
+    year="2016",
+    volume="44",
+    number="5",
+    pages="e45",
+    textVersion = "Lun ATL and Smyth GK (2016). csaw: a Bioconductor package for differential binding analysis of ChIP-seq data using sliding windows. Nucleic Acids Res. 44, e45"
+)
