@@ -1,6 +1,6 @@
 Package: csawUsersGuide
-Version: 0.99.0
-Date: 2019-01-21
+Version: 0.99.1
+Date: 2019-01-23
 Description: csaw User's Guide
 Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
     "infinite.monkeys.with.keyboards@gmail.com")
@@ -14,8 +14,7 @@ Suggests: csaw,
     Gviz,
     knitr,
     BiocStyle
-biocViews: MultipleComparison, ChIPSeq, Normalization, Sequencing,
-    Coverage, Annotation, DifferentialPeakCalling
+biocViews: Workflow, EpigeneticsWorkflow
 Description: A user's guide for the csaw package for detecting 
     differentially bound regions in ChIP-seq data. Describes how to
     read in BAM files to obtain a per-window count matrix, filtering 
@@ -25,3 +24,4 @@ Description: A user's guide for the csaw package for detecting
     and annotation and visualization of the DB results.
 License: GPL-3
 VignetteBuilder: knitr
+Workflow: true
