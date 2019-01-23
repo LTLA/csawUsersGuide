@@ -1,7 +1,7 @@
 Package: csawUsersGuide
-Version: 0.99.1
+Version: 0.99.2
 Date: 2019-01-23
-Description: csaw User's Guide
+Title: csaw User's Guide
 Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
     "infinite.monkeys.with.keyboards@gmail.com")
 Suggests: csaw,
