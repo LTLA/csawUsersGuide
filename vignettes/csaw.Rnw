@@ -2,6 +2,7 @@
 \usepackage{tikz}
 
 %\VignetteEngine{knitr::knitr}
+%\VignetteIndexEntry{User's guide}
 
 <<style-knitr, echo=FALSE, results="asis">>=
 BiocStyle::latex(relative.path=TRUE)

@@ -1,5 +1,5 @@
 Package: csawUsersGuide
-Version: 0.99.2
+Version: 0.99.3
 Date: 2019-01-23
 Title: csaw User's Guide
 Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
