@@ -1,6 +1,6 @@
 Package: csawUsersGuide
-Version: 0.99.3
-Date: 2019-01-23
+Version: 0.99.4
+Date: 2019-03-13
 Title: csaw User's Guide
 Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
     "infinite.monkeys.with.keyboards@gmail.com")

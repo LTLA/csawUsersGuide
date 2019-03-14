@@ -342,14 +342,10 @@ demo <- windowCounts(bam.files, ext=frag.len, width=win.width,
 head(assay(demo))
 @
 
-Users can parallelize read counting and several other functions by setting \Rcode{BPPARAM} in the \Robject{param} object.
+Users can parallelize read counting and several other functions by setting the \Rcode{BPPARAM} argument.
 This will load and process reads from multiple BAM files simultaneously.
 The number of workers and type of parallelization can be specified using \Rclass{BiocParallelParam} objects.
-By default, parallelization is turned off (i.e., set to a \Rclass{SerialParam} object) because it seems to provide little benefit for small files or on systems with I/O bottlenecks.
-
-<<>>=
-param$BPPARAM
-@
+By default, parallelization is turned off (i.e., set to a \Rclass{SerialParam} object) because it provides little benefit for small files or on systems with I/O bottlenecks.
 
 \subsection{Assigning reads into bins}
 Setting \Rcode{bin=TRUE} will direct \Rfunction{windowCounts} to count reads into contiguous bins across the genome.
