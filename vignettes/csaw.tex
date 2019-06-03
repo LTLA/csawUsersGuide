@@ -1,6 +1,6 @@
 \documentclass{report}\usepackage[]{graphicx}\usepackage[usenames,dvipsnames]{color}
-%% maxwidth is the original width if it is less than linewidth
-%% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+% maxwidth is the original width if it is less than linewidth
+% otherwise use linewidth (to make sure the graphics do not exceed the margin)
 \makeatletter
 \def\maxwidth{ %
   \ifdim\Gin@nat@width>\linewidth
@@ -27,8 +27,13 @@
 \usepackage{alltt}
 \usepackage{tikz}
 
+%\VignetteEngine{knitr::knitr}
+%\VignetteIndexEntry{User's guide}
+
 \RequirePackage[]{Bioconductor}
 \AtBeginDocument{\bibliographystyle{unsrturl}}
+
+
 
 
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
@@ -55,16 +60,14 @@ summarization of windows into regions, and visualization and annotation of detec
 
 \vspace{0.05in}
 \textit{First edition:} 15 August 2012 \\
-\textit{Last revised:} 17 September 2017 \\
-\textit{Last compiled:} 19 January 2019
+\textit{Last revised:} 2 June 2019 \\
+\textit{Last compiled:} 02 June 2019
 \end{abstract}
 
-\packageVersion{csaw 1.17.4}
+\packageVersion{csaw 1.19.2}
 
 \tableofcontents
 \newpage
-
-
 
 \chapter{Introduction}
 
@@ -155,8 +158,7 @@ The code is split across several steps:
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{merged} \hlkwb{<-} \hlkwd{mergeWindows}\hlstd{(}\hlkwd{rowRanges}\hlstd{(data),} \hlkwc{tol}\hlstd{=}\hlnum{1000L}\hlstd{)}
-\hlstd{tabcom} \hlkwb{<-} \hlkwd{combineTests}\hlstd{(merged}\hlopt{$}\hlstd{id, results}\hlopt{$}\hlstd{table)}
+\hlstd{merged} \hlkwb{<-} \hlkwd{mergeResults}\hlstd{(data, results}\hlopt{$}\hlstd{table,} \hlkwc{tol}\hlstd{=}\hlnum{1000L}\hlstd{)}
 \end{alltt}
 \end{kframe}
 \end{knitrout}
@@ -200,21 +202,21 @@ This will be used as a case study for most of the code examples throughout the g
 ## DataFrame with 5 rows and 3 columns
 ##          Name   Description                                           Path
 ##   <character>   <character>                                    <character>
-## 1   SRR074398 NF-YA ESC (1) /tmp/RtmpUINiXA/file715d7c566625/SRR074398.bam
-## 2   SRR074399 NF-YA ESC (2) /tmp/RtmpUINiXA/file715d7c566625/SRR074399.bam
-## 3   SRR074417  NF-YA TN (1) /tmp/RtmpUINiXA/file715d7c566625/SRR074417.bam
-## 4   SRR074418  NF-YA TN (2) /tmp/RtmpUINiXA/file715d7c566625/SRR074418.bam
-## 5   SRR074401         Input /tmp/RtmpUINiXA/file715d7c566625/SRR074401.bam
+## 1   SRR074398 NF-YA ESC (1) /tmp/RtmpZAKjSr/file743c3de7562c/SRR074398.bam
+## 2   SRR074399 NF-YA ESC (2) /tmp/RtmpZAKjSr/file743c3de7562c/SRR074399.bam
+## 3   SRR074417  NF-YA TN (1) /tmp/RtmpZAKjSr/file743c3de7562c/SRR074417.bam
+## 4   SRR074418  NF-YA TN (2) /tmp/RtmpZAKjSr/file743c3de7562c/SRR074418.bam
+## 5   SRR074401         Input /tmp/RtmpZAKjSr/file743c3de7562c/SRR074401.bam
 \end{verbatim}
 \begin{alltt}
 \hlstd{bam.files} \hlkwb{<-} \hlkwd{head}\hlstd{(tf.data}\hlopt{$}\hlstd{Path,} \hlopt{-}\hlnum{1}\hlstd{)} \hlcom{# skip the input.}
 \hlstd{bam.files}
 \end{alltt}
 \begin{verbatim}
-## [1] "/tmp/RtmpUINiXA/file715d7c566625/SRR074398.bam"
-## [2] "/tmp/RtmpUINiXA/file715d7c566625/SRR074399.bam"
-## [3] "/tmp/RtmpUINiXA/file715d7c566625/SRR074417.bam"
-## [4] "/tmp/RtmpUINiXA/file715d7c566625/SRR074418.bam"
+## [1] "/tmp/RtmpZAKjSr/file743c3de7562c/SRR074398.bam"
+## [2] "/tmp/RtmpZAKjSr/file743c3de7562c/SRR074399.bam"
+## [3] "/tmp/RtmpZAKjSr/file743c3de7562c/SRR074417.bam"
+## [4] "/tmp/RtmpZAKjSr/file743c3de7562c/SRR074418.bam"
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -335,7 +337,6 @@ This ensures that read loading is consistent throughout the analysis.
 ##     Reads are extracted from both strands
 ##     No restrictions are placed on read extraction
 ##     No regions are specified to discard reads
-##     Using SerialParam with 1 worker
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -431,7 +432,6 @@ This is safer than directly modifying the slots, as appropriate type/value check
 ##     Reads are extracted from both strands
 ##     No restrictions are placed on read extraction
 ##     Reads in 1 region will be discarded
-##     Using SerialParam with 1 worker
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -504,25 +504,10 @@ More sophisticated filtering is recommended and should be applied later (see Cha
 \end{kframe}
 \end{knitrout}
 
-Users can parallelize read counting and several other functions by setting \Rcode{BPPARAM} in the \Robject{param} object.
+Users can parallelize read counting and several other functions by setting the \Rcode{BPPARAM} argument.
 This will load and process reads from multiple BAM files simultaneously.
 The number of workers and type of parallelization can be specified using \Rclass{BiocParallelParam} objects.
-By default, parallelization is turned off (i.e., set to a \Rclass{SerialParam} object) because it seems to provide little benefit for small files or on systems with I/O bottlenecks.
-
-\begin{knitrout}
-\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
-\begin{alltt}
-\hlstd{param}\hlopt{$}\hlstd{BPPARAM}
-\end{alltt}
-\begin{verbatim}
-## class: SerialParam
-##   bpisup: TRUE; bpnworkers: 1; bptasks: 0; bpjobname: BPJOB
-##   bplog: FALSE; bpthreshold: INFO; bpstopOnError: TRUE
-##   bptimeout: 2592000; bpprogressbar: FALSE; bpexportglobals: TRUE
-##   bplogdir: NA
-\end{verbatim}
-\end{kframe}
-\end{knitrout}
+By default, parallelization is turned off (i.e., set to a \Rclass{SerialParam} object) because it provides little benefit for small files or on systems with I/O bottlenecks.
 
 \subsection{Assigning reads into bins}
 Setting \Rcode{bin=TRUE} will direct \Rfunction{windowCounts} to count reads into contiguous bins across the genome.
@@ -596,7 +581,7 @@ The location of the mode should be consistent with the fragmentation and size se
 \hlkwd{abline}\hlstd{(}\hlkwc{v}\hlstd{=}\hlnum{400}\hlstd{,} \hlkwc{col}\hlstd{=}\hlstr{"red"}\hlstd{)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{2\fltoffset}{2\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/frag-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/frag-1} \end{adjustwidth}
 \end{knitrout}
 
 The number of fragments exceeding the maximum size is recorded for quality control. 
@@ -657,7 +642,7 @@ This reflects the strand-dependent bimodality of reads around narrow regions of 
 \hlkwd{plot}\hlstd{(}\hlnum{0}\hlopt{:}\hlstd{max.delay, x,} \hlkwc{type}\hlstd{=}\hlstr{"l"}\hlstd{,} \hlkwc{ylab}\hlstd{=}\hlstr{"CCF"}\hlstd{,} \hlkwc{xlab}\hlstd{=}\hlstr{"Delay (bp)"}\hlstd{)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{2\fltoffset}{2\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/ccf-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/ccf-1} \end{adjustwidth}
 \end{knitrout}
 
 The location of the peak is used as an estimate of the fragment length for read extension in \Rfunction{windowCounts}. 
@@ -708,7 +693,7 @@ However, they are less effective for regions of diffuse enrichment where bimodal
        \hlkwd{c}\hlstd{(}\hlstr{"H3K9ac"}\hlstd{,} \hlstr{"H3K27me3"}\hlstd{,} \hlstr{"H3K4me3"}\hlstd{),} \hlkwc{pch}\hlstd{=}\hlnum{16}\hlstd{)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
-\includegraphics[width=\maxwidth]{plots-ug/histone_ccf-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/histone_ccf-1} \end{adjustwidth}
 \end{knitrout}
 \label{data:ccf}
 
@@ -1010,7 +995,7 @@ This is due to the dominance of the background-containing bins throughout the ge
        \hlkwc{legend}\hlstd{=}\hlkwd{c}\hlstd{(}\hlstr{"Background"}\hlstd{,} \hlstr{"Threshold"}\hlstd{))}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
-\includegraphics[width=\maxwidth]{plots-ug/binhist-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/binhist-1} \end{adjustwidth}
 \end{knitrout}
 
 Of course, the pre-specified minimum fold change may be too aggressive when binding is weak. 
@@ -1195,12 +1180,12 @@ The example below retrieves the coordinates of the broad gene bodies from the mo
 ## GRanges object with 6 ranges and 1 metadata column:
 ##             seqnames              ranges strand |     gene_id
 ##                <Rle>           <IRanges>  <Rle> | <character>
-##   100009600     chr9   21062393-21078496      - |   100009600
-##   100009609     chr7   84940169-84967009      - |   100009609
-##   100009614    chr10   77708446-77712009      + |   100009614
-##   100009664    chr11   45805083-45842880      + |   100009664
-##      100012     chr4 144157556-144165651      - |      100012
-##      100017     chr4 134745412-134771004      - |      100017
+##   100009600     chr9   21062393-21076096      - |   100009600
+##   100009609     chr7   84935565-84967115      - |   100009609
+##   100009614    chr10   77708457-77712009      + |   100009614
+##   100009664    chr11   45805087-45841171      + |   100009664
+##      100012     chr4 144157557-144165663      - |      100012
+##      100017     chr4 134741554-134771024      - |      100017
 ##   -------
 ##   seqinfo: 66 sequences (1 circular) from mm10 genome
 \end{verbatim}
@@ -1218,7 +1203,7 @@ This could also be combined with abundance filtering to retain windows that cont
 \hlkwd{sum}\hlstd{(keep)}
 \end{alltt}
 \begin{verbatim}
-## [1] 2581579
+## [1] 2676762
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
@@ -1389,7 +1374,7 @@ This indicates that undersampling has been identified and corrected.
 \hlstd{\}}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/normplot-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/normplot-1} \end{adjustwidth}
 \end{knitrout}
 
 \section{Eliminating efficiency biases}
@@ -1419,10 +1404,10 @@ Consider the following H3K4me3 data set, where reads are counted into 150 bp win
 ## 4 h3k4me3-matureB-8088 mature B H3K4me3 (8088)
 ##                                                        Path
 ##                                                 <character>
-## 1    /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-proB-8110.bam
-## 2    /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-proB-8115.bam
-## 3 /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-matureB-8070.bam
-## 4 /tmp/RtmpUINiXA/file715d25b4e843/h3k4me3-matureB-8088.bam
+## 1    /tmp/RtmpZAKjSr/file743c4a05e923/h3k4me3-proB-8110.bam
+## 2    /tmp/RtmpZAKjSr/file743c4a05e923/h3k4me3-proB-8115.bam
+## 3 /tmp/RtmpZAKjSr/file743c4a05e923/h3k4me3-matureB-8070.bam
+## 4 /tmp/RtmpZAKjSr/file743c4a05e923/h3k4me3-matureB-8088.bam
 \end{verbatim}
 \begin{alltt}
 \hlstd{me.files} \hlkwb{<-} \hlstd{k4data}\hlopt{$}\hlstd{Path[}\hlkwd{c}\hlstd{(}\hlnum{1}\hlstd{,}\hlnum{3}\hlstd{)]}
@@ -1483,10 +1468,10 @@ As a demonstration, we repeat this procedure on another data set involving H3 ac
 ## 4 h3k9ac-matureB-8086 mature B H3K9ac (8086)
 ##                                                       Path
 ##                                                <character>
-## 1    /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-proB-8113.bam
-## 2    /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-proB-8108.bam
-## 3 /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-matureB-8059.bam
-## 4 /tmp/RtmpUINiXA/file715d2c21eada/h3k9ac-matureB-8086.bam
+## 1    /tmp/RtmpZAKjSr/file743c32f09f6c/h3k9ac-proB-8113.bam
+## 2    /tmp/RtmpZAKjSr/file743c32f09f6c/h3k9ac-proB-8108.bam
+## 3 /tmp/RtmpZAKjSr/file743c32f09f6c/h3k9ac-matureB-8059.bam
+## 4 /tmp/RtmpZAKjSr/file743c32f09f6c/h3k9ac-matureB-8086.bam
 \end{verbatim}
 \begin{alltt}
 \hlstd{ac.files} \hlkwb{<-} \hlstd{acdata}\hlopt{$}\hlstd{Path[}\hlkwd{c}\hlstd{(}\hlnum{1}\hlstd{,}\hlnum{2}\hlstd{)]}
@@ -1582,7 +1567,7 @@ This also induces composition bias, leading to a non-zero M-value for the backgr
 \hlstd{\}}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/methplot-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/methplot-1} \end{adjustwidth}
 \end{knitrout}
 
 \section{Choosing between normalization strategies}
@@ -1729,7 +1714,7 @@ This is done by subtraction, though note that the offsets are base $e$ while mos
 \hlkwd{lines}\hlstd{(abval[o], fit}\hlopt{$}\hlstd{fitted[o],} \hlkwc{col}\hlstd{=}\hlstr{"red"}\hlstd{)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/trendplot-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/trendplot-1} \end{adjustwidth}
 \end{knitrout}
 
 \section{A word on other biases}
@@ -1884,7 +1869,7 @@ Discrete patterns in the raw dispersions are indicative of low counts and sugges
 \hlkwd{plotQLDisp}\hlstd{(fit)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{0mm}{-\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/dispplot-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/dispplot-1} \end{adjustwidth}
 \end{knitrout}
 
 A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
@@ -1909,7 +1894,7 @@ Filtering has an additional benefit of removing those tests that have low power 
 \hlkwd{legend}\hlstd{(}\hlstr{"topright"}\hlstd{,} \hlkwd{c}\hlstd{(}\hlstr{"raw"}\hlstd{,} \hlstr{"filtered"}\hlstd{),} \hlkwc{col}\hlstd{=}\hlkwd{c}\hlstd{(}\hlstr{"black"}\hlstd{,} \hlstr{"grey"}\hlstd{),} \hlkwc{lwd}\hlstd{=}\hlnum{2}\hlstd{)}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{2\fltoffset}{2\fltoffset}
-\includegraphics[width=\maxwidth]{plots-ug/rmchecker-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/rmchecker-1} \end{adjustwidth}
 \end{knitrout}
 
 \subsection{Modelling variable dispersions between windows}
@@ -2038,7 +2023,7 @@ Again, counting with large bins is recommended as fold changes will be undefined
 \hlstd{\}}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
-\includegraphics[width=\maxwidth]{plots-ug/mds-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/mds-1} \end{adjustwidth}
 \end{knitrout}
 
 Replicates from different groups should form separate clusters in the MDS plot, as observed above.
@@ -2077,8 +2062,7 @@ This is not equivalent to that across all DB windows as each region will often c
 Control of one will not guarantee control of the other \cite{lun2014}.
 
 To illustrate this difference, consider an analysis where the FDR across all window positions is controlled at 10\%. 
-In the results, there are 18 adjacent window positions forming one cluster and 2 windows forming a separate cluster.
-Each cluster represents a region. 
+In the results, there are 18 adjacent window positions in one region and 2 windows in a separate region.
 The first set of windows is a truly DB region whereas the second set is a false positive. 
 A window-based interpretation of the FDR is correct as only 2 of the 20 window positions are false positives.
 However, a region-based interpretation results in an actual FDR of 50\%.
@@ -2090,113 +2074,28 @@ However, a region-based interpretation results in an actual FDR of 50\%.
 % E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
 % be under 0.05 as well. So, if the BH method works, so does Simes' method.
 
-\subsection{Restoring FDR control with clustered windows}
-Misinterpretation of the FDR can be avoided by obtaining a single $p$-value for each region.
-In particular, several strategies can be used to cluster adjacent windows into regions.
-A combined $p$-value can then be computed for each cluster, based on the $p$-values of the constituent windows \cite{simes1986}.
-This tests the joint null hypothesis for each cluster, i.e., that no enrichment is observed across any sites within the corresponding region. 
-The combined $p$-values are then adjusted using the BH method to control the region-level FDR.
+To avoid misinterpretation of the FDR, \Biocpkg{csaw} provides a number of strategies to obtain region-level results.
+This involves defining the regions of interest - possibly from the windows themselves - 
+and converting per-window statistics into a $p$-value for each region.
+Application of the BH method to the per-region $p$-values will then control the relevant FDR across regions.
+These strategies are demonstrated below using the NF-YA data.
 
-An alternative approach is to choose a single window to represent each cluster/region.
-For example, the window with the highest average abundance in each cluster can be used.
-This is sensible for analyses involving sharp binding events, where each cluster is expected to be small and contain no more than one binding site.
-Thus, a single window (and $p$-value) can reasonably be used as a representative of the entire region.
-The BH method can then be applied to the corresponding $p$-values of the representative windows from all clusters.
-
-Both approaches are available in the \Biocpkg{csaw} package.
-The combining procedure is known as Simes' method and is implemented in the \Rfunction{combineTests} function.
-Similarly, selection of a representative window can be performed using the \Rfunction{getBestTest} function.
-Examples of their usage are shown below, along with demonstrations of the different clustering strategies.
-
-\section{Clustering windows into regions}
-
-\subsection{Clustering with external information}
-Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
-The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
-Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \cite{lun2014}.
-In either case, the \Rfunction{findOverlaps} function from the \Biocpkg{GenomicRanges} package can be used to identify all windows in or overlapping each specified region. 
-
-\begin{knitrout}
-\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
-\begin{alltt}
-\hlstd{olap} \hlkwb{<-} \hlkwd{findOverlaps}\hlstd{(broads,} \hlkwd{rowRanges}\hlstd{(filtered.data))}
-\hlstd{olap}
-\end{alltt}
-\begin{verbatim}
-## Hits object with 15726 hits and 0 metadata columns:
-##           queryHits subjectHits
-##           <integer>   <integer>
-##       [1]         7        8922
-##       [2]         7        8923
-##       [3]         7        8924
-##       [4]        19       10619
-##       [5]        19       10620
-##       ...       ...         ...
-##   [15722]     24361        8725
-##   [15723]     24361        8726
-##   [15724]     24364        8438
-##   [15725]     24364        8439
-##   [15726]     24364        8440
-##   -------
-##   queryLength: 24368 / subjectLength: 15708
-\end{verbatim}
-\end{kframe}
-\end{knitrout}
-
-The \Rfunction{combineOverlaps} function can be used to combine the $p$-values for all windows in each region. 
-This is a wrapper around \Rfunction{combineTests} for \Rclass{Hits} objects.
-It returns a single combined $p$-value (and its BH-adjusted value) for each region. 
-The number of windows in each region that change by more than $\sqrt{2}$ in either direction are also reported.
-Regions that do not overlap any windows have values of \Rcode{NA} in all fields for the corresponding rows.
-
-\begin{knitrout}
-\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
-\begin{alltt}
-\hlstd{tabbroad} \hlkwb{<-} \hlkwd{combineOverlaps}\hlstd{(olap, results}\hlopt{$}\hlstd{table)}
-\hlkwd{head}\hlstd{(tabbroad[}\hlopt{!}\hlkwd{is.na}\hlstd{(tabbroad}\hlopt{$}\hlstd{PValue),])}
-\end{alltt}
-\begin{verbatim}
-## DataFrame with 6 rows and 6 columns
-##     nWindows  logFC.up logFC.down               PValue                 FDR
-##    <integer> <integer>  <integer>            <numeric>           <numeric>
-## 7          3         3          0 0.000354344776491868 0.00450287251062473
-## 19         4         4          0 0.000831695416857529 0.00715752134982737
-## 24         4         4          0    0.084562340456042   0.144688162055889
-## 26         4         0          0      0.8665376697912    0.89687371110087
-## 29         3         3          0 0.000553807968763198 0.00568995137646539
-## 37         4         4          0   0.0163475284799344  0.0472696997829639
-##      direction
-##    <character>
-## 7           up
-## 19          up
-## 24          up
-## 26       mixed
-## 29          up
-## 37          up
-\end{verbatim}
-\end{kframe}
-\end{knitrout}
-
-At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
-This is a valid strategy but will yield different results. 
-Consider a promoter containing two separate sites that are identically DB in opposite directions. 
-Counting reads across the promoter will give equal counts for each condition so changes within the promoter will not be detected. 
-Similarly, imprecise boundaries for called peaks can lead to loss of DB detection power due to ``contamination'' by reads from background regions. 
-In both cases, window-based methods may be more robust as each interval of the promoter/peak region is examined separately \cite{lun2014}.
+\section{Grouping windows into regions}
 
 \subsection{Quick and dirty clustering}
 \label{sec:cluster}
-Clustering can also be performed with a simple single-linkage algorithm in the \Rfunction{mergeWindows} function.
-This approach avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
+
+The \Rfunction{mergeWindows} function provides a simple single-linkage algorithm to cluster windows into regions.
 Windows that are less than \Rcode{tol} apart are considered to be adjacent and are grouped into the same cluster.
 The chosen \Rcode{tol} represents the minimum distance at which two binding events are treated as separate sites.
-Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpretation of the results, while smaller values (\textless{} 200 bp) allow resolution of individual binding sites.
+Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpretation of the results, 
+while smaller values (\textless{} 200 bp) allow resolution of individual binding sites.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{merged} \hlkwb{<-} \hlkwd{mergeWindows}\hlstd{(}\hlkwd{rowRanges}\hlstd{(filtered.data),} \hlkwc{tol}\hlstd{=}\hlnum{1000L}\hlstd{)}
-\hlstd{merged}\hlopt{$}\hlstd{region}
+\hlstd{merged} \hlkwb{<-} \hlkwd{mergeWindows}\hlstd{(filtered.data,} \hlkwc{tol}\hlstd{=}\hlnum{1000L}\hlstd{)}
+\hlstd{merged}\hlopt{$}\hlstd{regions}
 \end{alltt}
 \begin{verbatim}
 ## GRanges object with 4433 ranges and 0 metadata columns:
@@ -2219,51 +2118,19 @@ Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpre
 \end{kframe}
 \end{knitrout}
 
-A combined $p$-value is computed for each cluster with the \Rfunction{combineTests} function.
-The BH method is then applied to control the FDR across all detected clusters.
-The number of \Rcode{up} or \Rcode{down} windows can be used to gauge whether binding increases or decreases across the cluster.
-A complex DB event may be present if both \Rcode{up} and \Rcode{down} are substantially non-zero (i.e., opposing changes within the region) or if the total number of windows is much larger than either number (e.g., interval of constant binding adjacent to the DB interval).
-
-\begin{knitrout}
-\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
-\begin{alltt}
-\hlstd{tabcom} \hlkwb{<-} \hlkwd{combineTests}\hlstd{(merged}\hlopt{$}\hlstd{id, results}\hlopt{$}\hlstd{table)}
-\hlkwd{head}\hlstd{(tabcom)}
-\end{alltt}
-\begin{verbatim}
-## DataFrame with 6 rows and 6 columns
-##    nWindows  logFC.up logFC.down             PValue                FDR
-##   <integer> <integer>  <integer>          <numeric>          <numeric>
-## 1         1         1          0 0.0222371328049001 0.0601814467180232
-## 2         6         6          0  0.063040469764802  0.123599470352661
-## 3         3         3          0 0.0268570682027511 0.0679163624317146
-## 4         3         3          0  0.102465783196559  0.174905974936598
-## 5         1         1          0 0.0146023514325386 0.0450959801719733
-## 6         2         2          0  0.260094148644719  0.352167795034221
-##     direction
-##   <character>
-## 1          up
-## 2          up
-## 3          up
-## 4          up
-## 5          up
-## 6          up
-\end{verbatim}
-\end{kframe}
-\end{knitrout}
-
 If many adjacent windows are present, very large clusters may be formed that are difficult to interpret. 
 We perform a simple check below to determine whether most clusters are of an acceptable size. 
 Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:filter} is required.  
 This mitigates chaining effects by reducing the density of windows in the genome.
 
 % Note that several large clusters may still be present due to high coverage within long tandem repeat loci.  
-% In general, chaining isn't as bad as single-linkage on the reads themselves, because windows that survive weak filtering should have reasonably high read counts. 
+% In general, chaining isn't as bad as single-linkage on the reads themselves, 
+% because windows that survive weak filtering should have reasonably high read counts. 
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlkwd{summary}\hlstd{(}\hlkwd{width}\hlstd{(merged}\hlopt{$}\hlstd{region))}
+\hlkwd{summary}\hlstd{(}\hlkwd{width}\hlstd{(merged}\hlopt{$}\hlstd{regions))}
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
@@ -2274,15 +2141,16 @@ This mitigates chaining effects by reducing the density of windows in the genome
 
 Alternatively, chaining can be limited by setting \Rcode{max.width} to restrict the size of the merged intervals. 
 Clusters substantially larger than \Rcode{max.width} are split into several smaller subclusters of roughly equal size.
-The chosen value should be small enough so as to separate DB regions from unchanged neighbors, yet large enough to avoid misinterpretation of the FDR.
+The chosen value should be small enough so as to separate DB regions from unchanged neighbors, 
+yet large enough to avoid misinterpretation of the FDR.
 Any value from 2000 to 10000 bp is recommended. 
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{merged.max} \hlkwb{<-} \hlkwd{mergeWindows}\hlstd{(}\hlkwd{rowRanges}\hlstd{(filtered.data),} \hlkwc{tol}\hlstd{=}\hlnum{1000L}\hlstd{,} \hlkwc{max.width}\hlstd{=}\hlnum{5000L}\hlstd{)}
-\hlkwd{summary}\hlstd{(}\hlkwd{width}\hlstd{(merged.max}\hlopt{$}\hlstd{region))}
+\hlstd{merged.max} \hlkwb{<-} \hlkwd{mergeWindows}\hlstd{(filtered.data,} \hlkwc{tol}\hlstd{=}\hlnum{1000L}\hlstd{,} \hlkwc{max.width}\hlstd{=}\hlnum{5000L}\hlstd{)}
+\hlkwd{summary}\hlstd{(}\hlkwd{width}\hlstd{(merged.max}\hlopt{$}\hlstd{regions))}
 \end{alltt}
 \begin{verbatim}
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
@@ -2291,11 +2159,80 @@ This paramater can also interpreted as the maximum distance at which two binding
 \end{kframe}
 \end{knitrout}
 
-\section{Summarizing the direction of DB per cluster}
+\subsection{Using external information}
 
-\subsection{Based on the contribution to the combined $p$-value}
+Another approach is to group together windows that overlap with a pre-specified region of interest.
+The most obvious source of pre-specified regions is that of annotated features such as promoters or gene bodies.
+Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \cite{lun2014}.
+Regardless of how they are specified, each region of interest corresponds to a group that contains all overlapping windows,  
+as identified by the \Rfunction{findOverlaps} function from the \Biocpkg{GenomicRanges} package. 
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{olap} \hlkwb{<-} \hlkwd{findOverlaps}\hlstd{(broads,} \hlkwd{rowRanges}\hlstd{(filtered.data))}
+\hlstd{olap}
+\end{alltt}
+\begin{verbatim}
+## Hits object with 16316 hits and 0 metadata columns:
+##           queryHits subjectHits
+##           <integer>   <integer>
+##       [1]         7        8922
+##       [2]         7        8923
+##       [3]         7        8924
+##       [4]        18       10619
+##       [5]        18       10620
+##       ...       ...         ...
+##   [16312]     24395        8725
+##   [16313]     24395        8726
+##   [16314]     24398        8438
+##   [16315]     24398        8439
+##   [16316]     24398        8440
+##   -------
+##   queryLength: 24402 / subjectLength: 15708
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-specified regions. 
+This is a valid strategy but will yield different results. 
+Consider a promoter containing two separate sites that are identically DB in opposite directions. 
+Counting reads across the promoter will give equal counts for each condition so changes within the promoter will not be detected. 
+Similarly, imprecise peak boundaries can lead to loss of detection power due to ``contamination'' by reads in background regions.
+Window-based methods may be more robust as each interval of the promoter/peak region is examined separately \cite{lun2014}, 
+avoiding potential problems with peak-calling errors and incorrect/incomplete annotation.
+
+\section{Obtaining per-region $p$-value}
+
+\subsection{Combining window-level $p$-values}
+
+We compute a combined $p$-value for each region based on the $p$-values of the constituent windows \cite{simes1986}.
+This tests the joint null hypothesis for each region, i.e., that no enrichment is observed across any of its windows.
+Any DB within the region will reject the joint null and yield a low $p$-value for the entire region.
+The combined $p$-values are then adjusted using the BH method to control the region-level FDR.
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{tabcom} \hlkwb{<-} \hlkwd{combineTests}\hlstd{(merged}\hlopt{$}\hlstd{ids, results}\hlopt{$}\hlstd{table)}
+\hlstd{is.sig.region} \hlkwb{<-} \hlstd{tabcom}\hlopt{$}\hlstd{FDR} \hlopt{<=} \hlnum{0.05}
+\hlkwd{summary}\hlstd{(is.sig.region)}
+\end{alltt}
+\begin{verbatim}
+##    Mode   FALSE    TRUE 
+## logical    2945    1488
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
 Summarizing the direction of DB for each cluster requires some care as the direction of DB can differ between constituent windows.
-The \Rcode{direction} field returned by \Rfunction{combineTests} specifies which DB direction contributes to the combined $p$-value.
+The \Rcode{up} or \Rcode{down} fields contain the number of windows that change by more than $\sqrt{2}$ in either direction, 
+and can be used to gauge whether binding increases or decreases across the cluster.
+A complex DB event may be present if both \Rcode{up} and \Rcode{down} are substantially non-zero 
+(i.e., opposing changes within the region) or if the total number of windows is much larger than either number 
+(e.g., interval of constant binding adjacent to the DB interval).
+
+Alternatively, the \Rcode{direction} field specifies which DB direction contributes to the combined $p$-value.
 If \Rcode{"up"}, the combined $p$-value for this cluster is driven by $p$-values of windows with positive log-fold changes.
 If \Rcode{"down"}, the combined $p$-value is driven by windows with negative log-fold changes.
 If \Rcode{"mixed"}, windows with both positive and negative log-fold changes are involved.
@@ -2304,7 +2241,6 @@ This allows the dominant DB in significant clusters to be quickly summarized, as
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{is.sig.region} \hlkwb{<-} \hlstd{tabcom}\hlopt{$}\hlstd{FDR} \hlopt{<=} \hlnum{0.05}
 \hlkwd{table}\hlstd{(tabcom}\hlopt{$}\hlstd{direction[is.sig.region])}
 \end{alltt}
 \begin{verbatim}
@@ -2315,11 +2251,36 @@ This allows the dominant DB in significant clusters to be quickly summarized, as
 \end{kframe}
 \end{knitrout}
 
-The same approach is used with the output of \Rfunction{combineOverlaps} for gene-based clusters.
-This requires some protection against \Rcode{NA} values for genes that contain no windows.
+For pre-specified regions, the \Rfunction{combineOverlaps} function will combine the $p$-values for all windows in each region. 
+This is a wrapper around \Rfunction{combineTests} for \Rclass{Hits} objects.
+It returns a single combined $p$-value (and its BH-adjusted value) for each region. 
+Regions that do not overlap any windows have values of \Rcode{NA} in all fields for the corresponding rows.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{tabbroad} \hlkwb{<-} \hlkwd{combineOverlaps}\hlstd{(olap, results}\hlopt{$}\hlstd{table)}
+\hlkwd{head}\hlstd{(tabbroad[}\hlopt{!}\hlkwd{is.na}\hlstd{(tabbroad}\hlopt{$}\hlstd{PValue),])}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 6 rows and 6 columns
+##     nWindows  logFC.up logFC.down               PValue                 FDR
+##    <integer> <integer>  <integer>            <numeric>           <numeric>
+## 7          3         3          0 0.000354344776491868  0.0046261105222466
+## 18         4         4          0 0.000831695416857529 0.00733136235568506
+## 23         4         4          0    0.084562340456042   0.145810612461362
+## 25         4         0          0      0.8665376697912   0.897607144419383
+## 28         3         3          0 0.000553807968763198 0.00584894359462642
+## 36         4         4          0   0.0163475284799344  0.0476900537675219
+##      direction
+##    <character>
+## 7           up
+## 18          up
+## 23          up
+## 25       mixed
+## 28          up
+## 36          up
+\end{verbatim}
 \begin{alltt}
 \hlstd{is.sig.gene} \hlkwb{<-} \hlstd{tabcom}\hlopt{$}\hlstd{FDR} \hlopt{<=} \hlnum{0.05}
 \hlkwd{table}\hlstd{(tabbroad}\hlopt{$}\hlstd{direction[is.sig.gene])}
@@ -2327,28 +2288,25 @@ This requires some protection against \Rcode{NA} values for genes that contain n
 \begin{verbatim}
 ## 
 ##  down mixed    up 
-##   111    51  1269
+##   112    53  1352
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
-Mixed clusters represent complex DB events where the shape of the binding profile changes, i.e., not just a scaling increase/decrease to binding intensity.
-This includes regions with multiple peaks changing in opposite directions, or peaks that change in shape or position between conditions.
-Regions labelled as \Rcode{"up"} or \Rcode{"down"} may also correspond to complex DB events,
-but will not be labelled as \Rcode{"mixed"} if the significance calculations are dominated by windows changing in only one direction.
-For rigorous identification of mixed clusters, users are advised to use the \Rfunction{mixedClusters} function instead of \Rfunction{combineTests}.
-
 \subsection{Based on the most significant window}
-Another approach is to define the direction of change for each cluster as that of the window with the strongest DB.
+\label{sec:mostsig}
+
+Another approach is to use the single window with the strongest DB as a representative of the entire region.
 This is useful when a log-fold change is required for each cluster, e.g., for plotting.
-In contrast, taking the average log-fold change across all windows in a cluster will understate the magnitude of DB.
+(In contrast, taking the average log-fold change across all windows in a region will understate the magnitude of DB,
+especially if the region includes some non-DB background intervals of the genome.)
 Identification of the most significant (i.e., ``best'') window is performed using the \Rfunction{getBestTest} function.
-This reports the index of the window with the lowest $p$-value in each cluster, as well as the associated statistics.
+This reports the index of the window with the lowest $p$-value in each cluster as well as the associated statistics.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{tab.best} \hlkwb{<-} \hlkwd{getBestTest}\hlstd{(merged}\hlopt{$}\hlstd{id, results}\hlopt{$}\hlstd{table)}
+\hlstd{tab.best} \hlkwb{<-} \hlkwd{getBestTest}\hlstd{(merged}\hlopt{$}\hlstd{ids, results}\hlopt{$}\hlstd{table)}
 \hlkwd{head}\hlstd{(tab.best)}
 \end{alltt}
 \begin{verbatim}
@@ -2372,6 +2330,12 @@ This reports the index of the window with the lowest $p$-value in each cluster, 
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
+
+A Bonferroni correction is applied to the $p$-value of the best window in each region, 
+based on the number of constituent windows in that region.
+This is necessary to account for the implicit multiple testing across all windows in each region.
+The corrected $p$-value is reported as \Rcode{PValue} in \Robject{tab.best},
+and can be used for correction across regions using the BH method to control the region-level FDR.
 
 In addition, it is often useful to report the start location of the best window within each cluster.
 This allows users to easily identify a relevant DB subinterval in large regions.
@@ -2398,9 +2362,11 @@ For example, the sequence of the DB subinterval can be extracted for motif disco
 \end{kframe}
 \end{knitrout}
 
-The same approach can be applied to the overlaps between windows and pre-specified regions, using the \Rfunction{getBestOverlaps} wrapper function.
+The same approach can be applied to the overlaps between windows and pre-specified regions, 
+using the \Rfunction{getBestOverlaps} wrapper function.
 This is demonstrated below for the broad gene body example.
-As with \Rfunction{combineOverlaps}, regions with no windows are assigned \Rcode{NA} in the output table, but these are removed here to show some actual results.
+As with \Rfunction{combineOverlaps}, regions with no windows are assigned \Rcode{NA} in the output table, 
+but these are removed here to show some actual results.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
@@ -2415,19 +2381,48 @@ As with \Rfunction{combineOverlaps}, regions with no windows are assigned \Rcode
 ##            best.logFC best.start
 ##             <numeric>  <integer>
 ## 7    3.08043392756386   32657101
-## 19   3.13982804061885    8259301
-## 24   1.43472431463571   92934601
-## 26 -0.481129335439545   71596001
-## 29   3.19449403596054    4137001
-## 37   1.63806823230666  100187601
+## 18   3.13982804061885    8259301
+## 23   1.43472431463571   92934601
+## 25 -0.481129335439545   71596001
+## 28   3.19449403596054    4137001
+## 36   1.63806823230666  100187601
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
-Typically, the best window will only be used as a descriptive measure for each cluster.
-However, more statistical rigour is required if these windows are treated as the features of interest over which the error rate is to be controlled.
-A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \Rcode{PValue} in \Robject{tab.best}.
-This is necessary to account for the implicit multiple testing across all windows in each cluster.
+\subsection{Wrapper functions}
+
+For convenience, the steps of merging windows and computing statistics are implemented into a single wrapper function.
+This simply calls \Rcode{mergeWindows} followed by \Rcode{combineTests} and \Rcode{getBestTest}.
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{merge.res} \hlkwb{<-} \hlkwd{mergeResults}\hlstd{(filtered.data, results}\hlopt{$}\hlstd{table,} \hlkwc{tol}\hlstd{=}\hlnum{100}\hlstd{,}
+    \hlkwc{merge.args}\hlstd{=}\hlkwd{list}\hlstd{(}\hlkwc{max.width}\hlstd{=}\hlnum{5000}\hlstd{))}
+\hlkwd{names}\hlstd{(merge.res)}
+\end{alltt}
+\begin{verbatim}
+## [1] "regions"  "combined" "best"
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+An equivalent wrapper function is also available for handling overlaps to pre-specified regions.
+This simply calls \Rcode{findOverlaps} followed by \Rcode{combineOverlaps} and \Rcode{getBestOverlaps}.
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{broad.res} \hlkwb{<-} \hlkwd{overlapResults}\hlstd{(filtered.data,} \hlkwc{regions}\hlstd{=broads,}
+    \hlkwc{tab}\hlstd{=results}\hlopt{$}\hlstd{table)}
+\hlkwd{names}\hlstd{(broad.res)}
+\end{alltt}
+\begin{verbatim}
+## [1] "regions"  "combined" "best"
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
 
 \section{Squeezing out more detection power}
 
@@ -2443,9 +2438,11 @@ Corresponding tables of DB results should also be obtained -- for brevity, mock 
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
 \hlstd{ac.small} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(ac.files,} \hlkwc{width}\hlstd{=}\hlnum{150L}\hlstd{,} \hlkwc{spacing}\hlstd{=}\hlnum{100L}\hlstd{,}
-                         \hlkwc{filter}\hlstd{=}\hlnum{25}\hlstd{,} \hlkwc{param}\hlstd{=param)}
+    \hlkwc{filter}\hlstd{=}\hlnum{25}\hlstd{,} \hlkwc{param}\hlstd{=param)}
 \hlstd{ac.large} \hlkwb{<-} \hlkwd{windowCounts}\hlstd{(ac.files,} \hlkwc{width}\hlstd{=}\hlnum{1000L}\hlstd{,} \hlkwc{spacing}\hlstd{=}\hlnum{500L}\hlstd{,}
-                         \hlkwc{filter}\hlstd{=}\hlnum{35}\hlstd{,} \hlkwc{param}\hlstd{=param)}
+    \hlkwc{filter}\hlstd{=}\hlnum{35}\hlstd{,} \hlkwc{param}\hlstd{=param)}
+
+\hlcom{# Mocking up results for demonstration purposes.}
 \hlstd{ns} \hlkwb{<-} \hlkwd{nrow}\hlstd{(ac.small)}
 \hlstd{mock.small} \hlkwb{<-} \hlkwd{data.frame}\hlstd{(}\hlkwc{logFC}\hlstd{=}\hlkwd{rnorm}\hlstd{(ns),} \hlkwc{logCPM}\hlstd{=}\hlnum{0}\hlstd{,} \hlkwc{PValue}\hlstd{=}\hlkwd{runif}\hlstd{(ns))}
 \hlstd{nl} \hlkwb{<-} \hlkwd{nrow}\hlstd{(ac.large)}
@@ -2454,19 +2451,22 @@ Corresponding tables of DB results should also be obtained -- for brevity, mock 
 \end{kframe}
 \end{knitrout}
 
-The \Rfunction{consolidateWindows} and \Rfunction{consolidateTests} functions are applied to combine these results.
-The former merges windows of all sizes into a single set of clusters, and the latter computes a combined $p$-value from the associated $p$-values for each cluster.
-Equal contributions from each window size are enforced by setting \Rcode{equiweight=TRUE}, which uses a weighted version of Simes' method \cite{benjamini1997}.
+The \Rfunction{mergeResultsList} function merges windows of all sizes into a single set of regions, 
+and computes a combined $p$-value from the associated $p$-values for each region.
+Equal contributions from each window size are enforced by setting \Rcode{equiweight=TRUE}, 
+which uses a weighted version of Simes' method \cite{benjamini1997}.
 The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
-Weighting avoids the problem where, if a cluster contains many small windows, the DB results for the analysis with the small window size contribute most to the combined $p$-value.
+This avoids the situation where, if a cluster contains many small windows, 
+the DB results for the analysis with the small window size contribute most to the combined $p$-value.
 This is not ideal when results from all window sizes are of equal interest.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{cons.win} \hlkwb{<-} \hlkwd{consolidateWindows}\hlstd{(}\hlkwc{data.list}\hlstd{=}\hlkwd{list}\hlstd{(ac.small, ac.large),}
-    \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{merge.args}\hlstd{=}\hlkwd{list}\hlstd{(}\hlkwc{tol}\hlstd{=}\hlnum{1000}\hlstd{))}
-\hlstd{cons.win}\hlopt{$}\hlstd{region}
+\hlstd{cons.res} \hlkwb{<-} \hlkwd{mergeResultsList}\hlstd{(}\hlkwd{list}\hlstd{(ac.small, ac.large),}
+    \hlkwc{tab.list}\hlstd{=}\hlkwd{list}\hlstd{(mock.small, mock.large),}
+    \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{tol}\hlstd{=}\hlnum{1000}\hlstd{)}
+\hlstd{cons.res}\hlopt{$}\hlstd{regions}
 \end{alltt}
 \begin{verbatim}
 ## GRanges object with 21726 ranges and 0 metadata columns:
@@ -2487,91 +2487,107 @@ This is not ideal when results from all window sizes are of equal interest.
 ##   seqinfo: 66 sequences from an unspecified genome
 \end{verbatim}
 \begin{alltt}
-\hlstd{cons.res} \hlkwb{<-} \hlkwd{consolidateTests}\hlstd{(}\hlkwc{id.list}\hlstd{=cons.win}\hlopt{$}\hlstd{id,}
-    \hlkwc{result.list}\hlstd{=}\hlkwd{list}\hlstd{(mock.small, mock.large),}
-    \hlkwc{weight.list}\hlstd{=cons.win}\hlopt{$}\hlstd{weight)}
-\hlstd{cons.res}
+\hlstd{cons.res}\hlopt{$}\hlstd{combined}
 \end{alltt}
 \begin{verbatim}
 ## DataFrame with 21726 rows and 6 columns
 ##        nWindows  logFC.up logFC.down             PValue               FDR
 ##       <integer> <integer>  <integer>          <numeric>         <numeric>
-## 1             2         0          1  0.261313516646624 0.989617173606933
-## 2            13         6          4   0.48972743205153 0.996606563842107
-## 3             7         1          1  0.369826351292431 0.996606563842107
-## 4            18         5          6  0.844250607820552 0.998168715421028
-## 5             7         2          2  0.439831266977957 0.996606563842107
+## 1             2         1          1  0.849990377435461 0.997130815333018
+## 2            13         4          4 0.0345734525471926 0.965610491430627
+## 3             7         0          3  0.707537500420585 0.997130815333018
+## 4            18         6          6  0.777573201320289 0.997130815333018
+## 5             7         0          1  0.709560823227678 0.997130815333018
 ## ...         ...       ...        ...                ...               ...
-## 21722         5         1          2 0.0420264936983585 0.968406238726708
-## 21723         1         0          1  0.149147776886821 0.986666526179761
-## 21724         3         0          0  0.274719097651541 0.989617173606933
-## 21725         4         2          0  0.758170083165169 0.998168715421028
-## 21726         4         1          1  0.011742933653295 0.946898079531129
+## 21722         5         2          2  0.349410871043801 0.994507629777256
+## 21723         1         0          0  0.355160737643018 0.994999637141485
+## 21724         3         0          1  0.434378537970285 0.997130815333018
+## 21725         4         1          2 0.0945855714380741 0.971568328097182
+## 21726         4         0          3  0.800249986350536 0.997130815333018
 ##         direction
 ##       <character>
-## 1            down
-## 2            down
+## 1           mixed
+## 2              up
 ## 3           mixed
 ## 4           mixed
-## 5           mixed
+## 5            down
 ## ...           ...
-## 21722        down
+## 21722          up
 ## 21723        down
 ## 21724        down
-## 21725          up
+## 21725        down
 ## 21726        down
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
-The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
-This is done by specifying the \Rcode{region} argument, as shown below.
+Similarly, the \Rfunction{overlapResultsList} function is used to merge windows of varying size that overlap pre-specified regions.
 
 \begin{knitrout}
 \definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
 \begin{alltt}
-\hlstd{cons.olap} \hlkwb{<-} \hlkwd{consolidateWindows}\hlstd{(}\hlkwc{data.list}\hlstd{=}\hlkwd{list}\hlstd{(ac.small, ac.large),}
+\hlstd{cons.broad} \hlkwb{<-} \hlkwd{overlapResultsList}\hlstd{(}\hlkwd{list}\hlstd{(ac.small, ac.large),}
+    \hlkwc{tab.list}\hlstd{=}\hlkwd{list}\hlstd{(mock.small, mock.large),}
     \hlkwc{equiweight}\hlstd{=}\hlnum{TRUE}\hlstd{,} \hlkwc{region}\hlstd{=broads)}
-\hlstd{cons.broad} \hlkwb{<-} \hlkwd{consolidateOverlaps}\hlstd{(}\hlkwc{olap.list}\hlstd{=cons.olap}\hlopt{$}\hlstd{olap,}
-    \hlkwc{result.list}\hlstd{=}\hlkwd{list}\hlstd{(mock.small, mock.large),}
-    \hlkwc{weight.list}\hlstd{=cons.olap}\hlopt{$}\hlstd{weight)}
-\hlstd{cons.broad}
+\hlstd{cons.broad}\hlopt{$}\hlstd{regions}
 \end{alltt}
 \begin{verbatim}
-## DataFrame with 24368 rows and 6 columns
-##        nWindows  logFC.up logFC.down            PValue               FDR
-##       <integer> <integer>  <integer>         <numeric>         <numeric>
-## 1            11         2          2 0.668729060340718 0.996533125904792
-## 2            NA        NA         NA                NA                NA
-## 3            NA        NA         NA                NA                NA
-## 4            NA        NA         NA                NA                NA
-## 5            NA        NA         NA                NA                NA
-## ...         ...       ...        ...               ...               ...
-## 24364       103        31         27  0.54309746456102 0.996533125904792
-## 24365        17         3          9 0.437573739443905 0.994837264364171
-## 24366         5         1          2 0.702550453366712 0.996533125904792
-## 24367        16         4          3 0.934611816657707 0.998024202568164
-## 24368         8         2          3 0.866734127746895 0.996633189500054
+## GRanges object with 24402 ranges and 1 metadata column:
+##             seqnames              ranges strand |     gene_id
+##                <Rle>           <IRanges>  <Rle> | <character>
+##   100009600     chr9   21062393-21076096      - |   100009600
+##   100009609     chr7   84935565-84967115      - |   100009609
+##   100009614    chr10   77708457-77712009      + |   100009614
+##   100009664    chr11   45805087-45841171      + |   100009664
+##      100012     chr4 144157557-144165663      - |      100012
+##         ...      ...                 ...    ... .         ...
+##       99889     chr3   84496093-85890516      - |       99889
+##       99890     chr3 110246109-110253998      - |       99890
+##       99899     chr3 151730922-151752960      - |       99899
+##       99929     chr3   65525410-65555518      + |       99929
+##       99982     chr4 136550540-136605723      - |       99982
+##   -------
+##   seqinfo: 66 sequences (1 circular) from mm10 genome
+\end{verbatim}
+\begin{alltt}
+\hlstd{cons.res}\hlopt{$}\hlstd{combined}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 21726 rows and 6 columns
+##        nWindows  logFC.up logFC.down             PValue               FDR
+##       <integer> <integer>  <integer>          <numeric>         <numeric>
+## 1             2         1          1  0.849990377435461 0.997130815333018
+## 2            13         4          4 0.0345734525471926 0.965610491430627
+## 3             7         0          3  0.707537500420585 0.997130815333018
+## 4            18         6          6  0.777573201320289 0.997130815333018
+## 5             7         0          1  0.709560823227678 0.997130815333018
+## ...         ...       ...        ...                ...               ...
+## 21722         5         2          2  0.349410871043801 0.994507629777256
+## 21723         1         0          0  0.355160737643018 0.994999637141485
+## 21724         3         0          1  0.434378537970285 0.997130815333018
+## 21725         4         1          2 0.0945855714380741 0.971568328097182
+## 21726         4         0          3  0.800249986350536 0.997130815333018
 ##         direction
 ##       <character>
 ## 1           mixed
-## 2              NA
-## 3              NA
-## 4              NA
-## 5              NA
+## 2              up
+## 3           mixed
+## 4           mixed
+## 5            down
 ## ...           ...
-## 24364       mixed
-## 24365        down
-## 24366       mixed
-## 24367       mixed
-## 24368       mixed
+## 21722          up
+## 21723        down
+## 21724        down
+## 21725        down
+## 21726        down
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
 Consolidation is most useful for histone marks and other analyses involving diffuse regions of enrichment.
-For such studies, the ideal window size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
+For such studies, the ideal window size is not known or may not even exist, 
+e.g., if the widths of the enriched regions or DB subintervals are variable.
 
 \subsection{Weighting windows on abundance}
 Windows that are more likely to be DB can be upweighted to improve detection power.
@@ -2642,19 +2658,19 @@ These wrappers are designed to minimize book-keeping problems when one window ov
 ##         best              logFC             logCPM                 F
 ##    <integer>          <numeric>          <numeric>         <numeric>
 ## 7       8923   3.08043392756386 -0.452904564559266  18.3038930138366
-## 19     10620   1.39821129233062  0.576529254835471  6.38118914299321
-## 24       413  0.981084306115614  0.372636647518153   3.1325329558643
-## 26     12753 -0.096208260364703 -0.110784753139787 0.029067316502803
-## 29     11210   3.19449403596054 -0.638878311087708  17.0669754515381
-## 37      3509   1.63806823230666 -0.170697692941698  7.81008539653676
+## 18     10620   1.39821129233062  0.576529254835471  6.38118914299321
+## 23       413  0.981084306115614  0.372636647518153   3.1325329558643
+## 25     12753 -0.096208260364703 -0.110784753139787 0.029067316502803
+## 28     11210   3.19449403596054 -0.638878311087708  17.0669754515381
+## 36      3509   1.63806823230666 -0.170697692941698  7.81008539653676
 ##                  PValue                 FDR
 ##               <numeric>           <numeric>
-## 7  0.000118114925497289  0.0021219686691453
-## 19   0.0157050623040909  0.0466535890455085
-## 24    0.084562340456042   0.147771584890213
-## 26    0.865505096004326   0.886306585116588
-## 29 0.000184602656254399 0.00279541165185233
-## 37  0.00801699278542564  0.0300102072742979
+## 7  0.000118114925497289 0.00217742109910888
+## 18   0.0157050623040909  0.0469161234140886
+## 23    0.084562340456042   0.148323603823798
+## 25    0.865505096004326    0.88770770039106
+## 28 0.000184602656254399 0.00287031491217778
+## 36  0.00801699278542564  0.0301935186653793
 \end{verbatim}
 \begin{alltt}
 \hlstd{broad.weights} \hlkwb{<-} \hlkwd{summitOverlaps}\hlstd{(olap,} \hlkwc{region.best}\hlstd{=broad.best}\hlopt{$}\hlstd{best)}
@@ -2746,6 +2762,50 @@ As non-specific binding events tend to be condition-specific, they are indisting
 Thus, for noisy data, use of the empirical FDR may be more appropriate to control the proportion of ``experimental'' false positives.
 However, calculation of the empirical FDR is not as statistically rigorous as that of the BH method, so users are advised to only apply it when necessary.
 
+\subsection{Detecting complex DB}
+
+Complex DB events involve changes to the shape of the binding profile, not just a scaling increase/decrease to binding intensity.
+Such regions may contain multiple sites that change in binding strength in opposite directions, 
+or peaks that change in width or position between conditions.
+This often manifests as DB in opposite directions in different subintervals of a region.
+Some of these events can be identified using the \Rfunction{mixedClusters} function.
+
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.941, 0.941, 0.941}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{tab.mixed} \hlkwb{<-} \hlkwd{mixedClusters}\hlstd{(merged}\hlopt{$}\hlstd{ids, results}\hlopt{$}\hlstd{table)}
+\hlstd{tab.mixed}
+\end{alltt}
+\begin{verbatim}
+## DataFrame with 4433 rows and 5 columns
+##       nWindows  logFC.up logFC.down            PValue       FDR
+##      <integer> <integer>  <integer>         <numeric> <numeric>
+## 1            1         1          0  0.98888143359755         1
+## 2            6         6          0 0.994660344882674         1
+## 3            3         3          0 0.993841540647325         1
+## 4            3         3          0 0.978055272432128         1
+## 5            1         1          0 0.992698824283731         1
+## ...        ...       ...        ...               ...       ...
+## 4429         1         0          1  0.99454603802349         1
+## 4430         1         0          1 0.940947398315358         1
+## 4431         2         0          2 0.999984417994415         1
+## 4432         2         2          0 0.942395346040386         1
+## 4433         6         0          1 0.892396874576611         1
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
+
+\Rfunction{mixedClusters} converts the $p$-value for each window into two one-sided $p$-values.
+The one-sided $p$-values in each direction are combined using Simes' method,
+and the two one-sided combined $p$-values are themselves combined using an intersection-union test \cite{berger1996bioequivalence}.
+The resulting $p$-value is only low if a region contains strong DB in both directions.
+
+\Rfunction{combineTests} also computes some statistics for informal detection of complex DB.
+For example, the \Rcode{up} and \Rcode{down} fields can be used to identify regions with changes in both directions.
+The \Rcode{direction} field will also label some regions as \Rcode{"mixed"}, though this is not comprehensive.
+Indeed, regions labelled as \Rcode{"up"} or \Rcode{"down"} in the `direction` field may also correspond to complex DB events,
+but will not be labelled as \Rcode{"mixed"} if the significance calculations are dominated by windows changing in only one direction.
+
 \section{Further points on data management}
 Technically, \Rcode{results\$table} was not required in any of the calls performed in this chapter.
 Recall that the per-window significance statistics were stored in the row metadata of \Robject{filtered.data}.
@@ -2810,18 +2870,18 @@ Any exonic features within \Rcode{dist} on the left or right side of each suppli
 \hlkwd{head}\hlstd{(anno}\hlopt{$}\hlstd{right)}
 \end{alltt}
 \begin{verbatim}
-## [1] ""                        ""                       
-## [3] "Rrs1:+:3898"             "Rrs1:+:48,Adhfe1:+:2686"
-## [5] "1700034P13Rik:+:3989"    "Ppp1r42:-:1612"
+## [1] "Pcmtd1:+:144"            ""                       
+## [3] "Rrs1:+:3898"             "Rrs1:+:48,Adhfe1:+:2588"
+## [5] "1700034P13Rik:+:21"      "Ppp1r42:-:1612"
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
 
 Character vectors of compact string representations are provided to summarize the features overlapped by each supplied region. 
-Each pattern contains \Rcode{GENE|EXONS|STRAND} to describe the strand and overlapped exons of that gene. 
-Promoters are labelled as exon \Rcode{0} whereas introns are labelled as \Rcode{I}. 
-For \Rcode{left} and \Rcode{right}, an additional \Rcode{[DISTANCE]} field is included.
-This indicates the gap between the annotated feature and the supplied region.
+Each pattern contains \Rcode{GENE|STRAND|TYPE} to describe the strand and overlapped features of that gene. 
+Exons are labelled as \Rcode{E}, promoters are \Rcode{P} and introns are \Rcode{I}. 
+For \Rcode{left} and \Rcode{right}, \Rcode{TYPE} is replaced by \Rcode{DISTANCE}.
+This indicates the gap (in base pairs) between the supplied region and the closest non-overlapping exon of the annotated feature.
 All of this annotation can be stored in the metadata of the \Rcode{GRanges} object for later use.
 
 \begin{knitrout}
@@ -2846,20 +2906,20 @@ This can then be used for interactive manipulation, e.g., to identify all genes 
 \hlstd{anno.ranges}
 \end{alltt}
 \begin{verbatim}
-## GRanges object with 319008 ranges and 2 metadata columns:
+## GRanges object with 494004 ranges and 2 metadata columns:
 ##             seqnames              ranges strand |      symbol        type
 ##                <Rle>           <IRanges>  <Rle> | <character> <character>
 ##   100009600     chr9   21062393-21062717      - |       Zglp1           E
+##   100009600     chr9   21062400-21062717      - |       Zglp1           E
 ##   100009600     chr9   21062894-21062987      - |       Zglp1           E
 ##   100009600     chr9   21063314-21063396      - |       Zglp1           E
 ##   100009600     chr9   21066024-21066377      - |       Zglp1           E
-##   100009600     chr9   21066940-21067925      - |       Zglp1           E
 ##         ...      ...                 ...    ... .         ...         ...
-##       99982     chr4 136592965-136593130      - |       Kdm1a           E
-##       99982     chr4 136602232-136602723      - |       Kdm1a           E
-##       99982     chr4 136601724-136605723      - |       Kdm1a           P
-##       99982     chr4 136601724-136605723      - |       Kdm1a           P
-##       99982     chr4 136550533-136602723      - |       Kdm1a           G
+##       99982     chr4 136554325-136558324      - |       Kdm1a           P
+##       99982     chr4 136560502-136564501      - |       Kdm1a           P
+##       99982     chr4 136567608-136571607      - |       Kdm1a           P
+##       99982     chr4 136576159-136580158      - |       Kdm1a           P
+##       99982     chr4 136550540-136602723      - |       Kdm1a           G
 ##   -------
 ##   seqinfo: 66 sequences (1 circular) from mm10 genome
 \end{verbatim}
@@ -3013,7 +3073,7 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 \hlkwd{plotTracks}\hlstd{(}\hlkwd{c}\hlstd{(gax, collected),} \hlkwc{from}\hlstd{=}\hlkwd{start}\hlstd{(cur.region),} \hlkwc{to}\hlstd{=}\hlkwd{end}\hlstd{(cur.region))}
 \end{alltt}
 \end{kframe}\begin{adjustwidth}{\fltoffset}{0mm}
-\includegraphics[width=\maxwidth]{plots-ug/regionplot-1} \end{adjustwidth}
+\includegraphics[width=\maxwidth]{figure/regionplot-1} \end{adjustwidth}
 \end{knitrout}
 
 
@@ -3042,98 +3102,99 @@ But died when he saw the bill.
 \hlkwd{sessionInfo}\hlstd{()}
 \end{alltt}
 \begin{verbatim}
-## R Under development (unstable) (2019-01-14 r75992)
+## R version 3.6.0 Patched (2019-05-02 r76458)
 ## Platform: x86_64-pc-linux-gnu (64-bit)
-## Running under: Ubuntu 16.04.5 LTS
+## Running under: Ubuntu 18.04.2 LTS
 ## 
 ## Matrix products: default
-## BLAS: /home/cri.camres.org/lun01/Software/R/trunk/lib/libRblas.so
-## LAPACK: /home/cri.camres.org/lun01/Software/R/trunk/lib/libRlapack.so
+## BLAS:   /home/luna/Software/R/R-3-6-branch-dev/lib/libRblas.so
+## LAPACK: /home/luna/Software/R/R-3-6-branch-dev/lib/libRlapack.so
 ## 
 ## locale:
-##  [1] LC_CTYPE=en_GB.UTF-8       LC_NUMERIC=C              
-##  [3] LC_TIME=en_GB.UTF-8        LC_COLLATE=en_GB.UTF-8    
-##  [5] LC_MONETARY=en_GB.UTF-8    LC_MESSAGES=en_GB.UTF-8   
-##  [7] LC_PAPER=en_GB.UTF-8       LC_NAME=C                 
+##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+##  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+##  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+##  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
 ##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
-## [11] LC_MEASUREMENT=en_GB.UTF-8 LC_IDENTIFICATION=C       
+## [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
 ## 
 ## attached base packages:
 ##  [1] grid      parallel  stats4    stats     graphics  grDevices utils    
 ##  [8] datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] Gviz_1.27.5                             
-##  [2] rtracklayer_1.43.1                      
-##  [3] org.Mm.eg.db_3.7.0                      
-##  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.4
-##  [5] GenomicFeatures_1.35.4                  
-##  [6] AnnotationDbi_1.45.0                    
-##  [7] edgeR_3.25.3                            
-##  [8] limma_3.39.3                            
-##  [9] csaw_1.17.4                             
-## [10] SummarizedExperiment_1.13.0             
-## [11] DelayedArray_0.9.6                      
-## [12] BiocParallel_1.17.6                     
+##  [1] Gviz_1.29.0                             
+##  [2] rtracklayer_1.45.1                      
+##  [3] org.Mm.eg.db_3.8.2                      
+##  [4] TxDb.Mmusculus.UCSC.mm10.knownGene_3.4.7
+##  [5] GenomicFeatures_1.37.1                  
+##  [6] AnnotationDbi_1.47.0                    
+##  [7] edgeR_3.27.4                            
+##  [8] limma_3.41.2                            
+##  [9] csaw_1.19.2                             
+## [10] SummarizedExperiment_1.15.1             
+## [11] DelayedArray_0.11.0                     
+## [12] BiocParallel_1.19.0                     
 ## [13] matrixStats_0.54.0                      
-## [14] Biobase_2.43.1                          
-## [15] GenomicRanges_1.35.1                    
-## [16] GenomeInfoDb_1.19.1                     
-## [17] IRanges_2.17.4                          
-## [18] S4Vectors_0.21.9                        
-## [19] BiocGenerics_0.29.1                     
-## [20] chipseqDBData_0.99.3                    
+## [14] Biobase_2.45.0                          
+## [15] GenomicRanges_1.37.8                    
+## [16] GenomeInfoDb_1.21.1                     
+## [17] IRanges_2.19.6                          
+## [18] S4Vectors_0.23.4                        
+## [19] BiocGenerics_0.31.2                     
+## [20] chipseqDBData_1.1.0                     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] colorspace_1.4-0              biovizBase_1.31.1            
-##  [3] htmlTable_1.13.1              XVector_0.23.0               
+##  [1] colorspace_1.4-1              biovizBase_1.33.0            
+##  [3] htmlTable_1.13.1              XVector_0.25.0               
 ##  [5] base64enc_0.1-3               dichromat_2.0-0              
-##  [7] rstudioapi_0.9.0              bit64_0.9-7                  
-##  [9] interactiveDisplayBase_1.21.0 splines_3.6.0                
-## [11] knitr_1.21                    Formula_1.2-3                
-## [13] Rsamtools_1.35.1              cluster_2.0.7-1              
-## [15] shiny_1.2.0                   BiocManager_1.30.4           
-## [17] compiler_3.6.0                httr_1.4.0                   
-## [19] backports_1.1.3               assertthat_0.2.0             
-## [21] Matrix_1.2-15                 lazyeval_0.2.1               
-## [23] later_0.7.5                   acepack_1.4.1                
-## [25] htmltools_0.3.6               prettyunits_1.0.2            
-## [27] tools_3.6.0                   bindrcpp_0.2.2               
-## [29] gtable_0.2.0                  glue_1.3.0                   
-## [31] GenomeInfoDbData_1.2.0        dplyr_0.7.8                  
-## [33] Rcpp_1.0.0                    Biostrings_2.51.2            
-## [35] ExperimentHub_1.9.1           xfun_0.4                     
-## [37] stringr_1.3.1                 mime_0.6                     
-## [39] ensembldb_2.7.5               statmod_1.4.30               
-## [41] XML_3.98-1.16                 AnnotationHub_2.15.4         
-## [43] zlibbioc_1.29.0               scales_1.0.0                 
-## [45] BSgenome_1.51.0               BiocStyle_2.11.0             
-## [47] VariantAnnotation_1.29.13     ProtGenerics_1.15.0          
-## [49] hms_0.4.2                     promises_1.0.1               
-## [51] AnnotationFilter_1.7.0        RColorBrewer_1.1-2           
-## [53] yaml_2.2.0                    curl_3.3                     
-## [55] memoise_1.1.0                 gridExtra_2.3                
-## [57] ggplot2_3.1.0                 biomaRt_2.39.2               
-## [59] rpart_4.1-13                  latticeExtra_0.6-28          
-## [61] stringi_1.2.4                 RSQLite_2.1.1                
-## [63] highr_0.7                     checkmate_1.9.1              
-## [65] rlang_0.3.1                   pkgconfig_2.0.2              
-## [67] bitops_1.0-6                  evaluate_0.12                
-## [69] lattice_0.20-38               purrr_0.2.5                  
-## [71] bindr_0.1.1                   GenomicAlignments_1.19.1     
-## [73] htmlwidgets_1.3               bit_1.1-14                   
-## [75] tidyselect_0.2.5              plyr_1.8.4                   
-## [77] magrittr_1.5                  R6_2.3.0                     
-## [79] Hmisc_4.1-1                   DBI_1.0.0                    
-## [81] pillar_1.3.1                  foreign_0.8-71               
-## [83] survival_2.43-3               RCurl_1.95-4.11              
-## [85] nnet_7.3-12                   tibble_2.0.1                 
-## [87] crayon_1.3.4                  KernSmooth_2.23-15           
-## [89] rmarkdown_1.11                progress_1.2.0               
-## [91] locfit_1.5-9.1                data.table_1.12.0            
-## [93] blob_1.1.1                    digest_0.6.18                
-## [95] xtable_1.8-3                  httpuv_1.4.5.1               
-## [97] munsell_0.5.0
+##  [7] rstudioapi_0.10               bit64_0.9-7                  
+##  [9] interactiveDisplayBase_1.23.0 codetools_0.2-16             
+## [11] splines_3.6.0                 knitr_1.23                   
+## [13] Formula_1.2-3                 Rsamtools_2.1.2              
+## [15] cluster_2.0.9                 dbplyr_1.4.0                 
+## [17] shiny_1.3.2                   BiocManager_1.30.4           
+## [19] compiler_3.6.0                httr_1.4.0                   
+## [21] backports_1.1.4               assertthat_0.2.1             
+## [23] Matrix_1.2-17                 lazyeval_0.2.2               
+## [25] later_0.8.0                   acepack_1.4.1                
+## [27] htmltools_0.3.6               prettyunits_1.0.2            
+## [29] tools_3.6.0                   gtable_0.3.0                 
+## [31] glue_1.3.1                    GenomeInfoDbData_1.2.1       
+## [33] dplyr_0.8.1                   rappdirs_0.3.1               
+## [35] Rcpp_1.0.1                    Biostrings_2.53.0            
+## [37] ExperimentHub_1.11.1          xfun_0.7                     
+## [39] stringr_1.4.0                 mime_0.6                     
+## [41] ensembldb_2.9.1               statmod_1.4.32               
+## [43] XML_3.98-1.19                 AnnotationHub_2.17.3         
+## [45] zlibbioc_1.31.0               scales_1.0.0                 
+## [47] BSgenome_1.53.0               BiocStyle_2.13.0             
+## [49] VariantAnnotation_1.31.3      ProtGenerics_1.17.2          
+## [51] hms_0.4.2                     promises_1.0.1               
+## [53] AnnotationFilter_1.9.0        RColorBrewer_1.1-2           
+## [55] yaml_2.2.0                    curl_3.3                     
+## [57] memoise_1.1.0                 gridExtra_2.3                
+## [59] ggplot2_3.1.1                 biomaRt_2.41.0               
+## [61] rpart_4.1-15                  latticeExtra_0.6-28          
+## [63] stringi_1.4.3                 RSQLite_2.1.1                
+## [65] highr_0.8                     checkmate_1.9.3              
+## [67] rlang_0.3.4                   pkgconfig_2.0.2              
+## [69] bitops_1.0-6                  evaluate_0.14                
+## [71] lattice_0.20-38               purrr_0.3.2                  
+## [73] GenomicAlignments_1.21.2      htmlwidgets_1.3              
+## [75] bit_1.1-14                    tidyselect_0.2.5             
+## [77] plyr_1.8.4                    magrittr_1.5                 
+## [79] R6_2.4.0                      Hmisc_4.2-0                  
+## [81] DBI_1.0.0                     pillar_1.4.1                 
+## [83] foreign_0.8-71                survival_2.44-1.1            
+## [85] RCurl_1.95-4.12               nnet_7.3-12                  
+## [87] tibble_2.1.2                  crayon_1.3.4                 
+## [89] KernSmooth_2.23-15            BiocFileCache_1.9.0          
+## [91] rmarkdown_1.13                progress_1.2.2               
+## [93] locfit_1.5-9.1                data.table_1.12.2            
+## [95] blob_1.1.1                    digest_0.6.19                
+## [97] xtable_1.8-4                  httpuv_1.5.1                 
+## [99] munsell_0.5.0
 \end{verbatim}
 \end{kframe}
 \end{knitrout}
