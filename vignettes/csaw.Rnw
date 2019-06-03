@@ -9,7 +9,7 @@ BiocStyle::latex(relative.path=TRUE)
 @
 
 <<results="hide", echo=FALSE>>=
-knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE, cache=TRUE)
 @
 
 \bioctitle[\Biocpkg{csaw} User's Guide]{\Biocpkg{csaw}: ChIP-seq analysis with windows \\ User's Guide}
@@ -36,7 +36,7 @@ summarization of windows into regions, and visualization and annotation of detec
 
 \vspace{0.05in}
 \textit{First edition:} 15 August 2012 \\
-\textit{Last revised:} 17 September 2017 \\
+\textit{Last revised:} 2 June 2019 \\
 \textit{Last compiled:} \Sexpr{format(Sys.Date(), "%d %B %Y")}
 \end{abstract}
 
@@ -125,8 +125,7 @@ results <- glmQLFTest(fit)
 @
 \item Correcting for multiple testing.
 <<>>=
-merged <- mergeWindows(rowRanges(data), tol=1000L)
-tabcom <- combineTests(merged$id, results$table)
+merged <- mergeResults(data, results$table, tol=1000L)
 @
 \end{enumerate}
 
@@ -1484,8 +1483,7 @@ This is not equivalent to that across all DB windows as each region will often c
 Control of one will not guarantee control of the other \cite{lun2014}.
 
 To illustrate this difference, consider an analysis where the FDR across all window positions is controlled at 10\%. 
-In the results, there are 18 adjacent window positions forming one cluster and 2 windows forming a separate cluster.
-Each cluster represents a region. 
+In the results, there are 18 adjacent window positions in one region and 2 windows in a separate region.
 The first set of windows is a truly DB region whereas the second set is a false positive. 
 A window-based interpretation of the FDR is correct as only 2 of the 20 window positions are false positives.
 However, a region-based interpretation results in an actual FDR of 50\%.
@@ -1497,76 +1495,26 @@ However, a region-based interpretation results in an actual FDR of 50\%.
 % E(FDR)<=0.05. Now, the probability of all false positives (i.e. FDR=1) must
 % be under 0.05 as well. So, if the BH method works, so does Simes' method.
 
-\subsection{Restoring FDR control with clustered windows}
-Misinterpretation of the FDR can be avoided by obtaining a single $p$-value for each region.
-In particular, several strategies can be used to cluster adjacent windows into regions.
-A combined $p$-value can then be computed for each cluster, based on the $p$-values of the constituent windows \cite{simes1986}.
-This tests the joint null hypothesis for each cluster, i.e., that no enrichment is observed across any sites within the corresponding region. 
-The combined $p$-values are then adjusted using the BH method to control the region-level FDR.
+To avoid misinterpretation of the FDR, \Biocpkg{csaw} provides a number of strategies to obtain region-level results.
+This involves defining the regions of interest - possibly from the windows themselves - 
+and converting per-window statistics into a $p$-value for each region.
+Application of the BH method to the per-region $p$-values will then control the relevant FDR across regions.
+These strategies are demonstrated below using the NF-YA data.
 
-An alternative approach is to choose a single window to represent each cluster/region.
-For example, the window with the highest average abundance in each cluster can be used.
-This is sensible for analyses involving sharp binding events, where each cluster is expected to be small and contain no more than one binding site.
-Thus, a single window (and $p$-value) can reasonably be used as a representative of the entire region.
-The BH method can then be applied to the corresponding $p$-values of the representative windows from all clusters.
-
-Both approaches are available in the \Biocpkg{csaw} package.
-The combining procedure is known as Simes' method and is implemented in the \Rfunction{combineTests} function.
-Similarly, selection of a representative window can be performed using the \Rfunction{getBestTest} function.
-Examples of their usage are shown below, along with demonstrations of the different clustering strategies.
-
-\section{Clustering windows into regions}
-
-\subsection{Clustering with external information}
-Combined $p$-values can be computed for a pre-defined set of regions based on the windows overlapping those regions. 
-The most obvious source of pre-defined regions is that of annotated features such as promoters or gene bodies.
-Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \cite{lun2014}.
-In either case, the \Rfunction{findOverlaps} function from the \Biocpkg{GenomicRanges} package can be used to identify all windows in or overlapping each specified region. 
-
-<<>>=
-olap <- findOverlaps(broads, rowRanges(filtered.data))
-olap
-@
-
-The \Rfunction{combineOverlaps} function can be used to combine the $p$-values for all windows in each region. 
-This is a wrapper around \Rfunction{combineTests} for \Rclass{Hits} objects.
-It returns a single combined $p$-value (and its BH-adjusted value) for each region. 
-The number of windows in each region that change by more than $\sqrt{2}$ in either direction are also reported.
-Regions that do not overlap any windows have values of \Rcode{NA} in all fields for the corresponding rows.
-
-<<>>=
-tabbroad <- combineOverlaps(olap, results$table)
-head(tabbroad[!is.na(tabbroad$PValue),])
-@
-
-At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-defined regions. 
-This is a valid strategy but will yield different results. 
-Consider a promoter containing two separate sites that are identically DB in opposite directions. 
-Counting reads across the promoter will give equal counts for each condition so changes within the promoter will not be detected. 
-Similarly, imprecise boundaries for called peaks can lead to loss of DB detection power due to ``contamination'' by reads from background regions. 
-In both cases, window-based methods may be more robust as each interval of the promoter/peak region is examined separately \cite{lun2014}.
+\section{Grouping windows into regions}
 
 \subsection{Quick and dirty clustering}
 \label{sec:cluster}
-Clustering can also be performed with a simple single-linkage algorithm in the \Rfunction{mergeWindows} function.
-This approach avoids potential problems with the other clustering strategies, e.g., peak-calling errors, incorrect or incomplete annotation. 
+
+The \Rfunction{mergeWindows} function provides a simple single-linkage algorithm to cluster windows into regions.
 Windows that are less than \Rcode{tol} apart are considered to be adjacent and are grouped into the same cluster.
 The chosen \Rcode{tol} represents the minimum distance at which two binding events are treated as separate sites.
-Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpretation of the results, while smaller values (\textless{} 200 bp) allow resolution of individual binding sites.
+Large values (500 - 1000 bp) reduce redundancy and favor a region-based interpretation of the results, 
+while smaller values (\textless{} 200 bp) allow resolution of individual binding sites.
 
 <<>>=
-merged <- mergeWindows(rowRanges(filtered.data), tol=1000L)
-merged$region
-@
-
-A combined $p$-value is computed for each cluster with the \Rfunction{combineTests} function.
-The BH method is then applied to control the FDR across all detected clusters.
-The number of \Rcode{up} or \Rcode{down} windows can be used to gauge whether binding increases or decreases across the cluster.
-A complex DB event may be present if both \Rcode{up} and \Rcode{down} are substantially non-zero (i.e., opposing changes within the region) or if the total number of windows is much larger than either number (e.g., interval of constant binding adjacent to the DB interval).
-
-<<>>=
-tabcom <- combineTests(merged$id, results$table)
-head(tabcom)
+merged <- mergeWindows(filtered.data, tol=1000L)
+merged$regions
 @
 
 If many adjacent windows are present, very large clusters may be formed that are difficult to interpret. 
@@ -1575,63 +1523,110 @@ Huge clusters indicate that more aggressive filtering from Chapter~\ref{chap:fil
 This mitigates chaining effects by reducing the density of windows in the genome.
 
 % Note that several large clusters may still be present due to high coverage within long tandem repeat loci.  
-% In general, chaining isn't as bad as single-linkage on the reads themselves, because windows that survive weak filtering should have reasonably high read counts. 
+% In general, chaining isn't as bad as single-linkage on the reads themselves, 
+% because windows that survive weak filtering should have reasonably high read counts. 
 
 <<>>=
-summary(width(merged$region))
+summary(width(merged$regions))
 @
 
 Alternatively, chaining can be limited by setting \Rcode{max.width} to restrict the size of the merged intervals. 
 Clusters substantially larger than \Rcode{max.width} are split into several smaller subclusters of roughly equal size.
-The chosen value should be small enough so as to separate DB regions from unchanged neighbors, yet large enough to avoid misinterpretation of the FDR.
+The chosen value should be small enough so as to separate DB regions from unchanged neighbors, 
+yet large enough to avoid misinterpretation of the FDR.
 Any value from 2000 to 10000 bp is recommended. 
 This paramater can also interpreted as the maximum distance at which two binding sites are considered part of the same event.
 
 <<>>=
-merged.max <- mergeWindows(rowRanges(filtered.data), tol=1000L, max.width=5000L)
-summary(width(merged.max$region))
+merged.max <- mergeWindows(filtered.data, tol=1000L, max.width=5000L)
+summary(width(merged.max$regions))
 @
 
-\section{Summarizing the direction of DB per cluster}
+\subsection{Using external information}
 
-\subsection{Based on the contribution to the combined $p$-value}
+Another approach is to group together windows that overlap with a pre-specified region of interest.
+The most obvious source of pre-specified regions is that of annotated features such as promoters or gene bodies.
+Alternatively, called peaks can be used provided that sufficient care has been taken to avoid loss of error control from data snooping \cite{lun2014}.
+Regardless of how they are specified, each region of interest corresponds to a group that contains all overlapping windows,  
+as identified by the \Rfunction{findOverlaps} function from the \Biocpkg{GenomicRanges} package. 
+
+<<>>=
+olap <- findOverlaps(broads, rowRanges(filtered.data))
+olap
+@
+
+At this point, one might imagine that it would be simpler to just collect and analyze counts over the pre-specified regions. 
+This is a valid strategy but will yield different results. 
+Consider a promoter containing two separate sites that are identically DB in opposite directions. 
+Counting reads across the promoter will give equal counts for each condition so changes within the promoter will not be detected. 
+Similarly, imprecise peak boundaries can lead to loss of detection power due to ``contamination'' by reads in background regions.
+Window-based methods may be more robust as each interval of the promoter/peak region is examined separately \cite{lun2014}, 
+avoiding potential problems with peak-calling errors and incorrect/incomplete annotation.
+
+\section{Obtaining per-region $p$-value}
+
+\subsection{Combining window-level $p$-values}
+
+We compute a combined $p$-value for each region based on the $p$-values of the constituent windows \cite{simes1986}.
+This tests the joint null hypothesis for each region, i.e., that no enrichment is observed across any of its windows.
+Any DB within the region will reject the joint null and yield a low $p$-value for the entire region.
+The combined $p$-values are then adjusted using the BH method to control the region-level FDR.
+
+<<>>=
+tabcom <- combineTests(merged$ids, results$table)
+is.sig.region <- tabcom$FDR <= 0.05
+summary(is.sig.region)
+@
+
 Summarizing the direction of DB for each cluster requires some care as the direction of DB can differ between constituent windows.
-The \Rcode{direction} field returned by \Rfunction{combineTests} specifies which DB direction contributes to the combined $p$-value.
+The \Rcode{up} or \Rcode{down} fields contain the number of windows that change by more than $\sqrt{2}$ in either direction, 
+and can be used to gauge whether binding increases or decreases across the cluster.
+A complex DB event may be present if both \Rcode{up} and \Rcode{down} are substantially non-zero 
+(i.e., opposing changes within the region) or if the total number of windows is much larger than either number 
+(e.g., interval of constant binding adjacent to the DB interval).
+
+Alternatively, the \Rcode{direction} field specifies which DB direction contributes to the combined $p$-value.
 If \Rcode{"up"}, the combined $p$-value for this cluster is driven by $p$-values of windows with positive log-fold changes.
 If \Rcode{"down"}, the combined $p$-value is driven by windows with negative log-fold changes.
 If \Rcode{"mixed"}, windows with both positive and negative log-fold changes are involved.
 This allows the dominant DB in significant clusters to be quickly summarized, as shown below.
 
 <<>>=
-is.sig.region <- tabcom$FDR <= 0.05
 table(tabcom$direction[is.sig.region])
 @
 
-The same approach is used with the output of \Rfunction{combineOverlaps} for gene-based clusters.
-This requires some protection against \Rcode{NA} values for genes that contain no windows.
+For pre-specified regions, the \Rfunction{combineOverlaps} function will combine the $p$-values for all windows in each region. 
+This is a wrapper around \Rfunction{combineTests} for \Rclass{Hits} objects.
+It returns a single combined $p$-value (and its BH-adjusted value) for each region. 
+Regions that do not overlap any windows have values of \Rcode{NA} in all fields for the corresponding rows.
 
 <<>>=
+tabbroad <- combineOverlaps(olap, results$table)
+head(tabbroad[!is.na(tabbroad$PValue),])
 is.sig.gene <- tabcom$FDR <= 0.05
 table(tabbroad$direction[is.sig.gene])
 @
 
-Mixed clusters represent complex DB events where the shape of the binding profile changes, i.e., not just a scaling increase/decrease to binding intensity.
-This includes regions with multiple peaks changing in opposite directions, or peaks that change in shape or position between conditions.
-Regions labelled as \Rcode{"up"} or \Rcode{"down"} may also correspond to complex DB events,
-but will not be labelled as \Rcode{"mixed"} if the significance calculations are dominated by windows changing in only one direction.
-For rigorous identification of mixed clusters, users are advised to use the \Rfunction{mixedClusters} function instead of \Rfunction{combineTests}.
-
 \subsection{Based on the most significant window}
-Another approach is to define the direction of change for each cluster as that of the window with the strongest DB.
+\label{sec:mostsig}
+
+Another approach is to use the single window with the strongest DB as a representative of the entire region.
 This is useful when a log-fold change is required for each cluster, e.g., for plotting.
-In contrast, taking the average log-fold change across all windows in a cluster will understate the magnitude of DB.
+(In contrast, taking the average log-fold change across all windows in a region will understate the magnitude of DB,
+especially if the region includes some non-DB background intervals of the genome.)
 Identification of the most significant (i.e., ``best'') window is performed using the \Rfunction{getBestTest} function.
-This reports the index of the window with the lowest $p$-value in each cluster, as well as the associated statistics.
+This reports the index of the window with the lowest $p$-value in each cluster as well as the associated statistics.
 
 <<>>=
-tab.best <- getBestTest(merged$id, results$table)
+tab.best <- getBestTest(merged$ids, results$table)
 head(tab.best)
 @
+
+A Bonferroni correction is applied to the $p$-value of the best window in each region, 
+based on the number of constituent windows in that region.
+This is necessary to account for the implicit multiple testing across all windows in each region.
+The corrected $p$-value is reported as \Rcode{PValue} in \Robject{tab.best},
+and can be used for correction across regions using the BH method to control the region-level FDR.
 
 In addition, it is often useful to report the start location of the best window within each cluster.
 This allows users to easily identify a relevant DB subinterval in large regions.
@@ -1643,9 +1638,11 @@ tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
 head(tabcom[,c("best.logFC", "best.start")])
 @
 
-The same approach can be applied to the overlaps between windows and pre-specified regions, using the \Rfunction{getBestOverlaps} wrapper function.
+The same approach can be applied to the overlaps between windows and pre-specified regions, 
+using the \Rfunction{getBestOverlaps} wrapper function.
 This is demonstrated below for the broad gene body example.
-As with \Rfunction{combineOverlaps}, regions with no windows are assigned \Rcode{NA} in the output table, but these are removed here to show some actual results.
+As with \Rfunction{combineOverlaps}, regions with no windows are assigned \Rcode{NA} in the output table, 
+but these are removed here to show some actual results.
 
 <<>>=
 tab.best.broad <- getBestOverlaps(olap, results$table)
@@ -1654,10 +1651,25 @@ tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
 head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
 @
 
-Typically, the best window will only be used as a descriptive measure for each cluster.
-However, more statistical rigour is required if these windows are treated as the features of interest over which the error rate is to be controlled.
-A Bonferroni correction is applied to the $p$-value of each best window to obtain the corresponding \Rcode{PValue} in \Robject{tab.best}.
-This is necessary to account for the implicit multiple testing across all windows in each cluster.
+\subsection{Wrapper functions}
+
+For convenience, the steps of merging windows and computing statistics are implemented into a single wrapper function.
+This simply calls \Rcode{mergeWindows} followed by \Rcode{combineTests} and \Rcode{getBestTest}.
+
+<<>>=
+merge.res <- mergeResults(filtered.data, results$table, tol=100,
+    merge.args=list(max.width=5000))
+names(merge.res)
+@
+
+An equivalent wrapper function is also available for handling overlaps to pre-specified regions.
+This simply calls \Rcode{findOverlaps} followed by \Rcode{combineOverlaps} and \Rcode{getBestOverlaps}.
+
+<<>>=
+broad.res <- overlapResults(filtered.data, regions=broads,
+    tab=results$table)
+names(broad.res)
+@
 
 \section{Squeezing out more detection power}
 
@@ -1671,47 +1683,48 @@ Corresponding tables of DB results should also be obtained -- for brevity, mock 
 
 <<>>=
 ac.small <- windowCounts(ac.files, width=150L, spacing=100L, 
-                         filter=25, param=param)
+    filter=25, param=param)
 ac.large <- windowCounts(ac.files, width=1000L, spacing=500L, 
-                         filter=35, param=param)
+    filter=35, param=param)
+
+# Mocking up results for demonstration purposes.
 ns <- nrow(ac.small)
 mock.small <- data.frame(logFC=rnorm(ns), logCPM=0, PValue=runif(ns)) 
 nl <- nrow(ac.large)
 mock.large <- data.frame(logFC=rnorm(nl), logCPM=0, PValue=runif(nl)) 
 @
 
-The \Rfunction{consolidateWindows} and \Rfunction{consolidateTests} functions are applied to combine these results.
-The former merges windows of all sizes into a single set of clusters, and the latter computes a combined $p$-value from the associated $p$-values for each cluster.
-Equal contributions from each window size are enforced by setting \Rcode{equiweight=TRUE}, which uses a weighted version of Simes' method \cite{benjamini1997}.
+The \Rfunction{mergeResultsList} function merges windows of all sizes into a single set of regions, 
+and computes a combined $p$-value from the associated $p$-values for each region.
+Equal contributions from each window size are enforced by setting \Rcode{equiweight=TRUE}, 
+which uses a weighted version of Simes' method \cite{benjamini1997}.
 The weight assigned to each window is inversely proportional to the number of windows of that size in the same cluster.
-Weighting avoids the problem where, if a cluster contains many small windows, the DB results for the analysis with the small window size contribute most to the combined $p$-value.
+This avoids the situation where, if a cluster contains many small windows, 
+the DB results for the analysis with the small window size contribute most to the combined $p$-value.
 This is not ideal when results from all window sizes are of equal interest.
 
 <<>>=
-cons.win <- consolidateWindows(data.list=list(ac.small, ac.large), 
-    equiweight=TRUE, merge.args=list(tol=1000))
-cons.win$region
-cons.res <- consolidateTests(id.list=cons.win$id, 
-    result.list=list(mock.small, mock.large), 
-    weight.list=cons.win$weight)
-cons.res
+cons.res <- mergeResultsList(list(ac.small, ac.large), 
+    tab.list=list(mock.small, mock.large), 
+    equiweight=TRUE, tol=1000)
+cons.res$regions
+cons.res$combined
 @
 
-The same function can also be used to consolidate windows of varying size that overlap pre-specified regions.
-This is done by specifying the \Rcode{region} argument, as shown below.
+Similarly, the \Rfunction{overlapResultsList} function is used to merge windows of varying size that overlap pre-specified regions.
 
 <<>>=
-cons.olap <- consolidateWindows(data.list=list(ac.small, ac.large),
+cons.broad <- overlapResultsList(list(ac.small, ac.large),
+    tab.list=list(mock.small, mock.large), 
     equiweight=TRUE, region=broads)
-cons.broad <- consolidateOverlaps(olap.list=cons.olap$olap,
-    result.list=list(mock.small, mock.large), 
-    weight.list=cons.olap$weight)
-cons.broad
+cons.broad$regions
+cons.res$combined
 @
 
 In this manner, DB results from multiple window widths can be gathered together and reported as a single set of regions.
 Consolidation is most useful for histone marks and other analyses involving diffuse regions of enrichment.
-For such studies, the ideal window size is not known or may not even exist, e.g., if the widths of the enriched regions are variable.
+For such studies, the ideal window size is not known or may not even exist, 
+e.g., if the widths of the enriched regions or DB subintervals are variable.
 
 \subsection{Weighting windows on abundance}
 Windows that are more likely to be DB can be upweighted to improve detection power.
@@ -1801,6 +1814,30 @@ In contrast, the standard BH method in \Rfunction{combineTests} relies on proper
 As non-specific binding events tend to be condition-specific, they are indistinguishable from DB events and assigned low $p$-values, resulting in loss of FDR control.
 Thus, for noisy data, use of the empirical FDR may be more appropriate to control the proportion of ``experimental'' false positives.
 However, calculation of the empirical FDR is not as statistically rigorous as that of the BH method, so users are advised to only apply it when necessary.
+
+\subsection{Detecting complex DB}
+
+Complex DB events involve changes to the shape of the binding profile, not just a scaling increase/decrease to binding intensity.
+Such regions may contain multiple sites that change in binding strength in opposite directions, 
+or peaks that change in width or position between conditions.
+This often manifests as DB in opposite directions in different subintervals of a region.
+Some of these events can be identified using the \Rfunction{mixedClusters} function.
+
+<<>>=
+tab.mixed <- mixedClusters(merged$ids, results$table)
+tab.mixed
+@
+
+\Rfunction{mixedClusters} converts the $p$-value for each window into two one-sided $p$-values.
+The one-sided $p$-values in each direction are combined using Simes' method,
+and the two one-sided combined $p$-values are themselves combined using an intersection-union test \cite{berger1996bioequivalence}.
+The resulting $p$-value is only low if a region contains strong DB in both directions.
+
+\Rfunction{combineTests} also computes some statistics for informal detection of complex DB.
+For example, the \Rcode{up} and \Rcode{down} fields can be used to identify regions with changes in both directions.
+The \Rcode{direction} field will also label some regions as \Rcode{"mixed"}, though this is not comprehensive.
+Indeed, regions labelled as \Rcode{"up"} or \Rcode{"down"} in the `direction` field may also correspond to complex DB events,
+but will not be labelled as \Rcode{"mixed"} if the significance calculations are dominated by windows changing in only one direction.
 
 \section{Further points on data management}
 Technically, \Rcode{results\$table} was not required in any of the calls performed in this chapter.
