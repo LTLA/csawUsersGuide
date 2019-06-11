@@ -639,11 +639,11 @@ The threshold may also be inappropriate when library sizes are very different.
 One approach is to to assume that only a certain proportion - say, 0.1\% - of the genome is genuinely bound. 
 This corresponds to the top proportion of high-abundance windows.
 The total number of windows is calculated from the genome length and the \Rcode{spacing} interval used in \Rfunction{windowCounts}. 
-The \Rfunction{filterWindows} function returns the ratio of the rank of each window to this total, where higher-abundance windows have larger ranks.
+The \Rfunction{filterWindowsProportion} function returns the ratio of the rank of each window to this total, where higher-abundance windows have larger ranks.
 Users can then retain those windows with rank ratios above the unbound proportion of the genome.
 
 <<>>=
-keep <- filterWindows(data, type="proportion")$filter > 0.999
+keep <- filterWindowsProportion(data)$filter > 0.999
 sum(keep)
 @
 
@@ -669,14 +669,14 @@ This determines whether a window is driven by background enrichment, and thus, u
 However, some care is required as the sizes of the regions used for read counting are different between bins and windows.
 The average abundance of each bin must be scaled down to be comparable to those of the windows.
 
-With \Rcode{type="global"}, the \Rfunction{filterWindows} function returns the increase in the abundance of each window over the global background.
+The \Rfunction{filterWindowsGlobal} function returns the increase in the abundance of each window over the global background.
 Windows are filtered by setting some minimum threshold on this increase.
 The aim is to eliminate the majority of uninteresting windows prior to further analysis.
 Here, a fold change of 3 is necessary for a window to be considered as containing a binding site. 
 This approach has an intuitive and experimentally relevant interpretation that adapts to the level of non-specific enrichment in the dataset. 
 
 <<>>=
-filter.stat <- filterWindows(data, background=binned, type="global")
+filter.stat <- filterWindowsGlobal(data, background=binned)
 keep <- filter.stat$filter > log2(3)
 sum(keep)
 @
@@ -714,7 +714,7 @@ neighbor <- suppressWarnings(resize(rowRanges(data), surrounds, fix="center"))
 wider <- regionCounts(bam.files, regions=neighbor, ext=frag.len, param=param)
 @
 
-We apply \Rfunction{filterWindows} with \Rcode{type="local"} to compute enrichment values, i.e., the increase in the abundance of each window over its neighborhood.
+We apply \Rfunction{filterWindowsLocal} to compute enrichment values, i.e., the increase in the abundance of each window over its neighborhood.
 In this function, counts for each window are subtracted from the counts for its neighborhood.
 This ensures that any enriched regions or binding sites inside the window will not interfere with estimation of its local background.
 The width of the window is also subtracted from that of its neighborhood, to reflect the effective size of the latter after subtraction of counts.
@@ -722,7 +722,7 @@ Based on the fold-differences in widths, the abundance of the neighborhood is sc
 Enrichment values are subsequently calculated from the differences in scaled abundances.
 
 <<>>=
-filter.stat <- filterWindows(data, wider, type="local")
+filter.stat <- filterWindowsLocal(data, wider)
 summary(filter.stat$filter)
 @
 
@@ -787,15 +787,15 @@ control.binned <- in.binned[,5]
 scale.info <- scaleControlFilter(chip.binned, control.binned)
 @
 
-We use the \Rfunction{filterWindows} function with \Rcode{type="control"} to compute the enrichment of the ChIP counts over the control counts for each window.
+We use the \Rfunction{filterWindowsControl} function to compute the enrichment of the ChIP counts over the control counts for each window.
 This uses \Robject{scale.info} to adjust for composition biases between ChIP and control samples.
 A larger \Rcode{prior.count} of 5 is also used to compute the average abundance.
 This protects against inflated log-fold changes when the count for the window in the control sample is near zero.
 By comparison, the global and local background estimates require less protection (\Rcode{prior.count=2}, by default) as they are derived from larger bins with more counts.
 
 <<>>=
-filter.stat <- filterWindows(chip, control, type="control", prior.count=5, 
-                             scale.info=scale.info)
+filter.stat <- filterWindowsControl(chip, control, 
+    prior.count=5, scale.info=scale.info)
 @
 
 The log-fold enrichment of the ChIP sample over the control is then computed for each window, after normalizing for composition bias with the binned counts.
@@ -1008,7 +1008,7 @@ Here, the binned counts in \Robject{me.bin} are only used for defining the backg
 
 <<>>=
 me.bin <- windowCounts(me.files, bin=TRUE, width=10000, param=param) 
-keep <- filterWindows(me.demo, me.bin, type="global")$filter > log2(3)
+keep <- filterWindowsGlobal(me.demo, me.bin)$filter > log2(3)
 filtered.me <- me.demo[keep,]
 @
 
@@ -1034,7 +1034,7 @@ acdata
 ac.files <- acdata$Path[c(1,2)]
 ac.demo <- windowCounts(ac.files, width=150, param=param)
 ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
-keep <- filterWindows(ac.demo, ac.bin, type="global")$filter > log2(5)
+keep <- filterWindowsGlobal(ac.demo, ac.bin)$filter > log2(5)
 summary(keep)
 filtered.ac <- ac.demo[keep,]
 filtered.ac <- normFactors(filtered.ac, se.out=TRUE)
@@ -1048,21 +1048,22 @@ In such cases, it is safer to normalize for composition biases -- see Section~\r
 
 \subsection{Filtering windows prior to normalization}
 Normalization for efficiency biases is performed on window-level counts instead of bin counts.
-This is possible as the former should be large enough after filtering and retention of high-abundance windows.
-It is not necessary to use larger windows or bins to compute the normalization factors.
-Indeed, direct use of the windows of interest ensures removal of systematic differences prior to downstream analyses.
+This is possible as filtering ensures that we only retain the high-abundance windows, 
+i.e., those with counts that are large enough for stable calculation of normalization factors.
+It is not necessary to use larger windows or bins, and indeed, 
+direct use of the windows of interest ensures removal of systematic differences in those windows prior to downstream analyses.
 
-The filtering procedure needs to be stringent to avoid retaining windows from background regions.
+The filtering procedure needs to be stringent enough to avoid retaining windows from background regions.
 These will interfere with calculation of normalization factors from binding sites.
 This is due to the lower coverage for background regions, as well as the fact that they are not affected by efficiency bias (and cannot contribute to its estimation).
-Conversely, attempting to use the computed factors on windows from background regions will result in incorrect normalization of those windows.
+Conversely, attempting to use the factors computed from high-abundance windows on windows from background regions will result in incorrect normalization of the latter.
 Thus, it is usually better to err on the side of caution and filter aggressively to ensure that background regions are not retained in downstream analyses.
 Obviously, though, retaining too few windows will result in unstable estimates of the normalization factors.
 
 \subsection{Checking normalization with MA plots}
 \label{sec:eff_norm_ma}
 
-The effect of normalization can be visualized with MA plots. 
+We again visualize the effect of normalization with MA plots. 
 Plots are constructed using counts for 10 kbp bins, rather than with those from the windows.
 This is useful as the behavior of the entire genome can be examined, rather than just that of the high-abundance windows.
 It also allows calculation of and comparison to the factors for composition bias.
@@ -1147,7 +1148,7 @@ Compared to the previous normalization methods, the spike-in approach does not d
 Instead, it uses the fold-differences in the coverage of spiked-in binding sites to empirically measure and remove the net bias between libraries.
 This avoids the need for assumptions regarding the origin of any systematic differences between libraries.
 That said, spike-in normalization involves some strong assumptions of its own.
-In particular, the same ratio of spike-in chromatin to endogenous chromatin is assumed to be present in each sample.
+In particular, the ratio of spike-in chromatin to endogenous chromatin is assumed to be the same in each sample.
 This requires accurate quantitation of the chromatin in each sample, followed by precise addition of small spike-in quantities.
 Furthermore, the spike-in chromatin is assumed to behave in the same manner as endogenous chromatin throughout the ChIP-seq protocol.
 Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-in chromatin.
@@ -1171,7 +1172,7 @@ Obviously, users should pick a more appropriate value for their analysis.)
 
 <<>>=
 ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
-filtered <- filterWindows(ac.demo2, ac.bin, type="global")
+filtered <- filterWindowsGlobal(ac.demo2, ac.bin)
 keep <- filtered$filter > log2(4)
 ac.demo2 <- ac.demo2[keep,]
 ac.demo2 <- normOffsets(ac.demo2, se.out=TRUE)
@@ -1192,7 +1193,7 @@ This is necessary to remove trended biases but may also discard genuine changes,
 Compared to TMM normalization, the accuracy of loess normalization is less dependent on stringent filtering.
 This is because the use of a trend accommodates changes in the bias between high-abundance binding sites and low-abundance background regions.
 Nonetheless, some filtering is still necessary to avoid inaccuracies in loess fitting at low abundances.
-Any filter statistic for the windows should be based on the average abundance from \Rfunction{aveLogCPM}, such as those calculated using \Rfunction{filterWindows}.
+Any filter statistic for the windows should be based on the average abundance from \Rfunction{aveLogCPM}, such as those calculated using \Rfunction{filterWindowsGlobal} or equivalents.
 An average abundance threshold will act as a clean vertical cutoff in the MA plots above. 
 This avoids introducing spurious trends at the filter boundary that might affect normalization.
 
