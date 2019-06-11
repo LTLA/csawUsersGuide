@@ -48,9 +48,14 @@ summarization of windows into regions, and visualization and annotation of detec
 \chapter{Introduction}
 
 \section{Scope}
-This document gives an overview of the \Bioconductor{} package \Biocpkg{csaw} for detecting differential binding (DB) in ChIP-seq experiments.
+This document describes the \Bioconductor{} package \Biocpkg{csaw} for detecting differential binding (DB) in ChIP-seq experiments.
 \Biocpkg{csaw} uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions \cite{lun2016csaw}.
 However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.
+
+The descriptions in this user's guide are detailed and will explore the theoretical and practical motivations behind each step of a \Biocpkg{csaw} analysis.
+While all users are welcome to read it from start to finish, new users may prefer to examine the case studies presented in the \Biocpkg{chipseqDB} package \cite{lun2015from}, which provides the important information in a more concise format.
+Experienced users (or those looking for some nighttime reading!) are more likely to benefit from the in-depth discussions in this document.
+
 The statistical methods described here are based upon those in the \Biocpkg{edgeR} package \cite{robinson2010}. 
 Knowledge of \Biocpkg{edgeR} is useful but not a prerequesite for reading this guide.
 
