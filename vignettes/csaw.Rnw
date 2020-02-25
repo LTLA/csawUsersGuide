@@ -1585,9 +1585,9 @@ summary(is.sig.region)
 @
 
 Summarizing the direction of DB for each cluster requires some care as the direction of DB can differ between constituent windows.
-The \Rcode{up} or \Rcode{down} fields contain the number of windows that change by more than $\sqrt{2}$ in either direction, 
+The \Rcode{num.up.tests} and \Rcode{num.down.tests} fields contain the number of windows that change in each direction, 
 and can be used to gauge whether binding increases or decreases across the cluster.
-A complex DB event may be present if both \Rcode{up} and \Rcode{down} are substantially non-zero 
+A complex DB event may be present if both \Rcode{num.up.tests} and \Rcode{num.down.tests} are non-zero 
 (i.e., opposing changes within the region) or if the total number of windows is much larger than either number 
 (e.g., interval of constant binding adjacent to the DB interval).
 
@@ -1639,9 +1639,8 @@ This allows users to easily identify a relevant DB subinterval in large regions.
 For example, the sequence of the DB subinterval can be extracted for motif discovery.
 
 <<>>=
-tabcom$best.logFC <- tab.best$logFC
-tabcom$best.start <- start(rowRanges(filtered.data))[tab.best$best]
-head(tabcom[,c("best.logFC", "best.start")])
+tabcom$rep.start <- start(rowRanges(filtered.data))[tab.best$rep.test]
+head(tabcom[,c("rep.logFC", "rep.start")])
 @
 
 The same approach can be applied to the overlaps between windows and pre-specified regions, 
@@ -1652,9 +1651,8 @@ but these are removed here to show some actual results.
 
 <<>>=
 tab.best.broad <- getBestOverlaps(olap, results$table)
-tabbroad$best.logFC <- tab.best.broad$logFC
-tabbroad$best.start <- start(rowRanges(filtered.data))[tab.best.broad$best]
-head(tabbroad[!is.na(tabbroad$PValue),c("best.logFC", "best.start")])
+tabbroad$rep.start <- start(rowRanges(filtered.data))[tab.best.broad$rep.test]
+head(tabbroad[!is.na(tabbroad$PValue),c("rep.logFC", "rep.start")])
 @
 
 \subsection{Wrapper functions}
@@ -1751,7 +1749,7 @@ Window-specific weights are then computed using the \Rfunction{upweightSummits} 
 
 <<>>=
 tab.ave <- getBestTest(merged$id, results$table, by.pval=FALSE)
-weights <- upweightSummit(merged$id, tab.ave$best)
+weights <- upweightSummit(merged$id, tab.ave$rep.test)
 head(weights)
 tabcom.w <- combineTests(merged$id, results$table, weight=weights)
 head(tabcom.w)
@@ -1765,7 +1763,7 @@ These wrappers are designed to minimize book-keeping problems when one window ov
 <<>>=
 broad.best <- getBestOverlaps(olap, results$table, by.pval=FALSE)
 head(broad.best[!is.na(broad.best$PValue),])
-broad.weights <- summitOverlaps(olap, region.best=broad.best$best)
+broad.weights <- summitOverlaps(olap, region.best=broad.best$rep.test)
 tabbroad.w <- combineOverlaps(olap, results$table, o.weight=broad.weights) 
 @
 
@@ -1803,6 +1801,7 @@ That said, users should be aware that calculation of the cluster-level FDR is no
 As such, independent clustering and FDR control via Simes' method should be considered as the default for routine analyses.
 
 \subsection{Using the empirical FDR for noisy data}
+
 Some analyses involve comparisons of ChIP samples to negative controls.
 In such cases, any region exhibiting enrichment in the negative control over the ChIP samples must be a false positive.
 The number of significant regions that change in the ``wrong'' direction can be used as an estimate of the number of false positives at any given $p$-value threshold.
@@ -1827,25 +1826,48 @@ Complex DB events involve changes to the shape of the binding profile, not just 
 Such regions may contain multiple sites that change in binding strength in opposite directions, 
 or peaks that change in width or position between conditions.
 This often manifests as DB in opposite directions in different subintervals of a region.
-Some of these events can be identified using the \Rfunction{mixedClusters} function.
+Some of these events can be identified using the \Rfunction{mixedTests} function.
 
 <<>>=
-tab.mixed <- mixedClusters(merged$ids, results$table)
+tab.mixed <- mixedTests(merged$ids, results$table)
 tab.mixed
 @
 
-\Rfunction{mixedClusters} converts the $p$-value for each window into two one-sided $p$-values.
+\Rfunction{mixedTests} converts the $p$-value for each window into two one-sided $p$-values.
 The one-sided $p$-values in each direction are combined using Simes' method,
 and the two one-sided combined $p$-values are themselves combined using an intersection-union test \cite{berger1996bioequivalence}.
 The resulting $p$-value is only low if a region contains strong DB in both directions.
 
 \Rfunction{combineTests} also computes some statistics for informal detection of complex DB.
-For example, the \Rcode{up} and \Rcode{down} fields can be used to identify regions with changes in both directions.
+For example, the \Rcode{num.up.tests} and \Rcode{num.down.tests} fields can be used to identify regions with changes in both directions.
 The \Rcode{direction} field will also label some regions as \Rcode{"mixed"}, though this is not comprehensive.
 Indeed, regions labelled as \Rcode{"up"} or \Rcode{"down"} in the `direction` field may also correspond to complex DB events,
 but will not be labelled as \Rcode{"mixed"} if the significance calculations are dominated by windows changing in only one direction.
 
+\subsection{Enforcing a minimal number of DB windows}
+
+On occasion, we may be interested in genomic regions that contain at least a minimal number or proportion of DB windows.
+This is motivated by the desire to avoid detecting DB regions where only a small subinterval exhibits a change,
+instead favoring more systematic changes throughout the region that are easier to interpret.
+We can identify these regions using the \Rfunction{minimalTests} function.
+
+<<>>=
+tab.min <- minimalTests(merged$ids, results$table,
+    min.sig.n=3, min.sig.prop=0.5)
+tab.min
+@
+
+\Rfunction{minimalTests} applies a Holm-Bonferroni correction to all windows in the same cluster and picks the $x$\textsuperscript{th}-smallest adjusted $p$-value (where $x$ is defined from `min.sig.n` and `min.sig.prop`).
+This tests the joint null hypothesis that the per-window null hypothesis is false for fewer than $x$ windows in the cluster.
+If the $x$\textsuperscript{th}-smallest $p$-value is low, this provides strong evidence against the joint null for that cluster.
+
+As an aside, this function also has some utility outside of ChIP-seq contexts.
+For example, we might want to obtain a single $p$-value for a gene set based on the presence of a minimal percentage of differentially expressed genes.
+Alternatively, we may be interested in ranking genes in loss-of-function screens based on a minimal number of shRNA/CRISPR guides that exhibit a significant effect.
+These problems are equivalent to that of identifying a genomic region with a minimal number of DB windows.
+
 \section{Further points on data management}
+
 Technically, \Rcode{results\$table} was not required in any of the calls performed in this chapter.
 Recall that the per-window significance statistics were stored in the row metadata of \Robject{filtered.data}.
 Thus, \Rcode{rowData(filtered.data)} could be used instead of \Rcode{results\$table}.
