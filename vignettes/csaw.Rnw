@@ -1212,6 +1212,7 @@ par(mfrow=c(1,2))
 
 # MA plot without normalization.
 ac.y <- asDGEList(ac.demo2)
+lib.size <- ac.y$samples$lib.size
 adjc <- cpm(ac.y, log=TRUE)
 abval <- aveLogCPM(ac.y)
 mval <- adjc[,1]-adjc[,2]
@@ -2004,7 +2005,7 @@ This ensures that the same reads used in the analysis will be pulled out during 
 
 <<>>=
 cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
-extractReads(bam.files[1], cur.region, param=param)
+extractReads(bam.files[[1]], cur.region, param=param)
 @
 
 Here, coverage is visualized as the number of reads covering each base pair in the interval of interest.
@@ -2018,12 +2019,12 @@ For paired-end data, coverage can be similarly plotted for fragments, i.e., prop
 library(Gviz)
 collected <- vector("list", length(bam.files))
 for (i in seq_along(bam.files)) { 
-    reads <- extractReads(bam.files[i], cur.region, param=param)
+    reads <- extractReads(bam.files[[i]], cur.region, param=param)
     adj.total <- data$totals[i]/1e6
     pcov <- as(coverage(reads[strand(reads)=="+"])/adj.total, "GRanges")
     ncov <- as(coverage(reads[strand(reads)=="-"])/adj.total, "GRanges")
     ptrack <- DataTrack(pcov, type="histogram", lwd=0, fill=rgb(0,0,1,.4), 
-                        ylim=c(0,1.1), name=bam.files[i], col.axis="black", 
+                        ylim=c(0,1.1), name=tf.data$Name[i], col.axis="black", 
                         col.title="black")
     ntrack <- DataTrack(ncov, type="histogram", lwd=0, fill=rgb(1,0,0,.4), 
                         ylim=c(0,1.1))
