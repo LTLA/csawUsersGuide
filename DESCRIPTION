@@ -1,5 +1,5 @@
 Package: csawUsersGuide
-Version: 1.5.1
+Version: 1.6.0
 Date: 2020-10-21
 Title: csaw User's Guide
 Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
