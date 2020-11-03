@@ -1,0 +1,21 @@
+```{r}
+library(rebook)
+chapterPreamble()
+```
+
+```{r loading-files}
+library(chipseqDBData)
+tf.data <- NFYAData()
+tf.data
+bam.files <- head(tf.data$Path, -1) # skip the input.
+bam.files
+```
+
+```{r counting-windows}
+library(csaw)
+frag.len <- 110
+win.width <- 10
+param <- readParam(minq=20)
+data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
+```
+
