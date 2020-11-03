@@ -1,0 +1,134 @@
+--- 
+title: "The csaw User's Guide"
+documentclass: book
+bibliography: ref.bib
+biblio-style: apalike
+link-citations: yes
+description: "Too awesome for a vignette, too technical for Mills & Boon."
+github-repo: Bioconductor/OrchestratingSingleCellAnalysis
+---
+
+```{r, echo=FALSE}
+.gh_url <- file.path('https://github.com', rmarkdown::metadata[['github-repo']])
+```
+
+---
+date: "`r rebook::openingDetails(Copyright='Bioconductor, 2020', Source=.gh_url)`"
+url: "`r .gh_url`"
+---
+
+```{r, echo=FALSE}
+rebook::chapterPreamble()
+```
+
+# Welcome
+
+## Scope 
+
+This book describes the use of the `r Biocpkg("csaw")` Bioconductor package to detect differential binding (DB) in ChIP-seq experiments.
+`r Biocpkg("csaw")` uses sliding windows to identify significant changes in binding patterns for transcription factors (TFs) or histone marks across different biological conditions [@lun2016csaw].
+However, it can also be applied to any sequencing technique where reads represent coverage of enriched genomic regions.
+
+The descriptions in this user's guide explore the theoretical and practical motivations behind each step of a `r Biocpkg("csaw")` analysis.
+While all users are welcome to read it from start to finish, new users may prefer to examine the case studies presented in the later sections [@lun2015from], which provides the important information in a more concise format.
+Experienced users (or those looking for some nighttime reading!) are more likely to benefit from the in-depth discussions in this document.
+
+The statistical methods described here are based upon those in the `r Biocpkg("edgeR")` package [@robinson2010]. 
+Knowledge of `r Biocpkg("edgeR")` is useful but not a prerequesite for reading this guide.
+
+## How to get help
+
+Most questions about `r Biocpkg("csaw")` should be answered by the documentation. 
+Every function mentioned in this guide has its own help page. 
+For example, a detailed description of the arguments and output of the `windowCounts()` function can be obtained by typing `?windowCounts` or `help(windowCounts)` at the R prompt. 
+Further detail on the methods or the underlying theory can be found in the references at the bottom of each help page.
+
+The authors of the package always appreciate receiving reports of bugs in the package functions or in the documentation. 
+The same goes for well-considered suggestions for improvements. 
+Other questions about how to use `r Biocpkg("csaw")` are best sent to the [Bioconductor support site](https://support.bioconductor.org).
+Please send requests for general assistance and advice to the support site, rather than to the individual authors. 
+Users posting to the support site for the first time may find it helpful to read the [posting guide](http://www.bioconductor.org/help/support/posting-guide).
+
+## How to cite this package
+
+Most users of `r Biocpkg("csaw")` should cite the following in any publications:
+
+> A. T. Lun and G. K. Smyth. 
+csaw: a Bioconductor package for differential binding analysis of ChIP-seq data using sliding windows. 
+_Nucleic Acids Res._, 44(5):e45, Mar 2016
+
+To cite the workflows specifically, we can use:
+
+> A. T. L. Lun and G. K. Smyth. 
+From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data. 
+_F1000Research_, 4, 2015
+
+For people interested in combined $p$-values, their use in DB analyses was proposed in:
+
+> A. T. Lun and G. K. Smyth. 
+De novo detection of differentially bound regions for ChIP-seq data using peaks and windows: controlling error rates correctly. 
+_Nucleic Acids Res._, 42(11):e95, Jul 2014
+
+The DB analyses shown here use methods from the `r Biocpkg("edgeR")` package, which has its own citation recommendations.
+See the appropriate section of the `r Biocpkg("edgeR")` user's guide for more details.
+
+## Quick start
+
+A typical ChIP-seq analysis in `r Biocpkg("csaw")` would look something like that described below. 
+This assumes that a vector of file paths to sorted and indexed BAM files is provided in \Robject{bam.files} and a design matrix in supplied in \Robject{design}.
+The code is split across several steps:
+
+```{r}
+library(chipseqDBData)
+tf.data <- NFYAData()
+tf.data <- head(tf.data, -1) # skip the input.
+bam.files <- tf.data$Path
+
+cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", tf.data$Description)
+design <- model.matrix(~factor(cell.type))
+colnames(design) <- c("intercept", "cell.type")
+```
+
+1. Loading in data from BAM files.
+
+    ```{r}
+    library(csaw)
+    param <- readParam(minq=20)
+    data <- windowCounts(bam.files, ext=110, width=10, param=param)
+    ```
+
+2. Filtering out uninteresting regions.
+
+    ```{r}
+    library(edgeR)
+    keep <- aveLogCPM(asDGEList(data)) >= -1
+    data <- data[keep,]
+    ```
+
+3. Calculating normalization factors.
+
+    ```{r}
+    binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+    data <- normFactors(binned, se.out=data)
+    ```
+
+4. Identifying DB windows.
+
+    ```{r}
+    y <- asDGEList(data)
+    y <- estimateDisp(y, design)
+    fit <- glmQLFit(y, design, robust=TRUE)
+    results <- glmQLFTest(fit)
+    ```
+
+5. Correcting for multiple testing.
+
+    ```{r}
+    merged <- mergeResults(data, results$table, tol=1000L)
+    ```
+
+## Session information {-}
+
+```{r, echo=FALSE, results='asis'}
+rebook::prettySessionInfo()
+```
