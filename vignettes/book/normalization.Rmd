@@ -1,0 +1,388 @@
+# Normalizing for technical biases {#chap:norm}
+
+```{r, echo=FALSE, results='asis'}
+library(rebook)
+chapterPreamble()
+```
+
+## Overview
+
+The complexity of the ChIP-seq technique gives rise to a number of different biases in the data.
+For a DB analysis, library-specific biases are of particular interest as they can introduce spurious differences between conditions.
+This includes composition biases, efficiency biases and trended biases.
+Thus, normalization between libraries is required to remove these biases prior to any statistical analysis.
+
+Several normalization strategies are presented here, though users should only pick _one_ to use for any given analysis.
+Advice on choosing the most appropriate method is scattered throughout the chapter.
+
+## Eliminating composition biases {#sec:compo-norm}
+
+### Using the TMM method on binned counts
+
+As the name suggests, composition biases are formed when there are differences in the composition of sequences across libraries. 
+Highly enriched regions consume more sequencing resources and thereby suppress the representation of other regions. 
+Differences in the magnitude of suppression between libraries can lead to spurious DB calls. 
+Scaling by library size fails to correct for this as composition biases can still occur in libraries of the same size. 
+
+To remove composition biases in `r Biocpkg("csaw")`, reads are counted into large bins and the counts are used for normalization with the `normFactors()` wrapper function.
+This uses the trimmed mean of M-values (TMM) method [@oshlack2010] to correct for any systematic fold change in the coverage of the bins. 
+The assumption here is that most bins represent non-DB background regions, so any consistent difference across bins must be technical bias.
+
+```{r, echo=FALSE, results="asis"}
+extractCached("nfya-stock.Rmd", "filtering", c("filtered.data", "bam.files", "param"))
+```
+
+```{r}
+library(csaw)
+binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+filtered.data <- normFactors(binned, se.out=filtered.data)
+filtered.data$norm.factors
+```
+
+The TMM method trims away putative DB bins (i.e., those with extreme M-values) and computes normalization factors from the remainder to use in `r Biocpkg("edgeR")`. 
+The size of each library is scaled by the corresponding factor to obtain an effective library size for modelling. 
+A larger normalization factor results in a larger effective library size and is conceptually equivalent to scaling each individual count downwards, given that the ratio of that count to the (effective) library size will be smaller. 
+Check out the `r Biocpkg("edgeR")` user's guide for more information.
+
+To elaborate on the above code: the `normFactors()` call computes normalization factors from the bin-level counts in `binned` (see Section \@ref(sec:normbinsize)).
+The `se.out` argument directs the function to return a modified version of `filtered.data`, where the normalization factors are stored alongside the _window_-level counts for further analysis.
+Composition biases affect both bin- and window-level counts, so computing normalization factors from the former and applying them to the latter is valid - 
+provided that the library sizes are the same between the two sets of counts, as the factors are interpreted with respect to the library sizes.
+(In `r Biocpkg("csaw")`, separate calls to `windowCounts()` with the same `readParam` object will always yield the same library sizes in `totals`.)
+
+Note that `normFactors()` skips the precision weighting step in the TMM method.
+Weighting aims to increase the contribution of bins with high counts, as these yield more precise M-values.
+However, high-abundance bins are more likely to contain binding sites and thus are more likely to be DB compared to background regions.
+If any DB regions should survive trimming, upweighting them would be counterproductive. 
+
+<!--
+By default, the top 5% of most abundant elements are already removed by TMM.
+You can ask for more removal, which could help; but in general, binding sites
+are so negligble in quantity compared to the background regions, it doesn't
+really matter too much, so long as weighting isn't in play.
+-->
+
+### Motivating the use of large bins {#sec:normbinsize}
+
+By definition, read coverage is low for background regions of the genome.
+This can result in a large number of zero counts and undefined M-values when reads are counted into small windows. 
+Adding a prior count is only a superficial solution as the chosen prior will have undue influence on the estimate of the normalization factor when many counts are low. 
+The variance of the fold change distribution is also higher for low counts, which reduces the effectiveness of the trimming procedure.
+These problems can be overcome by using large bins to increase the size of the counts, thus improving the precision of TMM normalization. 
+The normalization factors computed from the bin-level counts are then applied to the window-level counts of interest.
+
+Of course, this strategy requires the user to supply a bin size. 
+If the bins are too large, background and enriched regions will be included in the same bin. 
+This makes it difficult to trim away bins corresponding to enriched regions.
+On the other hand, the counts will be too low if the bins are too small.
+Testing multiple bin sizes is recommended to ensure that the estimates are robust to any changes. 
+A value of 10 kbp is usually suitable for most datasets.
+
+```{r}
+demo <- windowCounts(bam.files, bin=TRUE, width=5000, param=param)
+normFactors(demo, se.out=FALSE) # se.out=FALSE to report factors directly.
+demo <- windowCounts(bam.files, bin=TRUE, width=15000, param=param)
+normFactors(demo, se.out=FALSE)
+```
+
+Here, the factors are consistently close to unity, which suggests that composition bias is negligble in this dataset.
+See Section~\ref{sec:eff-norm-ma} for some examples with greater bias.
+
+### Visualizing normalization with MA plots
+
+The effectiveness of normalization can be examined using a MA plot (Figure \@ref(fig:compo-norm-ma)).
+A single main cloud of points should be present, consisting primarily of background regions.
+Separation into multiple discrete points indicates that the counts are too low and that larger bin sizes should be used. 
+Composition biases manifest as a vertical shift in the position of this cloud. 
+Ideally, the log-ratios of the corresponding normalization factors should pass through the centre of the cloud. 
+This indicates that undersampling has been identified and corrected.
+
+<!--
+Genuine binding sites are mixed in with the background in this example, as
+there's no clear distinction between the two. As one might expect, the bins
+containing binding sites tend to be those with higher A-values. Most of the
+bins should still be free of binding, though (8000/260000 bins, based on 
+those that overlap globally filtered windows in Chapter 4).
+-->
+
+```{r compo-norm-ma, fig.wide=TRUE, fig.asp=0.4, fig.cap="MA plots for each sample compared to the first in the NF-YA dataset. Each point represents a 10 kbp bin and the red line denotes the scaled normalization factor for each sample."}
+par(mfrow=c(1, 3), mar=c(5, 4, 2, 1.5))
+adj.counts <- cpm(asDGEList(binned), log=TRUE)
+normfacs <- filtered.data$norm.factors
+for (i in seq_len(length(bam.files)-1)) {
+    cur.x <- adj.counts[,1]
+    cur.y <- adj.counts[,1+i]
+    smoothScatter(x=(cur.x+cur.y)/2+6*log2(10), y=cur.x-cur.y,
+        xlab="A", ylab="M", main=paste("1 vs", i+1))
+    all.dist <- diff(log2(normfacs[c(i+1, 1)]))
+    abline(h=all.dist, col="red")
+}
+```
+
+## Eliminating efficiency biases {#sec:eff-norm}
+
+#### Using TMM on high-abundance regions {#data:norm}
+
+Efficiency biases in ChIP-seq data refer to fold changes in enrichment that are introduced by variability in IP efficiencies between libraries. 
+These technical differences are not biologically interesting and must be removed. 
+This can be achieved by assuming that high-abundance windows contain binding sites. 
+Consider the following H3K4me3 data set, where reads are counted into 150 bp windows.
+
+```{r}
+library(chipseqDBData)
+k4data <- H3K4me3Data()
+k4data
+me.files <- k4data$Path[c(1,3)] # just one sample from each condition, for brevity.
+me.demo <- windowCounts(me.files, width=150, param=param)
+```
+
+High-abundance windows are chosen using a global filtering approach described in Section \@ref{sec:global-filter}. 
+Here, the binned counts in `me.bin` are only used for defining the background abundance, _not_ for computing normalization factors.
+
+```{r}
+me.bin <- windowCounts(me.files, bin=TRUE, width=10000, param=param) 
+keep <- filterWindowsGlobal(me.demo, me.bin)$filter > log2(3)
+filtered.me <- me.demo[keep,]
+```
+
+The TMM method is then applied to eliminate systematic differences across those windows.
+This assumes that most binding sites in the genome are not DB -
+thus, any systematic differences in coverage among the high-abundance windows must be caused by differences in IP efficiency between libraries or some other technical issue.
+Scaling by the normalization factors will subseqeuently remove these biases prior to further analyses.
+
+```{r}
+filtered.me <- normFactors(filtered.me)
+me.eff <- filtered.me$norm.factors
+me.eff
+```
+
+The downside of this approach is that genuine biological differences may be removed when the assumption of a non-DB majority does not hold, e.g., overall binding is truly lower in one condition. 
+In such cases, it is safer to normalize for composition biases - see Section \@ref(sec:normchoice) for a discussion of the choice between normalization methods.
+
+While the above process seems rather involved, this is only because we need to work our way through counting and filtering for a new data set.
+Only `normFactors()` is actually needed for the normalization step.
+As a demonstration, we repeat this procedure on another data set involving H3 acetylation.
+
+```{r}
+acdata <- H3K9acData()
+ac.files <- acdata$Path[c(1,2)] # subsetting again for brevity.
+
+# Counting:
+ac.demo <- windowCounts(ac.files, width=150, param=param)
+
+# Filtering:
+ac.bin <- windowCounts(ac.files, bin=TRUE, width=10000, param=param)
+keep <- filterWindowsGlobal(ac.demo, ac.bin)$filter > log2(5)
+filtered.ac <- ac.demo[keep,]
+
+# Normalization:
+filtered.ac <- normFactors(filtered.ac, se.out=TRUE)
+ac.eff <- filtered.ac$norm.factors
+ac.eff
+```
+
+### Filtering windows prior to normalization
+
+Normalization for efficiency biases is performed on window-level counts instead of bin counts.
+This is possible as filtering ensures that we only retain the high-abundance windows, 
+i.e., those with counts that are large enough for stable calculation of normalization factors.
+It is not necessary to use larger windows or bins, and indeed, 
+direct use of the windows of interest ensures removal of systematic differences in those windows prior to downstream analyses.
+
+The filtering procedure needs to be stringent enough to avoid retaining windows from background regions.
+These will interfere with calculation of normalization factors from binding sites.
+This is due to the lower coverage for background regions, as well as the fact that they are not affected by efficiency bias (and cannot contribute to its estimation).
+Conversely, attempting to use the factors computed from high-abundance windows on windows from background regions will result in incorrect normalization of the latter.
+Thus, it is usually better to err on the side of caution and filter aggressively to ensure that background regions are not retained in downstream analyses.
+Obviously, though, retaining too few windows will result in unstable estimates of the normalization factors.
+
+### Visualizing normalization with MA plots {#sec:eff-norm-ma}
+
+We again visualize the effect of normalization with MA plots. 
+We continue to use the counts for 10 kbp bins to construct the plots, rather than with those from the windows.
+This is useful as the behavior of the entire genome can be examined, rather than just that of the high-abundance windows.
+It also allows calculation of and comparison to the factors for composition bias.
+
+```{r}
+# Again, just setting se.out=FALSE to report factors directly.
+me.comp <- normFactors(me.bin, se.out=FALSE)
+me.comp
+ac.comp <- normFactors(ac.bin, se.out=FALSE)
+ac.comp
+```
+
+In Figure \@ref(fig:eff-norm-ma), the clouds at low and high A-values represent the background and bound regions, respectively.
+The normalization factors from removal of composition bias (dashed) pass through the former, whereas the factors to remove efficiency bias (full) pass through the latter.
+A non-zero M-value location for the high A-value cloud represents a systematic difference between libraries for the bound regions, either due to genuine DB or variable IP efficiency. 
+This also induces composition bias, leading to a non-zero M-value for the background cloud.
+
+```{r eff-norm-ma, fig.wide=TRUE, fig.asp=0.5, fig.cap="MA plots between individual samples in the H3K4me3 and H3ac datasets. Each point represents a 10 kbp bin and the red lines denotes the ratio of normalization factors computed from bins (dashed) or high-abundance windows (full)."}
+par(mfrow=c(1,2))
+for (main in c("H3K4me3", "H3ac")) { 
+    if (main=="H3K4me3") { 
+        bins <- me.bin
+        comp <- me.comp
+        eff <- me.eff 
+    } else { 
+        bins <- ac.bin
+        comp <- ac.comp
+        eff <- ac.eff 
+    }
+    adjc <- cpm(asDGEList(bins), log=TRUE)
+    smoothScatter(x=rowMeans(adjc), y=adjc[,1]-adjc[,2], 
+                  xlab="A", ylab="M", main=main)
+    abline(h=log2(eff[1]/eff[2]), col="red")
+    abline(h=log2(comp[1]/comp[2]), col="red", lty=2)
+}
+```
+
+## Choosing between normalization strategies {#sec:normchoice}
+
+The normalization strategies for composition and efficiency biases are mutually exclusive, as only one set of normalization factors will ultimately be used in `r Biocpkg("edgeR")`.
+The choice between the two methods depends on whether one assumes that the systematic differences at high abundances represent genuine DB events.
+If so, the binned TMM method from Section \@ref(sec:compo-norm) should be used to remove composition bias.
+This will preserve the assumed DB, at the cost of ignoring any efficiency biases that might be present.
+Otherwise, if the systematic differences are not genuine DB, they must represent efficiency bias and should be removed by applying the TMM method on high-abundance windows (Section \@ref(sec:eff-norm)).
+Some understanding of the biological context is useful in making this decision, e.g., comparing a wild-type against a knock-out for the target protein should result in systematic DB, while overall levels of histone marking are expected to be consistent in most conditions.
+
+For the main NF-YA example, there is no expectation of constant binding between cell types.
+Thus, normalization factors will be computed to remove composition biases.
+This ensures that any genuine systematic changes in binding will still be picked up.
+In general, normalization for composition bias is a good starting point for any analysis.
+This can be considered as the "default" strategy unless there is evidence for a confounding efficiency bias.
+
+## With spike-in chromatin
+
+Some studies use spike-in chromatin for scaling normalization of ChIP-seq data [@bonhoure2014quantifying;@orlando2014quantitative].
+Briefly, a constant amount of chromatin from a different species is added to each sample at the start of the ChIP-seq protocol.
+The mixture is processed and sequenced in the usual manner, using antibodies that can bind epitopes of interest from both species.
+The coverage of the spiked-in foreign chromatin is then quantified in each library.
+As the quantity of foreign chromatin should be constant in each sample, the coverage of binding sites on the foreign genome should also be the same between libraries.
+Any difference in coverage between libraries represents some technical bias that should be removed by scaling.
+
+This normalization strategy can be implemented in `r Biocpkg("csaw")` with some work.
+Assuming that the reference genome includes appropriate sequences from the foreign genome, coverage is quantified across genomic windows with `windowCounts()`.
+Filtering is performed to select for high-abundance windows in the foreign genome, yielding counts for all enriched spike-in regions.
+(The filtered object is named `spike.data` in the code below.)
+Normalization factors are computed by applying the TMM method on these counts via `normFactors()`.
+This aims to identify the fold-change in coverage between samples that is attributable to technical effects.
+
+```{r}
+# Pretend chr1 is a spike-in, for demonstration purposes only!
+is.1 <- seqnames(rowRanges(data))=="chr1"
+spike.data <- data[is.1,]
+endog.data <- data[!is.1,]
+
+endog.data <- normFactors(spike.data, se.out=endog.data)
+```
+
+In the code above, the spike-in normalization factors are returned in a modified copy of `endog.data` for further analysis of the endogenous windows.
+We assume that the library sizes in `totals` are the same between `spike.data` and `endog.data`, 
+which should be the case if they were formed by subsetting the output of a single `windowCounts()` call.
+This ensures that the normalization factors computed from the spike-in windows are applicable to the endogenous windows.
+
+Compared to the previous normalization methods, the spike-in approach does not distinguish between composition and efficiency biases.
+Instead, it uses the fold-differences in the coverage of spiked-in binding sites to empirically measure and remove the net bias between libraries.
+This avoids the need for assumptions regarding the origin of any systematic differences between libraries.
+That said, spike-in normalization involves some strong assumptions of its own.
+In particular, the ratio of spike-in chromatin to endogenous chromatin is assumed to be the same in each sample.
+This requires accurate quantitation of the chromatin in each sample, followed by precise addition of small spike-in quantities.
+Furthermore, the spike-in chromatin, its protein target and the corresponding antibody are assumed to behave in the same manner as their endogenous counterparts throughout the ChIP-seq protocol.
+Whether these assumptions are reasonable will depend on the experimenter and the nature of the spike-in chromatin.
+
+## Dealing with trended biases
+
+In more extreme cases, the bias may vary with the average abundance to form a trend. 
+One possible explanation is that changes in IP efficiency will have little effect at low-abundance background regions and more effect at high-abundance binding sites. 
+Thus, the magnitude of the bias between libraries will change with abundance. 
+The trend cannot be corrected with scaling methods as no single scaling factor will remove differences at all abundances.
+Rather, non-linear methods are required, such as cyclic loess or quantile normalization.
+
+One such implementation of a non-linear normalization method is provided in `normOffsets()`.
+This is based on the fast loess algorithm [@ballman2004] with minor adaptations to handle low counts. 
+A matrix is produced that contains an offset term for each bin/window in each library.
+This offset matrix can then be directly used in `r Biocpkg("edgeR")`, assuming that the bins or windows used in normalization are also the ones to be tested for DB.
+We demonstrate this procedure below, using filtered counts for 2 kbp windows in the H3 acetylation data set.
+(This window size is chosen purely for aesthetics in this demonstration, as the trend is less obvious at smaller widths.
+Obviously, users should pick a more appropriate value for their analysis.)
+
+```{r}
+ac.demo2 <- windowCounts(ac.files, width=2000L, param=param)
+
+# Filtering for high-abundance intervals.
+filtered <- filterWindowsGlobal(ac.demo2, ac.bin)
+keep <- filtered$filter > log2(4)
+ac.demo2 <- ac.demo2[keep,]
+
+# Actually applying the normalization.
+ac.demo2 <- normOffsets(ac.demo2)
+ac.off <- assay(ac.demo2, "offset")
+head(ac.off)
+```
+
+By default, the offsets are stored in the `RangedSummarizedExperiment` object as an `"offset"` entry in the `assays` slot.
+Each offset represents the log-transformed scaling factor that needs to be applied to the corresponding entry of the count matrix for its normalization.
+Any operations like subsetting that are applied to modify the object will also be applied to the offsets, allowing for synchronised processing.
+Functions from packages like `r Biocpkg("edgeR")` will also respect the offsets during model fitting. 
+
+We again examine the MA plots in Figure \@ref(fig:trend-norm-ma) to determine whether normalization was successful.
+Any abundance-dependent trend in the M-values should be eliminated after applying the offsets to the log-counts.
+This is done by subtraction, though note that the offsets are base $e$ while most log-values in `r Biocpkg("edgeR")` are reported as base 2.
+
+```{r trend-norm-ma, fig.wide=TRUE, fig.asp=0.5, fig.cap="MA plots between individual samples in the H3ac dataset before and after trended normalization. Each point represents a 2 kbp bin, and the trend represents a fitted loess curve."}
+par(mfrow=c(1,2))
+
+# MA plot without normalization.
+ac.y <- asDGEList(ac.demo2)
+lib.size <- ac.y$samples$lib.size
+adjc <- cpm(ac.y, log=TRUE)
+abval <- aveLogCPM(ac.y)
+mval <- adjc[,1]-adjc[,2]
+
+fit <- loessFit(x=abval, y=mval)
+smoothScatter(abval, mval, ylab="M", xlab="Average logCPM", 
+    main="Raw", ylim=c(-2,2), xlim=c(0, 7))
+o <- order(abval)
+lines(abval[o], fit$fitted[o], col="red")
+
+# Repeating after normalization.
+re.adjc <- log2(assay(ac.demo2)+0.5) - ac.off/log(2)
+mval <- re.adjc[,1]-re.adjc[,2]
+
+fit <- loessFit(x=abval, y=mval)
+smoothScatter(abval, re.adjc[,1]-re.adjc[,2], ylab="M", xlab="Average logCPM", 
+    main="Normalized", ylim=c(-2,2), xlim=c(0, 7))
+lines(abval[o], fit$fitted[o], col="red")
+```
+
+Loess normalization of trended biases is quite similar to TMM normalization for efficiency biases described in Section \@ref(sec:eff-norm).
+Both methods assume a non-DB majority across features, and will not be appropriate if there is a change in overall binding.
+Loess normalization involves a slightly stronger assumption of a non-DB majority at every abundance, not just across all bound regions.
+This is necessary to remove trended biases but may also discard genuine changes, such as a subset of DB sites at very high abundances.
+
+Compared to TMM normalization, the accuracy of loess normalization is less dependent on stringent filtering.
+This is because the use of a trend accommodates changes in the bias between high-abundance binding sites and low-abundance background regions.
+Nonetheless, some filtering is still necessary to avoid inaccuracies in loess fitting at low abundances.
+Any filter statistic for the windows should be based on the average abundance from `aveLogCPM()`, such as those calculated using `filterWindowsGlobal()` or equivalents.
+An average abundance threshold will act as a clean vertical cutoff in the MA plots above. 
+This avoids introducing spurious trends at the filter boundary that might affect normalization.
+
+## A word on other biases
+
+No normalization is performed to adjust for differences in mappability or sequencability between different regions of the genome. 
+Region-specific biases are assumed to be constant between libraries. 
+This is generally reasonable as the biases depend on fixed properties of the genome sequence such as GC content. 
+Thus, biases should cancel out during DB comparisons.
+Any variability between samples will just be absorbed into the dispersion estimate. 
+
+That said, explicit normalization to correct these biases can improve results for some datasets.
+Procedures like GC correction could decrease the observed variability by removing systematic differences between replicates. 
+Of course, this also assumes that the targeted differences have no biological relevance.
+Detection power may be lost if this is not true. 
+For example, differences in the GC content distribution can be driven by technical bias as well as biology, e.g., when protein binding is associated with a specific GC composition.
+
+## Session information {-}
+
+```{r, echo=FALSE, results='asis'}
+rebook::prettySessionInfo()
+```

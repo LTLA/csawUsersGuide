@@ -19,3 +19,7 @@ param <- readParam(minq=20)
 data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
 ```
 
+```{r filtering}
+keep <- abundances > -1
+filtered.data <- data[keep,]
+```

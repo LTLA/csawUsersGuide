@@ -37,9 +37,9 @@ For demonstration purposes, an arbitrary threshold of -1 is used here to filter 
 This restricts the analysis to windows with abundances above this threshold.
 
 ```{r}
-keep.simple <- abundances > -1
-filtered.data <- data[keep.simple,]
-summary(keep.simple)
+keep <- abundances > -1
+filtered.data <- data[keep,]
+summary(keep)
 ```
 
 The exact choice of filter threshold may not be obvious.
