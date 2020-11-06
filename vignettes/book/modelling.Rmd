@@ -1,0 +1,238 @@
+# (PART) Statistical modelling 
+
+# Testing for per-window differences {#chap:stats}
+
+```{r, echo=FALSE, results="asis"}
+library(rebook)
+chapterPreamble()
+```
+
+## Overview
+
+Low counts per window are typically observed in ChIP-seq datasets, even for genuine binding sites. 
+Any statistical analysis to identify DB sites must be able to handle discreteness in the data. 
+Count-based models are ideal for this purpose. 
+In this guide, the quasi-likelihood (QL) framework in the `r Biocpkg("edgeR")` package is used [@lund2012]. 
+Counts are modelled using NB distributions that account for overdispersion between biological replicates [@robinson2008]. 
+Each window can then be tested for significant DB between conditions.
+
+Of course, any statistical method can be used if it is able to accept a count matrix and a vector of normalization factors (or more generally, a matrix of offsets). 
+The choice of `r Biocpkg("edgeR")` is primarily motivated by its performance relative to some published alternatives [@law2014]^[This author's desire to increase his h-index may also be a factor [@chen2014]!].
+
+## Setting up for `r Biocpkg("edgeR")`
+
+A `DGEList` object is first constructed from the `SummarizedExperiment` contaiing our filtered count matrix.
+If normalization factors or offsets are present in the `RangedSummarizedExperiment` object -- see Chapter~\@ref(chap:norm) -- they will automatically be inserted into the `DGEList`.
+Otherwise, they can be manually passed to the `asDGEList()` function.
+If offsets are available, they will generally override the normalization factors in the downstream `r Biocpkg("edgeR")` analysis.
+
+```{r, echo=FALSE, results="asis"}
+extractCached("nfya-stock.Rmd", "normalization", c("filtered.data", "data", "tf.data"))
+```
+
+```{r}
+library(csaw)
+y <- asDGEList(filtered.data)
+```
+
+The experimental design is described by a design matrix. 
+In this case, the only relevant factor is the cell type of each sample. 
+A generalized linear model (GLM) will be fitted to the counts for each window using the specified design [@mccarthy2012].
+This provides a general framework for the analysis of complex experiments with multiple factors.
+In this case, our design matrix contains an intercept representing the average abundance in the ESC group,
+plus a `cell.type` coefficient representing the log-fold change of the TN group over the ESC group.
+
+```{r}
+cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", head(tf.data$Description, -1))
+cell.type
+
+design <- model.matrix(~factor(cell.type))
+colnames(design) <- c("intercept", "cell.type")
+design
+```
+
+Readers are referred to the user's guide in `r Biocpkg("edgeR")` for more details on parametrization of the design matrix.
+
+## Estimating the dispersions
+
+### Stabilising estimates with empirical Bayes {#sec:dispest}
+
+Under the QL framework, both the QL and NB dispersions are used to model biological variability in the data [@lund2012]. 
+The former ensures that the NB mean-variance relationship is properly specified with appropriate contributions from the Poisson and Gamma components. 
+The latter accounts for variability and uncertainty in the dispersion estimate. 
+However, limited replication in most ChIP-seq experiments means that each window does not contain enough information for precise estimation of either dispersion. 
+
+<!--
+Both parameters need to be estimated for optimal performance; using too high
+a value for the NB dispersion means that the QL dispersion can't recover (as
+it's very sensitive to the former). Also, using a constant value (e.g. 0, a
+la quasi-poisson) puts a lot of pressure on the trend fitting as you're
+trying to shoehorn a NB mean-variance relationship into a QL mean-varince
+relationship (asymptotically the same, but different at low counts).
+-->
+
+This problem is overcome in `r Biocpkg("edgeR")` by sharing information across windows. 
+For the NB dispersions, a mean-dispersion trend is fitted across all windows to model the mean-variance relationship [@mccarthy2012]. 
+The raw QL dispersion for each window is estimated after fitting a GLM with the trended NB dispersion. 
+Another mean-dependent trend is fitted to the raw QL estimates.  
+An empirical Bayes (EB) strategy is then used to stabilize the raw QL dispersion estimates by shrinking them towards the second trend [@lund2012]. 
+The ideal amount of shrinkage is determined from the variability of the dispersions.
+
+```{r}
+library(edgeR)
+y <- estimateDisp(y, design)
+summary(y$trended.dispersion)
+fit <- glmQLFit(y, design, robust=TRUE)
+summary(fit$var.post)
+```
+
+The effect of EB stabilisation can be visualized by examining the biological coefficient of variation (for the NB dispersion) and the quarter-root deviance (for the QL dispersion). 
+Plot such as those in Figure \@ref(fig:nfya-disp-plot) can also be used to decide whether the fitted trend is appropriate. 
+Sudden irregulaties may be indicative of an underlying structure in the data which cannot be modelled with the mean-dispersion trend. 
+Discrete patterns in the raw dispersions are indicative of low counts and suggest that more aggressive filtering is required.
+
+```{r nfya-disp-plot, fig.wide=TRUE, fig.asp=0.5, fig.cap="Fitted trend in the NB dispersion (left) or QL dispersion (right) as a function of the average abundance for each window. For the NB dispersion, the square root is shown as the biological coefficient of variation. For the QL dispersion, the shrunken estimate is also shown for each window."}
+par(mfrow=c(1,2))
+o <- order(y$AveLogCPM)
+plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
+     ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
+     ylab=("Biological coefficient of variation"))
+plotQLDisp(fit)
+```
+
+A strong trend may also be observed where the NB dispersion drops sharply with increasing average abundance.
+This is due to the disproportionate impact of artifacts such as mapping errors and PCR duplicates at low counts. 
+It is difficult to accurately fit an empirical curve to these strong trends.  
+As a consequence, the dispersions at high abundances may be overestimated. 
+Filtering of low-abundance regions (as described in Chapter \@ref(chap:filter)) provides some protection by removing the strongest part of the trend.
+This has an additional benefit of removing those tests that have low power due to the magnitude of the dispersions.
+
+```{r nfya-disp-rmcheck, fig.cap="Fitted trend in the NB dispersions before (black) and after (grey) removing low-abundance windows."}
+relevant <- rowSums(assay(data)) >= 20 # weaker filtering than 'filtered.data'
+yo <- asDGEList(data[relevant,], norm.factors=filtered.data$norm.factors)
+yo <- estimateDisp(yo, design)
+oo <- order(yo$AveLogCPM)
+
+plot(yo$AveLogCPM[oo], sqrt(yo$trended.dispersion[oo]), type="l", lwd=2,
+     ylim=c(0, max(sqrt(yo$trended))), xlab=expression("Ave."~Log[2]~"CPM"), 
+     ylab=("Biological coefficient of variation"))
+lines(y$AveLogCPM[o], sqrt(y$trended[o]), lwd=2, col="grey")
+legend("topright", c("raw", "filtered"), col=c("black", "grey"), lwd=2)
+```
+
+### Modelling variable dispersions between windows
+
+Any variability in the dispersions across windows is modelled in `r Biocpkg("edgeR")` by the prior degrees of freedom (d.f.).
+A large value for the prior d.f. indicates that the variability is low. 
+This means that more EB shrinkage can be performed to reduce uncertainty and maximize power. 
+However, strong shrinkage is not appropriate if the dispersions are highly variable. 
+Fewer prior degrees of freedom (and less shrinkage) are required to maintain type I error control. 
+
+```{r}
+summary(fit$df.prior)
+```
+
+On occasion, the estimated prior degrees of freedom will be infinite. 
+This is indicative of a strong batch effect where the dispersions are consistently large.
+A typical example involves uncorrected differences in IP efficiency across replicates. 
+In severe cases, the trend may fail to pass through the bulk of points as the variability is too low to be properly modelled in the QL framework.
+This problem is usually resolved with appropriate normalization.
+
+Note that the prior degrees of freedom should be robustly estimated [@phipson2016]. 
+Obviously, this protects against large positive outliers (e.g., highly variable windows) but it also protects against near-zero dispersions at low counts. 
+These will manifest as large negative outliers after a log transformation step during estimation [@smyth2004]. 
+Without robustness, incorporation of these outliers will inflate the observed variability in the dispersions.
+This results in a lower estimated prior d.f. and reduced DB detection power.
+
+<!--
+If you've forgotten, you get near-zero dispersions because counts can be exactly equal.
+-->
+
+## Testing for DB windows
+
+We identify windows with significant differential binding with respect to specific factors of interest in our design matrix.
+In the QL framework, $p$-values are computed using the QL F-test [@lund2012]. 
+This is more appropriate than using the likelihood ratio test as the F-test accounts for uncertainty in the dispersion estimates. 
+Associated statistics such as log-fold changes and log-counts per million are also computed for each window.
+
+```{r}
+results <- glmQLFTest(fit, contrast=c(0, 1))
+head(results$table)
+```
+
+The null hypothesis here is that the cell type has no effect. 
+The `contrast` argument in the `glmQLFTest()` function specifies which factors are of interest^[Specification of the contrast is explained in greater depth in the `r Biocpkg("edgeR")` user's manual.].
+In this case, a contrast of `c(0, 1)` defines the null hypothesis as `0*intercept + 1*cell.type = 0`, i.e., that the log-fold change between cell types is zero. 
+DB windows can then be identified by rejecting the null. 
+Users may find it more intuitive to express the contrast through `r Biocpkg("limma")`'s `makeContrasts()` function,
+or by directly supplying the names of the relevant coefficients to `glmQLFTest()`, as shown below.
+
+```{r}
+colnames(design)
+
+# Same as above.
+results2 <- glmQLFTest(fit, coef="cell.type")
+```
+
+The log-fold change for each window is similarly defined from the contrast as `0*intercept + 1*cell.type`, i.e., the value of the `cell.type` coefficient.
+Recall that this coefficient represents the log-fold change of the TN group over the ESC group.
+Thus, in our analysis, positive log-fold changes represent increase in binding of TN over ESC, and vice versa for negative log-fold changes.
+One could also define the contrast as `c(0, -1)`, in which case the interpretation of the log-fold changes would be reversed.
+
+Once the significance statistics have been calculated, they can be stored in row metadata of the `RangedSummarizedExperiment` object.
+This ensures that the statistics and coordinates are processed together, e.g., when subsetting to select certain windows.
+
+```{r}
+rowData(filtered.data) <- cbind(rowData(filtered.data), results$table)
+```
+
+## What to do without replicates
+
+Designing a ChIP-seq experiment without any replicates is strongly discouraged.
+Without replication, the reproducibility of any findings cannot be determined. 
+Nonetheless, it may be helpful to salvage some information from datasets that lack replicates.
+This is done by supplying a "reasonable" value for the NB dispersion during GLM fitting (e.g., 0.05 - 0.1, based on past experience).
+DB windows are then identified using the likelihood ratio test.
+
+```{r}
+fit.norep <- glmFit(y, design, dispersion=0.05)
+results.norep <- glmLRT(fit.norep, contrast=c(0, 1))
+head(results.norep$table)
+```
+
+Obviously, this approach has a number of pitfalls. 
+The lack of replicates means that the biological variability in the data cannot be modelled.
+Thus, it becomes impossible to gauge the sensibility of the supplied NB dispersions in the analysis.
+Another problem is spurious DB due to inconsistent PCR duplication between libraries.
+Normally, inconsistent duplication results in a large QL dispersion for the affected window, such that significance is downweighted.
+However, estimation of the QL dispersion is not possible without replicates.
+This means that duplicates may need to be removed to protect against false positives.
+
+## Examining replicate similarity with MDS plots
+
+As a quality control measure, the window counts can be used to examine the similarity of replicates through multi-dimensional scaling (MDS) plots (Figure \@ref(fig:nfya-mds-qc)).
+The distance between each pair of libraries is computed as the square root of the mean squared log-fold change across the top set of bins with the highest absolute log-fold changes.
+A small top set visualizes the most extreme differences whereas a large set visualizes overall differences.
+Checking a range of `top` values may be useful when the scope of DB is unknown.
+Again, counting with large bins is recommended as fold changes will be undefined in the presence of zero counts.
+
+```{r nfya-mds-qc, fig.asp=1, fig.cap="MDS plots computed with varying numbers of top windows with the strongest log-fold changes between libaries. In each plot, each library is marked with its name and colored according to its cell type."}
+par(mfrow=c(2,2), mar=c(5,4,2,2))
+adj.counts <- cpm(y, log=TRUE)
+for (top in c(100, 500, 1000, 5000)) {
+    plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"),
+        labels=c("es.1", "es.2", "tn.1", "tn.2"), top=top)
+}
+```
+
+Replicates from different groups should form separate clusters in the MDS plot, as observed above.
+This indicates that the results are reproducible and that the effect sizes are large.
+Mixing between replicates of different conditions indicates that the biological difference has no effect on protein binding, or that the data is too variable for any effect to manifest.
+Any outliers should also be noted as their presence may confound the downstream analysis.
+In the worst case, outlier samples may need to be removed to obtain sensible results.
+
+## Session information {-}
+
+```{r, echo=FALSE, results='asis'}
+rebook::prettySessionInfo()
+```

@@ -20,6 +20,22 @@ data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
 ```
 
 ```{r filtering}
-keep <- abundances > -1
-filtered.data <- data[keep,]
+binned <- windowCounts(bam.files, bin=10000, param=param)
+fstats <- filterWindowsGlobal(data, binned)
+filtered.data <- data[fstats$filter > log2(5),]
+```
+
+```{r normalization}
+filtered.data <- normFactors(binned, se.out=filtered.data)
+```
+
+```{r modelling}
+cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", head(tf.data$Description, -1))
+design <- model.matrix(~cell.type)
+
+library(edgeR)
+y <- asDGEList(filtered.data)
+y <- estimateDisp(y, design)
+fit <- glmQLFit(y, design, robust=TRUE)
+res <- glmQLFTest(fit, coef="cell.type")
 ```
