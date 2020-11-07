@@ -32,10 +32,13 @@ filtered.data <- normFactors(binned, se.out=filtered.data)
 ```{r modelling}
 cell.type <- sub("NF-YA ([^ ]+) .*", "\\1", head(tf.data$Description, -1))
 design <- model.matrix(~cell.type)
+colnames(design) <- c("intercept", "cell.type")
 
 library(edgeR)
 y <- asDGEList(filtered.data)
 y <- estimateDisp(y, design)
 fit <- glmQLFit(y, design, robust=TRUE)
 res <- glmQLFTest(fit, coef="cell.type")
+
+rowData(filtered.data) <- cbind(rowData(filtered.data), res$table)
 ```
