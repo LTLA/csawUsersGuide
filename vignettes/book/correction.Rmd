@@ -1,6 +1,6 @@
 # Correction for multiple testing
 
-```{r, results="hide", echo=FALSE}
+```{r, results="asis", echo=FALSE}
 library(rebook)
 chapterPreamble()
 ```
@@ -413,3 +413,9 @@ As an aside, this function also has some utility outside of ChIP-seq contexts.
 For example, we might want to obtain a single $p$-value for a gene set based on the presence of a minimal percentage of differentially expressed genes.
 Alternatively, we may be interested in ranking genes in loss-of-function screens based on a minimal number of shRNA/CRISPR guides that exhibit a significant effect.
 These problems are equivalent to that of identifying a genomic region with a minimal number of DB windows.
+
+## Session information {-}
+
+```{r, echo=FALSE, results='asis'}
+rebook::prettySessionInfo()
+```

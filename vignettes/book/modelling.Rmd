@@ -1,4 +1,4 @@
-# (PART) Statistical modelling 
+# (PART) Statistical modelling {-}
 
 # Testing for per-window differences {#chap:stats}
 
