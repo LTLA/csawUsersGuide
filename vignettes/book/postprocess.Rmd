@@ -1,0 +1,158 @@
+# (PART) Post-processing {-}
+
+# Annotation and visualization
+
+```{r, results="asis", echo=FALSE}
+library(rebook)
+chapterPreamble()
+```
+
+## Adding gene-based annotation
+
+Annotation can be added to a given set of regions using the `detailRanges()` function. 
+This will identify overlaps between the regions and annotated genomic features such as exons, introns and promoters. 
+Here, the promoter region of each gene is defined as some interval 3 kbp up- and 1 kbp downstream of the TSS for that gene. 
+Any exonic features within `dist` on the left or right side of each supplied region will also be reported.
+
+```{r, echo=FALSE, results='asis'}
+extractCached("nfya-stock.Rmd", "merging", c("merged", "bam.files", "param", "frag.len", "data", "tf.data"))
+```
+
+```{r}
+library(csaw)
+library(org.Mm.eg.db)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+
+anno <- detailRanges(merged$regions, txdb=TxDb.Mmusculus.UCSC.mm10.knownGene,
+    orgdb=org.Mm.eg.db, promoter=c(3000, 1000), dist=5000)
+head(anno$overlap)
+head(anno$left)
+head(anno$right)
+```
+
+Character vectors of compact string representations are provided to summarize the features overlapped by each supplied region. 
+Each pattern contains `GENE|STRAND|TYPE` to describe the strand and overlapped features of that gene. 
+Exons are labelled as `E`, promoters are `P` and introns are `I`. 
+For `left` and `right`, `TYPE` is replaced by `DISTANCE`.
+This indicates the gap (in base pairs) between the supplied region and the closest non-overlapping exon of the annotated feature.
+All of this annotation can be stored in the metadata of the `GRanges` object for later use.
+
+```{r}
+merged$regions$overlap <- anno$overlap
+merged$regions$left <- anno$left
+merged$regions$right <- anno$right
+```
+
+While the string representation saves space in the output, it is not easy to work with.
+If the annotation needs to manipulated directly, users can obtain it from the `detailRanges()` command by not specifying the regions of interest. 
+This can then be used for interactive manipulation, e.g., to identify all genes where the promoter contains DB sites.
+
+```{r}
+anno.ranges <- detailRanges(txdb=TxDb.Mmusculus.UCSC.mm10.knownGene, 
+    orgdb=org.Mm.eg.db)
+anno.ranges
+```
+
+## Checking bimodality for TF studies
+
+For TF experiments, a simple measure of strand bimodality can be reported as a diagnostic.
+Given a set of regions, the `checkBimodality()` function will return the maximum bimodality score across all base positions in each region.
+The bimodality score at each base position is defined as the minimum of the ratio of the number of forward- to reverse-stranded reads to the left of that position, and the ratio of the reverse- to forward-stranded reads to the right.
+A high score is only possible if both ratios are large, i.e., strand bimodality is present.
+
+```{r}
+# TODO: make this less weird.
+spacing <- metadata(data)$spacing
+expanded <- resize(merged$regions, fix="center", 
+    width=width(merged$regions)+spacing)
+sbm.score <- checkBimodality(bam.files, expanded, width=frag.len)
+head(sbm.score)
+```
+
+In the above code, all regions are expanded by `spacing`, i.e., 50 bp.
+This ensures that the optimal bimodality score can be computed for the centre of the binding site, even if that position is not captured by a window.
+The `width` argument specifies the span with which to count reads for the score calculation.
+This should be set to the average fragment length.
+If multiple `bam.files` are provided, they will be pooled during counting.
+
+For typical TF binding sites, bimodality scores can be considered to be "high" if they are larger than 4.
+This allows users to distinguish between genuine binding sites and high-abundance artifacts such as repeats or read stacks.
+However, caution is still required as some high scores may be driven by the stochastic distribution of reads.
+Obviously, the concept of strand bimodality is less relevant for diffuse targets like histone marks.
+
+## Saving the results to file
+
+It is a simple matter to save the results for later perusal, e.g., to a tab-separated file.
+
+```{r}
+ofile <- gzfile("clusters.tsv.gz", open="w")
+write.table(as.data.frame(merged), file=ofile, 
+    row.names=FALSE, quote=FALSE, sep="\t")
+close(ofile)
+```
+
+Of course, other formats can be used depending on the purpose of the file. 
+For example, significantly DB regions can be exported to BED files through the `r Biocpkg("rtracklayer")` package for visual inspection with genomic browsers.
+A transformed FDR is used here for the score field.
+
+```{r}
+is.sig <- merged$combined$FDR <= 0.05
+test <- merged$regions[is.sig]
+test$score <- -10*log10(merged$combined$FDR[is.sig])
+names(test) <- paste0("region", 1:sum(is.sig))
+
+library(rtracklayer)
+export(test, "clusters.bed")
+head(read.table("clusters.bed"))
+```
+
+Alternatively, the `GRanges` object can be directly saved to file and reloaded later for direct manipulation in the R environment, e.g., to find overlaps with other regions of interest.
+
+```{r}
+saveRDS(merged$regions, "ranges.rds")
+```
+
+## Simple visualization of genomic coverage
+
+Visualization of the read depth around interesting features is often desired.
+This is facilitated by the `extractReads()` function, which pulls out the reads from the BAM file.
+The returned `GRanges` object can then be used to plot the sequencing coverage or any other statistic of interest.
+Note that the `extractReads()` function also accepts a `readParam` object.
+This ensures that the same reads used in the analysis will be pulled out during visualization.
+
+```{r}
+cur.region <- GRanges("chr18", IRanges(77806807, 77807165))
+extractReads(bam.files[[1]], cur.region, param=param)
+```
+
+Here, coverage is visualized as the number of reads covering each base pair in the interval of interest.
+Specifically, the reads-per-million is shown to allow comparisons between libraries of different size.
+The plots themselves are constructed using methods from the `r Biocpkg("Gviz")` package.
+The blue and red tracks represent the coverage on the forward and reverse strands, respectively. 
+Strong strand bimodality is consistent with a genuine TF binding site.
+For paired-end data, coverage can be similarly plotted for fragments, i.e., proper read pairs.
+
+```{r nfya-regionplot, fig.asp=1, fig.ca="Tracks of strand-specific genomic coverage in each sample of the NF-YA dataset, shown for a DB region."}
+library(Gviz)
+collected <- vector("list", length(bam.files))
+for (i in seq_along(bam.files)) { 
+    reads <- extractReads(bam.files[[i]], cur.region, param=param)
+    adj.total <- data$totals[i]/1e6
+    pcov <- as(coverage(reads[strand(reads)=="+"])/adj.total, "GRanges")
+    ncov <- as(coverage(reads[strand(reads)=="-"])/adj.total, "GRanges")
+    ptrack <- DataTrack(pcov, type="histogram", lwd=0, fill=rgb(0,0,1,.4), 
+        ylim=c(0,1.1), name=tf.data$Name[i], col.axis="black", 
+        col.title="black")
+    ntrack <- DataTrack(ncov, type="histogram", lwd=0, fill=rgb(1,0,0,.4), 
+        ylim=c(0,1.1))
+    collected[[i]] <- OverlayTrack(trackList=list(ptrack,ntrack))
+}
+gax <- GenomeAxisTrack(col="black")
+plotTracks(c(gax, collected), from=start(cur.region), to=end(cur.region))
+```
+
+## Session information {-}
+
+```{r, echo=FALSE, results='asis'}
+rebook::prettySessionInfo()
+```

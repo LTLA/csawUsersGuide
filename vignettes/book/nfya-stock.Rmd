@@ -42,3 +42,8 @@ res <- glmQLFTest(fit, coef="cell.type")
 
 rowData(filtered.data) <- cbind(rowData(filtered.data), res$table)
 ```
+
+```{r merging}
+merged <- mergeResults(filtered.data, tol=1000, 
+    merge.args=list(max.width=5000))
+```
