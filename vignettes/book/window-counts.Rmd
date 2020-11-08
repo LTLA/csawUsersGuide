@@ -68,6 +68,7 @@ We assume that the BAM files are sorted by position and have been indexed - for 
 It's worth pointing out that a common mistake is to replace or update the BAM file without updating the index, which will cause `r Biocpkg("csaw")` some grief.
 
 ```{r}
+library(csaw)
 frag.len <- 110
 win.width <- 10
 param <- readParam(minq=20)

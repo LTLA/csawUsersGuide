@@ -17,11 +17,11 @@ date: "`r rebook::openingDetails(Copyright='Bioconductor, 2020', Source=.gh_url)
 url: "`r .gh_url`"
 ---
 
-```{r, echo=FALSE}
+# Welcome
+
+```{r, echo=FALSE, results='asis'}
 rebook::chapterPreamble()
 ```
-
-# Welcome
 
 ## Scope 
 
@@ -100,21 +100,21 @@ colnames(design) <- c("intercept", "cell.type")
 2. Filtering out uninteresting regions.
 
     ```{r}
-    library(edgeR)
-    keep <- aveLogCPM(asDGEList(data)) >= -1
+    binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+    keep <- filterWindowsGlobal(data, binned)$filter > log2(5)
     data <- data[keep,]
     ```
 
 3. Calculating normalization factors.
 
     ```{r}
-    binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
     data <- normFactors(binned, se.out=data)
     ```
 
 4. Identifying DB windows.
 
     ```{r}
+    library(edgeR)
     y <- asDGEList(data)
     y <- estimateDisp(y, design)
     fit <- glmQLFit(y, design, robust=TRUE)
