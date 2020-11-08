@@ -5,7 +5,7 @@ bibliography: ref.bib
 biblio-style: apalike
 link-citations: yes
 description: "Too awesome for a vignette, too technical for Mills & Boon."
-github-repo: Bioconductor/OrchestratingSingleCellAnalysis
+github-repo: LTLA/csawUsersGuide
 ---
 
 ```{r, echo=FALSE}

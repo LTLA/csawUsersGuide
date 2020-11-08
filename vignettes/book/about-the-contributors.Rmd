@@ -1,0 +1,15 @@
+# (PART) Appendix {-}
+
+# Contributors
+
+```{r setup, echo=FALSE, results="asis"}
+library(rebook)
+chapterPreamble()
+```
+
+### *Aaron Lun* {-}
+
+For twelve years, you have been asking: Who is Aaron Lun?
+
+Well, he's this guy [here](https://github.com/LTLA). 
+There, I spared you 60 boring pages of philosophical rambling.
