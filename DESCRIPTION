@@ -1,19 +1,10 @@
 Package: csawUsersGuide
-Version: 1.7.0
-Date: 2020-10-21
+Version: 1.7.1
+Date: 2020-11-25
 Title: csaw User's Guide
 Authors@R: person("Aaron", "Lun", role=c("aut", "cre"), email =
     "infinite.monkeys.with.keyboards@gmail.com")
-Suggests: csaw,
-    chipseqDBData,
-    edgeR,
-    TxDb.Mmusculus.UCSC.mm10.knownGene,
-    org.Mm.eg.db,
-    rtracklayer,
-    Rsamtools,
-    Gviz,
-    knitr,
-    BiocStyle
+Suggests: knitr, BiocStyle, BiocManager
 biocViews: Workflow, EpigeneticsWorkflow
 Description: A user's guide for the csaw package for detecting 
     differentially bound regions in ChIP-seq data. Describes how to
